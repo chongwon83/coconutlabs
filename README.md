@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CoconutLabs — Web
 
-## Getting Started
+Static landing page for CoconutLabs.xyz — AI coding efficiency leaderboard,
+cost-per-fix challenges, and verified workflow drops.
 
-First, run the development server:
+> **Status**: Hypothesis-validation prototype. Not a production product.
+
+---
+
+## Setup
 
 ```bash
+cd web
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Build
 
-## Learn More
+```bash
+npm run build   # TypeScript check + production bundle
+npm run start   # Serve production build
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Next.js 16** (App Router, TypeScript)
+- **Tailwind CSS v4** (config-less, `@theme` tokens in `globals.css`)
+- **React 19** (via Next.js canary)
+- Fonts: Inter + JetBrains Mono via `next/font/google`
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+web/
+├── app/
+│   ├── layout.tsx        # Fonts + metadata
+│   ├── page.tsx          # Thin server component → LandingApp
+│   └── globals.css       # Design tokens + ported skin CSS
+├── components/
+│   ├── LandingApp.tsx    # 'use client' shell (toast, modal state)
+│   ├── Nav.tsx
+│   ├── StatusBar.tsx
+│   ├── Hero.tsx          # Includes ProductShot, HeroSecondaryCard
+│   ├── Ticker.tsx
+│   ├── BurnIndexSection.tsx
+│   ├── ChallengeSection.tsx  # Includes CodePanel, Stat
+│   ├── BuildersSection.tsx   # Includes ActivityFeed
+│   ├── DropsSection.tsx
+│   ├── TrustSection.tsx
+│   ├── FinalCTA.tsx
+│   ├── Footer.tsx
+│   ├── Toast.tsx
+│   ├── Sparkline.tsx
+│   ├── primitives/       # Icon, Button, Badge, VerifBadge, Avatar, Trend
+│   └── forms/
+│       ├── JoinBurnIndexForm.tsx     # Placeholder, local state only
+│       └── ChallengeInviteForm.tsx   # Placeholder, local state only
+├── lib/
+│   └── data.ts           # Types + static data + sparkFor()
+├── docs/
+│   └── usage-poc.md      # Track B manual guide
+└── tools/usage-poc/
+    ├── env-info.sh
+    ├── discover-logs.sh
+    ├── search-marker.sh
+    └── inspect-fields.sh
+```
+
+---
+
+## Track B — CLI usage PoC
+
+See `docs/usage-poc.md` for the step-by-step guide to validate the
+device-side collection hypothesis.
+
+```bash
+cd tools/usage-poc
+chmod +x *.sh
+./env-info.sh
+./discover-logs.sh
+./search-marker.sh
+./inspect-fields.sh <path>
+```
+
+**Security**: scripts output file names, paths, and field names only.
+Log file contents are never printed.
+
+---
+
+## What this prototype does NOT include
+
+- Real authentication or account system
+- Payment / marketplace
+- Actual CLI collector or API integration
+- Executable workflow installation
+- Any server-side data storage
+
+Forms submit locally and trigger a toast confirmation only.
