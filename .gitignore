@@ -43,3 +43,6 @@ next-env.d.ts
 # python
 __pycache__/
 *.pyc
+
+# workflow (개인 진행 상태 — 솔로 프로젝트)
+docs/workflow-state.md
