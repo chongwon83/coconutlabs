@@ -134,3 +134,74 @@ specific whitelisted keys (`input_tokens`, `output_tokens`, `model`, `timestamp`
 - 두 로그 파일 모두 본문(content/message/payload)에 raw text를 포함하므로,
   collector는 반드시 화이트리스트 키만 파싱하고 객체 통째 직렬화는 금지.
 
+---
+
+## 단가표 검증 (model-pricing.json, 2026-05-18)
+
+> "Estimated" 등급의 cost 추정은 `tools/usage-poc/model-pricing.json` 단가표에 의존.
+> 사용자가 Claude·ChatGPT의 다양한 현행/레거시 모델을 쓰므로 전 모델 단가를
+> 공식 페이지 + 제3자 집계 사이트로 교차검증한 결과.
+
+### 검증 방법
+
+- **1차(공식)**: Anthropic·OpenAI 공식 가격 페이지 직접 대조
+- **2차(교차)**: 공식 페이지 미게재 레거시 모델은 modelpricing.ai + pricepertoken.com
+  2개 출처로 교차확인 (다수결 + 공식 정합 기준)
+- 단가 수치만 기록 — 로그 본문/raw prompt/source 미포함
+
+### Claude — 11행, 공식 페이지 100% 일치
+
+| 모델 키 | input / 5m / 1h / cache_read / output | 판정 |
+|---------|---------------------------------------|------|
+| claude-opus-4-7 / -4-6 / -4-5 | 5 / 6.25 / 10 / 0.5 / 25 | 공식 일치 |
+| claude-opus-4-1 / claude-opus-4 (deprecated) | 15 / 18.75 / 30 / 1.5 / 75 | 공식 일치 |
+| claude-sonnet-4-6 / -4-5 / -4 (deprecated) | 3 / 3.75 / 6 / 0.3 / 15 | 공식 일치 |
+| claude-haiku-4-5 | 1 / 1.25 / 2 / 0.1 / 5 | 공식 일치 |
+| claude-haiku-3-5 (retired) | 0.8 / 1 / 1.6 / 0.08 / 4 | 공식 일치 |
+
+- cache 배수(5m=1.25×, 1h=2×, read=0.1× base input)도 공식 명시 규칙과 일치.
+- minor 버전별 단가 분리 확인: Opus 4.7~4.5=$5 vs 4.1~4.0=$15 (3배 차) →
+  와일드카드 키 폐기, `match_model` longest-prefix로 정확 분기.
+
+### OpenAI/Codex — 19행, 교차검증 완료
+
+| 모델 키 | input / cached_input / output | 검증 출처 |
+|---------|-------------------------------|-----------|
+| gpt-5.5 | 5 / 0.5 / 30 | 공식 |
+| gpt-5.5-pro | 30 / 30 / 180 | 공식 (cached 할인 없음) |
+| gpt-5.4 | 2.5 / 0.25 / 15 | 공식 |
+| gpt-5.4-pro | 30 / 30 / 180 | 공식 (cached 할인 없음) |
+| gpt-5.4-mini | 0.75 / 0.075 / 4.5 | 공식 |
+| gpt-5.4-nano | 0.2 / 0.02 / 1.25 | 공식 |
+| gpt-5.3-codex | 1.75 / 0.175 / 14 | 공식 |
+| gpt-5.2-codex | 1.75 / 0.175 / 14 | modelpricing.ai |
+| gpt-5-codex | 1.25 / 0.125 / 10 | modelpricing + pricepertoken |
+| gpt-5 | 1.25 / 0.125 / 10 | 2개 출처 일치 |
+| gpt-5-mini | 0.25 / 0.025 / 2 | 2개 출처 일치 |
+| gpt-5-nano | 0.05 / 0.005 / 0.4 | 2개 출처 일치 |
+| gpt-4.1 | 2 / 0.5 / 8 | 3개 출처 일치 |
+| gpt-4.1-mini | 0.4 / 0.1 / 1.6 | modelpricing + WebSearch |
+| gpt-4.1-nano | 0.1 / 0.025 / 0.4 | modelpricing + WebSearch |
+| gpt-4o | 2.5 / 1.25 / 10 | 2개 출처 일치 |
+| o3 | 2 / 0.5 / 8 | 3개 출처 일치 |
+| o4-mini | 1.1 / 0.275 / 4.4 | 2개 출처 일치 |
+
+- `pro` 모델(gpt-5.5-pro / 5.4-pro)은 공식 표기 "Cached Input —"(할인 없음) →
+  `cached_input == input`(=30)으로 설정. naive 10% 적용 시 가짜 90% 할인 발생.
+- gpt-5 세대는 `cached_input = input × 0.1`(공식 10% 룰). gpt-4 세대(4.1/4o/o3/
+  o4-mini)는 10% 룰 이전 모델로 자체 공식 cached 가격(25~50%) 사용.
+
+### 검증 중 발견한 출처 충돌 1건
+
+`pricepertoken.com`이 gpt-4.1-mini를 `0.2/0.8`, gpt-4.1-nano를 `0.05/0.2`로 표기
+(내 표의 약 절반). modelpricing.ai·WebSearch·공식 정합 모두 `0.4/1.6`·`0.1/0.4`로
+일치 → `pricepertoken.com`을 outlier(오류)로 판정, 다수결 값 채택.
+
+### 판정
+
+**전 30행(claude 11 + codex 19) 검증 통과 — 수정할 단가 없음.** 커밋 `c72ecb0`
+(`fix(usage-poc): correct and expand model pricing table`)이 공식 기준 최신 상태.
+
+- 출처: `model-pricing.json._source` 2개 URL (공식 페이지) + 교차검증 2개 사이트
+- 재검증 주기: 단가 변동 가능 → `_pricing_as_of` 날짜 기준 분기별 재대조 권장
+
