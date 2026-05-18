@@ -1,0 +1,15 @@
+{
+  "_pricing_as_of": "2026-05-18",
+  "_note": "USD per 1M tokens. PoC estimation table — verify against official provider pricing before relying on. Prices change.",
+  "_match": "Model name is prefix-matched (e.g. claude-opus-4-7 -> claude-opus-4-x). Unmatched model falls back to provider _default with price_confidence=low.",
+  "claude": {
+    "claude-opus-4-x":   { "input": 15, "output": 75, "cache_read": 1.5, "cache_write_5m": 18.75, "cache_write_1h": 30 },
+    "claude-sonnet-4-x": { "input": 3,  "output": 15, "cache_read": 0.3, "cache_write_5m": 3.75,  "cache_write_1h": 6 },
+    "claude-haiku-4-5":  { "input": 1,  "output": 5,  "cache_read": 0.1, "cache_write_5m": 1.25,  "cache_write_1h": 2 },
+    "_default":          { "input": 3,  "output": 15, "cache_read": 0.3, "cache_write_5m": 3.75,  "cache_write_1h": 6 }
+  },
+  "codex": {
+    "gpt-5-codex": { "input": 1.25, "cached_input": 0.125, "output": 10 },
+    "_default":    { "input": 1.25, "cached_input": 0.125, "output": 10 }
+  }
+}
