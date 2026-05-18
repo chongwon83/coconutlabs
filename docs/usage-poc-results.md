@@ -88,3 +88,49 @@ specific whitelisted keys (`input_tokens`, `output_tokens`, `model`, `timestamp`
   initially (`assert divide(5, 0) is None`), giving the agent a real bug to fix.
 - `tools/usage-poc/inspect-fields.sh` line 65: macOS BSD `grep -coi` emits
   multi-line counts; replaced with `grep -oi ... | wc -l | tr -d ' '`.
+
+---
+
+## 오늘 스펙 결과 (item 8)
+
+> 2026-05-18 스펙 item 7의 고정 필드 목록(12개)을 marker 로그에 대조한 결과.
+> 필드명·경로·형식만 기록 — 로그 본문/raw prompt/source 미포함.
+
+```
+[환경]
+- OS:               macOS 26.4.1 (Darwin 25.4.0, arm64)
+- claude --version: 2.1.143
+- codex --version:  codex-cli 0.128.0
+
+[Claude Code]
+- marker 포함 파일 발견 여부: 발견
+- 후보 파일 경로:            ~/.claude/projects/<path-slug>/<uuid>.jsonl
+- 파일 형식:                 JSONL (line-delimited JSON, 텍스트)
+- 발견된 usage 필드:         input_tokens, output_tokens,
+                             cache_read(_input_tokens), cache_creation(_input_tokens),
+                             model, session(Id), usage
+- 미발견 (item 7 목록 중):   cached_tokens, total_tokens, tokens, cost, usd
+- CLI 화면 usage/cost 표시:  없음 (headless `claude -p` 출력에 요약 없음)
+
+[Codex]
+- marker 포함 파일 발견 여부: 발견
+- 후보 파일 경로:            ~/.codex/sessions/YYYY/MM/DD/rollout-<ISO8601>-<uuid>.jsonl
+- 파일 형식:                 JSONL (line-delimited JSON, 텍스트)
+- 발견된 usage 필드:         input_tokens, output_tokens, total_tokens, tokens,
+                             model, session
+                             (목록 외: cached_input_tokens, reasoning_output_tokens,
+                              rate_limits, plan_type, credits 도 존재)
+- 미발견 (item 7 목록 중):   cache_read, cache_creation, cached_tokens, cost, usd, usage
+- CLI 화면 usage/cost 표시:  있음 ("tokens used: 16,514" 인라인 출력)
+```
+
+### 성공/실패 판정
+
+**성공 기준 충족** — Claude Code·Codex 양쪽 모두 로컬 로그에 usage 필드(토큰/모델/세션)
+보유. JSONL 텍스트 포맷이라 키 단위 파싱으로 원본 prompt/code 없이 summary 추출 가능.
+
+- `cost`/`usd` 직접 필드는 양쪽 모두 없음 → 토큰 수 × 모델 단가로 **추정**
+  (랜딩 페이지의 "Estimated" 검증 등급에 해당).
+- 두 로그 파일 모두 본문(content/message/payload)에 raw text를 포함하므로,
+  collector는 반드시 화이트리스트 키만 파싱하고 객체 통째 직렬화는 금지.
+
