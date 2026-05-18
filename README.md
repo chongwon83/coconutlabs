@@ -72,7 +72,9 @@ web/
     ├── env-info.sh
     ├── discover-logs.sh
     ├── search-marker.sh
-    └── inspect-fields.sh
+    ├── inspect-fields.sh
+    ├── estimate_cost.py     # Token-count → USD cost estimator
+    └── model-pricing.json   # Model pricing table (USD / 1M tokens)
 ```
 
 ---
@@ -91,8 +93,26 @@ chmod +x *.sh
 ./inspect-fields.sh <path>
 ```
 
+### Cost estimation
+
+`estimate_cost.py` converts token counts to estimated USD cost (the
+"Estimated" verification tier) using `model-pricing.json`.
+
+```bash
+# Single session log
+./estimate_cost.py <log-file> [--tool claude|codex] [--json]
+
+# Aggregate every local session (~/.claude/projects, ~/.codex/sessions)
+./estimate_cost.py --all [--json]
+```
+
+`--all` globs all standard log directories, sums token usage per
+`(tool, model)`, and prints per-model rows plus a grand total. Empty or
+unparseable files are skipped and counted. Add `--json` for machine output.
+
 **Security**: scripts output file names, paths, and field names only.
-Log file contents are never printed.
+`estimate_cost.py` reads only whitelisted numeric token keys and emits
+aggregates only — never prompt, response, or source-code content.
 
 ---
 
