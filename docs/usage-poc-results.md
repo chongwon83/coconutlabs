@@ -88,6 +88,8 @@ specific whitelisted keys (`input_tokens`, `output_tokens`, `model`, `timestamp`
   initially (`assert divide(5, 0) is None`), giving the agent a real bug to fix.
 - `tools/usage-poc/inspect-fields.sh` line 65: macOS BSD `grep -coi` emits
   multi-line counts; replaced with `grep -oi ... | wc -l | tr -d ' '`.
+- `tools/usage-poc/estimate_cost.py` (커밋 `78c2598`): cost round 6 → 4자리.
+  `json.dumps`가 1e-4 미만 float을 지수 표기(`7.5e-05`)로 직렬화 → plain decimal 보장.
 
 ---
 
