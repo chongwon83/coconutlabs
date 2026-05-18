@@ -149,8 +149,10 @@ def build_result(tool: str, path: Path, pricing: dict) -> dict:
         "model": model,
         "token_totals": tok,
         "total_tokens": sum(tok.values()),
-        "estimated_cost_usd": round(sum(breakdown.values()), 6),
-        "cost_breakdown_usd": {k: round(v, 6) for k, v in breakdown.items()},
+        # round to 4 dp: json.dumps emits scientific notation for floats
+        # below 1e-4, so 4 is the deepest precision that stays plain decimal.
+        "estimated_cost_usd": round(sum(breakdown.values()), 4),
+        "cost_breakdown_usd": {k: round(v, 4) for k, v in breakdown.items()},
         "pricing_as_of": pricing.get("_pricing_as_of", "unknown"),
         "price_confidence": confidence,
     }
@@ -169,8 +171,8 @@ def print_table(r: dict) -> None:
     print(f"    {'TOTAL':<16} {r['total_tokens']:>12,}")
     print("  --- cost (USD) ---")
     for cat, c in r["cost_breakdown_usd"].items():
-        print(f"    {cat:<16} ${c:>12.6f}")
-    print(f"  estimated_cost_usd:  ${r['estimated_cost_usd']:.6f}")
+        print(f"    {cat:<16} ${c:>12.4f}")
+    print(f"  estimated_cost_usd:  ${r['estimated_cost_usd']:.4f}")
     if r["price_confidence"] == "low":
         print("  WARNING: model unmatched — used _default pricing.")
 
