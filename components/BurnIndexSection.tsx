@@ -75,7 +75,7 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
             <span className="lb-col-cost">Cost</span>
             <span className="lb-col-fixes">Fixes</span>
             <span className="lb-col-ves">VES</span>
-            <span className="lb-col-trend">7d</span>
+            <span className="lb-col-trend">Trend</span>
             <span className="lb-col-spark">Spark</span>
           </div>
 
@@ -120,7 +120,7 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
                 <span className="lb-col-cost">Cost</span>
                 <span className="lb-col-fixes">Fixes</span>
                 <span className="lb-col-ves">VES</span>
-                <span className="lb-col-trend">7d</span>
+                <span className="lb-col-trend">Trend</span>
                 <span className="lb-col-spark">Spark</span>
               </div>
 
