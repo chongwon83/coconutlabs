@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1",
+  "generatedAt": "2026-05-19T21:50:00+09:00",
+  "window": { "days": 7, "since": "2026-05-12T00:00:00", "until": "2026-05-19T21:50:00" },
+  "repo": "coconutlabs",
+  "branch": "main",
+  "metrics": {
+    "commits": 28,
+    "insertions": 14616,
+    "deletions": 607,
+    "filesChangedTop": [
+      { "path": "docs/decision/decision-log.md", "touches": 9 },
+      { "path": "lib/data.ts", "touches": 6 },
+      { "path": "tools/usage-poc/estimate_cost.py", "touches": 4 },
+      { "path": "components/forms/JoinBurnIndexForm.tsx", "touches": 4 },
+      { "path": "components/BurnIndexSection.tsx", "touches": 4 }
+    ],
+    "commitTypes": { "feat": 10, "fix": 4, "docs": 11, "chore": 2, "initial": 1 }
+  },
+  "authors": [
+    { "name": "chongwon83", "label": "You", "commits": 28 }
+  ],
+  "sessions": [
+    { "id": 1, "span": "2026-05-18 21:28 .. 2026-05-19 00:03", "commits": 15, "theme": "랜딩 페이지 + usage-poc 비용 추정 스크립트" },
+    { "id": 2, "span": "2026-05-19 10:02 .. 10:05", "commits": 2, "theme": "Burn Summary collector + S8 검증 사이클" },
+    { "id": 3, "span": "2026-05-19 12:45 .. 12:49", "commits": 2, "theme": "collector --period 캘린더 윈도우 필터" },
+    { "id": 4, "span": "2026-05-19 15:57 .. 18:17", "commits": 8, "theme": "리더보드 서버 store + challenge/VES + 7d-trend + week 수정" },
+    { "id": 5, "span": "2026-05-19 21:37", "commits": 1, "theme": "A-2 trend 주간 import 이력 기반 재설계" }
+  ],
+  "highlights": [
+    "A-2: 죽은 일일 cron(snapshot.mjs) 제거, trend를 handle별 주간 import 이력 모델로 재설계 — 직전 retro의 미해결 concern 해소",
+    "Codex 교차 리뷰가 비-week import 혼입·두 파일 비원자성 쓰기 등 설계 결함을 사전 검출 (검증 분리 원칙 실효)",
+    "route.ts 시그니처 불변 유지 — trendByHandle() 계약을 깨지 않고 데이터 소스만 교체"
+  ],
+  "concerns": [
+    "JSON 파일 store(leaderboard.json·import-history.json)는 배포 시 ephemeral FS → KV/Postgres 전환 필요 (미해결)",
+    "fixes 자동 검증 불가 — owner 수동 CLI 게이트에 의존 (미해결)",
+    "trend metric이 totalTokens 기반 — 'burn 증가 = 추이 상승' 프레이밍, usage trend 재라벨 후속 과제",
+    "최근 7 import ≠ 연속 7주 — PoC 한계로 문서화만 됨"
+  ],
+  "priorRetro": "2026-05-19.json"
+}

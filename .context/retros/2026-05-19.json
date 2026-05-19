@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1",
+  "generatedAt": "2026-05-19T18:30:00+09:00",
+  "window": { "days": 7, "since": "2026-05-12T00:00:00", "until": "2026-05-19T18:30:00" },
+  "repo": "coconutlabs",
+  "branch": "main",
+  "metrics": {
+    "commits": 27,
+    "insertions": 14514,
+    "deletions": 537,
+    "filesChangedTop": [
+      { "path": "docs/decision/decision-log.md", "touches": 8 },
+      { "path": "lib/data.ts", "touches": 5 },
+      { "path": "tools/usage-poc/estimate_cost.py", "touches": 4 },
+      { "path": "components/BurnIndexSection.tsx", "touches": 4 },
+      { "path": "components/forms/JoinBurnIndexForm.tsx", "touches": 4 }
+    ],
+    "commitTypes": { "feat": 9, "fix": 4, "docs": 11, "chore": 2, "initial": 1 }
+  },
+  "authors": [
+    { "name": "chongwon83", "label": "You", "commits": 27 }
+  ],
+  "sessions": [
+    { "id": 1, "span": "2026-05-18 21:28 .. 2026-05-19 00:03", "commits": 15, "theme": "랜딩 페이지 + usage-poc 비용 추정 스크립트" },
+    { "id": 2, "span": "2026-05-19 10:02 .. 10:05", "commits": 2, "theme": "Burn Summary collector + S8 검증 사이클" },
+    { "id": 3, "span": "2026-05-19 12:45 .. 12:49", "commits": 2, "theme": "collector --period 캘린더 윈도우 필터" },
+    { "id": 4, "span": "2026-05-19 15:57 .. 18:17", "commits": 8, "theme": "리더보드 서버 store + challenge/VES + 7d-trend + week 수정" }
+  ],
+  "highlights": [
+    "신규 npm 의존성 0으로 서버 사이드 리더보드 + VES 파이프라인 완주",
+    "Codex 교차 리뷰가 동시성·이중합산 결함 2건 검출 (검증 분리 원칙 실효)",
+    "collector week를 직전 완료 주로 수정 — importer 간 공정성 확보"
+  ],
+  "concerns": [
+    "JSON 파일 store는 배포 시 ephemeral FS → KV 전환 필요 (미해결)",
+    "fixes 자동 검증 불가 — owner 수동 CLI 게이트에 의존",
+    "snapshot.mjs cron 미등록 → 7d-trend 데이터 누적 안 됨"
+  ]
+}
