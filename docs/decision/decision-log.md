@@ -55,3 +55,20 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 다음엔 무엇을 바꿀까: `parse_claude`는 세션당 단일 모델을 가정(파일 전체를
   마지막 비-synthetic 모델로 합산). 한 세션이 모델을 바꾸면 여전히 한 모델로
   몰림 — 알려진 한계. 정확도 필요 시 라인 단위 모델 귀속으로 전환.
+
+---
+
+### 2026-05-19 collector S8 검증 — Codex 교차 리뷰 P2-4 잔여 이견
+
+- 문제: `parsers.py`의 `ValueError(f"...{path.name}")` 예외 메시지에 파일명이
+  들어가는 것을 Codex가 "경로 노출 유출 경로 후보"(P2-4)로 지적.
+- 버린 대안: 예외 메시지에서 `path.name`을 완전 제거 — 디버깅 시 어느 로그
+  파일이 깨졌는지 추적 불가, 운영성 저하.
+- 핵심 트레이드오프: 예외 메시지 디버깅 정보 vs 이론적 유출 표면.
+- 선택 이유 (owner 최종 판정, 2라운드 한도 도달): 핸드오프 §8 금칙 대상은
+  **업로드되는 envelope**. `path.name`은 UUID 파일명(경로 아님) + 로컬 stderr
+  전용이라 envelope에 직렬화되지 않음. `PRICING_PATH`는 고정 패키지 경로로
+  사용자 데이터 무관. envelope-only 정책상 유출 아님 → by-design 유지.
+- 강한 증거: A3 금칙어 grep이 실 로그 기반 envelope(`/tmp/cc_env.json`)에서
+  `/Users/`·경로·content 토큰 0건 확인. Codex도 "scope-dependent 잔여 이견"
+  으로 분류 — 정책 경계(envelope vs 프로세스 전체) 차이일 뿐 결함 아님.

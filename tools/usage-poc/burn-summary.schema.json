@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coconutlabs.xyz/schemas/burn-summary.v1.json",
+  "title": "CoconutLabs Burn Summary",
+  "description": "Device-side aggregated AI coding token usage. Uploadable fields ONLY (handoff §8): tool, model, token count, estimated cost, timestamp bucket, session count, active day, project hash, verification level. No raw prompt/response/source/path/repo-name/secret keys ever appear here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "rows", "grandTotal"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "generatedAt": {
+      "type": "string",
+      "description": "ISO 8601 UTC timestamp of when this summary was generated.",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/burnSummaryRow" }
+    },
+    "grandTotal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalTokens", "estimatedCostUsd"],
+      "properties": {
+        "totalTokens": { "type": "integer", "minimum": 0 },
+        "estimatedCostUsd": { "type": "number", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "burnSummaryRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool", "model", "tokenCount", "totalTokens", "estimatedCostUsd",
+        "timestampBucket", "sessionCount", "activeDays", "projectHash", "verification"
+      ],
+      "properties": {
+        "tool": { "enum": ["claude-code", "codex"] },
+        "model": {
+          "type": "string",
+          "description": "Provider model identifier (not secret). Charset-restricted so a tampered file cannot smuggle a path/secret here.",
+          "pattern": "\\A[A-Za-z0-9][A-Za-z0-9._-]{0,79}\\Z"
+        },
+        "tokenCount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["input", "output", "cacheRead", "cacheWrite", "cachedInput"],
+          "properties": {
+            "input": { "type": "integer", "minimum": 0 },
+            "output": { "type": "integer", "minimum": 0 },
+            "cacheRead": { "type": "integer", "minimum": 0 },
+            "cacheWrite": { "type": "integer", "minimum": 0 },
+            "cachedInput": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "totalTokens": { "type": "integer", "minimum": 0 },
+        "estimatedCostUsd": { "type": "number", "minimum": 0 },
+        "timestampBucket": {
+          "type": "string",
+          "description": "UTC day bucket.",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "sessionCount": { "type": "integer", "minimum": 0 },
+        "activeDays": { "type": "integer", "minimum": 0 },
+        "projectHash": {
+          "type": "string",
+          "description": "sha256(deviceSalt + ':' + projectSlug)[:12]. Salt stays device-local, never uploaded.",
+          "pattern": "^[0-9a-f]{12}$"
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tokenSource", "costBasis", "priceConfidence", "level"],
+          "properties": {
+            "tokenSource": { "enum": ["device", "self"] },
+            "costBasis": { "enum": ["estimated", "native"] },
+            "priceConfidence": { "enum": ["high", "low"] },
+            "level": {
+              "enum": ["Provider-synced", "Device-synced", "Estimated", "Self-reported"],
+              "description": "Display hint only. Consumers MUST recompute from the three input axes."
+            }
+          }
+        }
+      }
+    }
+  }
+}

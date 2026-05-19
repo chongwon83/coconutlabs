@@ -1,0 +1,168 @@
+// validateSummary.ts — client-side validation of an uploaded Burn Summary.
+//
+// The Burn Index import flow is purely local: a user pastes or uploads a
+// JSON envelope produced by the CoconutLabs collector. Before we render it
+// we verify it matches BurnSummaryEnvelope exactly — right shape, the 9
+// whitelist fields per row, and NO unexpected keys anywhere. Rejecting
+// unknown keys is the client-side mirror of the schema's
+// `additionalProperties: false`: it guarantees a tampered file carrying raw
+// content / file paths / secrets cannot smuggle extra data into the UI.
+
+import type {
+  BurnSummary,
+  BurnSummaryEnvelope,
+  BurnTokenCount,
+  BurnVerification,
+} from "@/lib/data";
+
+export type ValidationResult =
+  | { ok: true; envelope: BurnSummaryEnvelope }
+  | { ok: false; error: string };
+
+const ENVELOPE_KEYS = ["schemaVersion", "generatedAt", "rows", "grandTotal"];
+const GRAND_TOTAL_KEYS = ["totalTokens", "estimatedCostUsd"];
+const ROW_KEYS = [
+  "tool", "model", "tokenCount", "totalTokens", "estimatedCostUsd",
+  "timestampBucket", "sessionCount", "activeDays", "projectHash",
+  "verification",
+];
+const TOKEN_COUNT_KEYS = [
+  "input", "output", "cacheRead", "cacheWrite", "cachedInput",
+];
+const VERIFICATION_KEYS = ["tokenSource", "costBasis", "priceConfidence", "level"];
+
+// A model id is a short token like "claude-opus-4-7". Charset-restricted so
+// a tampered file cannot smuggle a path/command/secret into this field —
+// the client mirror of the collector's _safe_model and the schema pattern.
+const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
+
+const TOOLS = ["claude-code", "codex"];
+const TOKEN_SOURCES = ["device", "self"];
+const COST_BASES = ["estimated", "native"];
+const PRICE_CONFIDENCES = ["high", "low"];
+const LEVELS = ["Provider-synced", "Device-synced", "Estimated", "Self-reported"];
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+// Returns the name of the first key not in `allowed`, or null if clean.
+function unexpectedKey(obj: Record<string, unknown>, allowed: string[]): string | null {
+  for (const k of Object.keys(obj)) {
+    if (!allowed.includes(k)) return k;
+  }
+  return null;
+}
+
+function isIntAtLeastZero(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v >= 0;
+}
+
+function isFiniteNonNeg(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0;
+}
+
+function checkTokenCount(tc: unknown, where: string): string | null {
+  if (!isObject(tc)) return `${where}.tokenCount must be an object`;
+  const bad = unexpectedKey(tc, TOKEN_COUNT_KEYS);
+  if (bad) return `${where}.tokenCount has unexpected key "${bad}"`;
+  for (const k of TOKEN_COUNT_KEYS) {
+    if (!isIntAtLeastZero(tc[k])) return `${where}.tokenCount.${k} must be an integer ≥ 0`;
+  }
+  return null;
+}
+
+function checkVerification(v: unknown, where: string): string | null {
+  if (!isObject(v)) return `${where}.verification must be an object`;
+  const bad = unexpectedKey(v, VERIFICATION_KEYS);
+  if (bad) return `${where}.verification has unexpected key "${bad}"`;
+  if (!TOKEN_SOURCES.includes(v.tokenSource as string))
+    return `${where}.verification.tokenSource is invalid`;
+  if (!COST_BASES.includes(v.costBasis as string))
+    return `${where}.verification.costBasis is invalid`;
+  if (!PRICE_CONFIDENCES.includes(v.priceConfidence as string))
+    return `${where}.verification.priceConfidence is invalid`;
+  if (!LEVELS.includes(v.level as string))
+    return `${where}.verification.level is invalid`;
+  return null;
+}
+
+function checkRow(row: unknown, i: number): string | null {
+  const where = `rows[${i}]`;
+  if (!isObject(row)) return `${where} must be an object`;
+  const bad = unexpectedKey(row, ROW_KEYS);
+  if (bad) return `${where} has unexpected key "${bad}" — only the 9 whitelist fields are allowed`;
+  if (!TOOLS.includes(row.tool as string)) return `${where}.tool is invalid`;
+  if (typeof row.model !== "string" || !MODEL_RE.test(row.model))
+    return `${where}.model must be a model identifier (letters, digits, . _ -; 1–80 chars)`;
+  const tcErr = checkTokenCount(row.tokenCount, where);
+  if (tcErr) return tcErr;
+  if (!isIntAtLeastZero(row.totalTokens)) return `${where}.totalTokens must be an integer ≥ 0`;
+  // totalTokens must equal the sum of its five tokenCount components — the
+  // collector guarantees this, so a mismatch means the file was tampered.
+  const tc = row.tokenCount as Record<string, number>;
+  const tcSum = TOKEN_COUNT_KEYS.reduce((s, k) => s + tc[k], 0);
+  if (row.totalTokens !== tcSum)
+    return `${where}.totalTokens (${row.totalTokens}) does not equal the sum of tokenCount (${tcSum})`;
+  if (!isFiniteNonNeg(row.estimatedCostUsd)) return `${where}.estimatedCostUsd must be a number ≥ 0`;
+  if (typeof row.timestampBucket !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.timestampBucket))
+    return `${where}.timestampBucket must be a YYYY-MM-DD date`;
+  if (!isIntAtLeastZero(row.sessionCount)) return `${where}.sessionCount must be an integer ≥ 0`;
+  if (!isIntAtLeastZero(row.activeDays)) return `${where}.activeDays must be an integer ≥ 0`;
+  if (typeof row.projectHash !== "string" || !/^[0-9a-f]{12}$/.test(row.projectHash))
+    return `${where}.projectHash must be 12 lowercase hex chars`;
+  const vErr = checkVerification(row.verification, where);
+  if (vErr) return vErr;
+  return null;
+}
+
+// Parse + validate a raw JSON string into a BurnSummaryEnvelope.
+export function validateSummary(raw: string): ValidationResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "Not valid JSON — check the file or pasted text." };
+  }
+  if (!isObject(parsed)) return { ok: false, error: "Top level must be a JSON object." };
+
+  const bad = unexpectedKey(parsed, ENVELOPE_KEYS);
+  if (bad) return { ok: false, error: `Envelope has unexpected key "${bad}".` };
+
+  if (parsed.schemaVersion !== "1")
+    return { ok: false, error: 'schemaVersion must be "1".' };
+  if (typeof parsed.generatedAt !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(parsed.generatedAt))
+    return { ok: false, error: "generatedAt must be an ISO-8601 UTC timestamp." };
+
+  if (!Array.isArray(parsed.rows)) return { ok: false, error: "rows must be an array." };
+  if (parsed.rows.length === 0) return { ok: false, error: "rows is empty — nothing to import." };
+  for (let i = 0; i < parsed.rows.length; i++) {
+    const err = checkRow(parsed.rows[i], i);
+    if (err) return { ok: false, error: err };
+  }
+
+  const gt = parsed.grandTotal;
+  if (!isObject(gt)) return { ok: false, error: "grandTotal must be an object." };
+  const gtBad = unexpectedKey(gt, GRAND_TOTAL_KEYS);
+  if (gtBad) return { ok: false, error: `grandTotal has unexpected key "${gtBad}".` };
+  if (!isIntAtLeastZero(gt.totalTokens))
+    return { ok: false, error: "grandTotal.totalTokens must be an integer ≥ 0." };
+  if (!isFiniteNonNeg(gt.estimatedCostUsd))
+    return { ok: false, error: "grandTotal.estimatedCostUsd must be a number ≥ 0." };
+
+  // grandTotal.totalTokens must equal the sum of every row's totalTokens.
+  const rowsTotal = (parsed.rows as { totalTokens: number }[])
+    .reduce((s, r) => s + r.totalTokens, 0);
+  if (gt.totalTokens !== rowsTotal)
+    return {
+      ok: false,
+      error: `grandTotal.totalTokens (${gt.totalTokens}) does not equal the sum of row totals (${rowsTotal}).`,
+    };
+
+  // Shape is proven — the cast is now safe.
+  return { ok: true, envelope: parsed as unknown as BurnSummaryEnvelope };
+}
+
+// Re-exported for convenience in consuming components.
+export type { BurnSummary, BurnSummaryEnvelope, BurnTokenCount, BurnVerification };

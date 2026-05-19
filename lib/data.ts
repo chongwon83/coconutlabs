@@ -192,6 +192,60 @@ export const V3_TRUST: TrustItem[] = [
   },
 ];
 
+// --- Burn Summary (collector output contract) ---
+// Mirrors web/tools/usage-poc/burn-summary.schema.json. The 9 uploadable
+// fields from handoff §8 — no raw content keys ever appear here.
+
+export type TokenSource = "device" | "self";
+export type CostBasis = "estimated" | "native";
+export type PriceConfidence = "high" | "low";
+
+export interface BurnVerification {
+  tokenSource: TokenSource;
+  costBasis: CostBasis;
+  priceConfidence: PriceConfidence;
+  level: VerifLevel; // display hint only — consumers recompute via deriveVerifLevel
+}
+
+export interface BurnTokenCount {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cachedInput: number;
+}
+
+export interface BurnSummary {
+  tool: "claude-code" | "codex";
+  model: string;
+  tokenCount: BurnTokenCount;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  timestampBucket: string; // "YYYY-MM-DD" UTC day
+  sessionCount: number;
+  activeDays: number;
+  projectHash: string; // 12-hex sha256(salt:slug) prefix
+  verification: BurnVerification;
+}
+
+export interface BurnSummaryEnvelope {
+  schemaVersion: "1";
+  generatedAt: string;
+  rows: BurnSummary[];
+  grandTotal: { totalTokens: number; estimatedCostUsd: number };
+}
+
+// Recompute the display verification level from the two orthogonal axes +
+// price confidence. The file's `verification.level` is an untrusted hint —
+// consumers MUST call this rather than read it. See
+// web/docs/decision/coconutlabs-verification-model.md §0-A.
+export function deriveVerifLevel(v: BurnVerification): VerifLevel {
+  if (v.tokenSource === "self") return "Self-reported";
+  if (v.costBasis === "native") return "Provider-synced";
+  // device + estimated: unmatched model price downgrades to Estimated
+  return v.priceConfidence === "high" ? "Device-synced" : "Estimated";
+}
+
 // Deterministic sparkline seed — LCG with handle as seed
 export function sparkFor(handle: string): number[] {
   let seed = 0;

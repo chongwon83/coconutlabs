@@ -4,13 +4,17 @@
 Reads a Claude Code or Codex CLI session JSONL log and estimates USD cost
 from token counts x model pricing (the "Estimated" verification tier).
 
-SECURITY: parsing a JSONL line necessarily materializes the whole record,
-but this script only ever *extracts* whitelisted numeric token keys and
-*outputs* aggregates — it never reads, serializes, or emits
+This is now a thin CLI shim: the parsing primitives (load_pricing,
+match_model, detect_tool, find_logs, cost_breakdown, parse_claude,
+parse_codex) live in coconut_collector/parsers.py and are shared with the
+collector. The aggregation + table output below are unchanged so the PoC
+report stays byte-identical.
+
+SECURITY: parsers only ever extract whitelisted numeric token keys,
+timestamps, model names, and project-path slugs (hash input only) — never
 content / message.content / payload text fields. Output is the same
 whitelist the real collector would upload. --all mode globs the standard
-log directories (~/.claude/projects, ~/.codex/sessions); the same
-whitelist applies to every file.
+log directories (~/.claude/projects, ~/.codex/sessions).
 
 Usage:
     ./estimate_cost.py <log-file> [--tool claude|codex] [--json]
@@ -21,134 +25,35 @@ import json
 import sys
 from pathlib import Path
 
-PRICING_PATH = Path(__file__).parent / "model-pricing.json"
+from coconut_collector.parsers import cost_breakdown  # noqa: F401
+from coconut_collector.parsers import (find_logs, match_model, parse_claude,
+                                       parse_codex)
+from coconut_collector.parsers import detect_tool as _detect_tool
+from coconut_collector.parsers import load_pricing as _load_pricing
 
 
 def load_pricing() -> dict:
-    """Load the model pricing table."""
+    """Load the model pricing table (exits 1 on failure, as the PoC did)."""
     try:
-        with open(PRICING_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error: cannot load pricing table: {e}", file=sys.stderr)
+        return _load_pricing()
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-def match_model(provider_table: dict, model: str) -> tuple[dict, str]:
-    """Prefix-match a model name to a pricing row (longest prefix wins).
-
-    A key's prefix must match at a hyphen boundary, so 'claude-opus-4-x'
-    matches 'claude-opus-4-7' but not 'claude-opus-40'. Longest-prefix-wins
-    removes order-dependency. Unmatched -> _default + 'low' confidence.
-    """
-    candidates = []
-    for key, row in provider_table.items():
-        if key == "_default":
-            continue
-        prefix = key[:-2] if key.endswith("-x") else key
-        if model == prefix or model.startswith(prefix + "-"):
-            candidates.append((len(prefix), row))
-    if candidates:
-        candidates.sort(key=lambda c: c[0], reverse=True)
-        return candidates[0][1], "high"
-    return provider_table.get("_default", {}), "low"
-
-
 def detect_tool(path: Path) -> str:
-    """Auto-detect claude vs codex from the log file path."""
-    p = str(path)
-    if ".codex" in p or path.name.startswith("rollout-"):
-        return "codex"
-    if ".claude" in p or "/projects/" in p:
-        return "claude"
-    # Fallback: sniff first matching line.
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            if '"token_count"' in line:
-                return "codex"
-            if '"type":"assistant"' in line or '"type": "assistant"' in line:
-                return "claude"
-    print("Error: cannot auto-detect tool; pass --tool", file=sys.stderr)
-    sys.exit(1)
-
-
-def parse_claude(path: Path) -> tuple[str, dict]:
-    """Sum per-message usage across all assistant lines (per-message billing)."""
-    model = "unknown"
-    tok = {"input": 0, "output": 0, "cache_read": 0,
-           "cache_write_5m": 0, "cache_write_1h": 0}
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            msg = obj.get("message")
-            if obj.get("type") != "assistant" or not isinstance(msg, dict):
-                continue
-            usage = msg.get("usage")
-            if not isinstance(usage, dict):
-                continue
-            # <synthetic> lines carry a usage dict but 0 tokens; never let
-            # one overwrite the real model or the file's whole token sum
-            # gets mis-attributed to a bogus '<synthetic>' group.
-            m = msg.get("model")
-            if m and m != "<synthetic>":
-                model = m
-            cc = usage.get("cache_creation") or {}
-            tok["input"] += usage.get("input_tokens", 0)
-            tok["output"] += usage.get("output_tokens", 0)
-            tok["cache_read"] += usage.get("cache_read_input_tokens", 0)
-            tok["cache_write_5m"] += cc.get("ephemeral_5m_input_tokens", 0)
-            tok["cache_write_1h"] += cc.get("ephemeral_1h_input_tokens", 0)
-    return model, tok
-
-
-def parse_codex(path: Path) -> tuple[str, dict]:
-    """Take the final token_count event (total_token_usage is cumulative)."""
-    model = "unknown"
-    final = None
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            payload = obj.get("payload")
-            if not isinstance(payload, dict):
-                continue
-            if payload.get("model"):
-                model = payload["model"]
-            if payload.get("type") == "token_count":
-                ttu = (payload.get("info") or {}).get("total_token_usage")
-                if isinstance(ttu, dict):
-                    final = ttu
-    if final is None:
-        raise ValueError(f"no token_count event in {path.name}")
-    cached = final.get("cached_input_tokens", 0)
-    # input_tokens includes cached_input_tokens as a subset -> split, no double-bill.
-    tok = {"input": max(final.get("input_tokens", 0) - cached, 0),
-           "cached_input": cached,
-           "output": final.get("output_tokens", 0)}
-    return model, tok
-
-
-def cost_breakdown(tok: dict, price: dict) -> dict:
-    """tokens x price / 1e6 per category."""
-    return {cat: tok[cat] * price.get(cat, 0) / 1_000_000
-            for cat in tok if cat in price}
+    """Auto-detect claude vs codex (exits 1 on failure, as the PoC did)."""
+    try:
+        return _detect_tool(path)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def build_result(tool: str, path: Path, pricing: dict) -> dict:
     """Parse the log and assemble the aggregate-only result."""
-    model, tok = (parse_claude(path) if tool == "claude"
-                  else parse_codex(path))
+    sp = parse_claude(path) if tool == "claude" else parse_codex(path)
+    model, tok = sp.model, sp.tokens
     price, confidence = match_model(pricing.get(tool, {}), model)
     breakdown = cost_breakdown(tok, price)
     return {
@@ -163,16 +68,6 @@ def build_result(tool: str, path: Path, pricing: dict) -> dict:
         "pricing_as_of": pricing.get("_pricing_as_of", "unknown"),
         "price_confidence": confidence,
     }
-
-
-CLAUDE_LOG_GLOB = ("~/.claude/projects", "*/*.jsonl")
-CODEX_LOG_GLOB = ("~/.codex/sessions", "*/*/*/rollout-*.jsonl")
-
-
-def find_logs(tool: str) -> list[Path]:
-    """Glob all local session logs for a tool (standard install paths)."""
-    base, pattern = CLAUDE_LOG_GLOB if tool == "claude" else CODEX_LOG_GLOB
-    return sorted(Path(base).expanduser().glob(pattern))
 
 
 def aggregate_sessions(pricing: dict) -> dict:
@@ -190,10 +85,11 @@ def aggregate_sessions(pricing: dict) -> dict:
         for path in find_logs(tool):
             scanned[tool]["files"] += 1
             try:
-                model, tok = parse(path)
+                sp = parse(path)
             except (ValueError, OSError, json.JSONDecodeError):
                 scanned[tool]["skipped"] += 1
                 continue
+            model, tok = sp.model, sp.tokens
             if sum(tok.values()) == 0:
                 scanned[tool]["skipped"] += 1
                 continue
