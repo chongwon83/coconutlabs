@@ -1,11 +1,17 @@
 // app/api/challenge/route.ts — challenge submission API.
 //
-// POST → a builder claims N fixes for a challenge. The claim is ALWAYS stored
-// unverified; it never touches the leaderboard's fixes/VES columns until the
-// owner runs scripts/verify-challenge.mjs. This endpoint only validates shape
-// and persists the claim — it makes no trust decision about the fixes count.
+// POST → a builder claims N fixes for a challenge. After shape validation the
+// endpoint runs two gates: a per-handle rate-limit (isRateLimited → 429) and
+// then triage (triageChallenge), which auto-verifies small claims and leaves
+// larger ones unverified for scripts/verify-challenge.mjs. The persisted
+// record carries triage's status/verifiedFixes/verifiedAt.
 
-import { addChallenge, type ChallengeRecord } from "@/lib/server/challenge";
+import {
+  addChallenge,
+  isRateLimited,
+  triageChallenge,
+  type ChallengeRecord,
+} from "@/lib/server/challenge";
 
 export const dynamic = "force-dynamic";
 
@@ -38,17 +44,28 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const record: ChallengeRecord = {
-    handle: handle.trim(),
-    challenge: challenge.trim(),
-    claimedFixes,
-    status: "unverified",
-    verifiedFixes: null,
-    submittedAt: new Date().toISOString(),
-    verifiedAt: null,
-  };
+  const cleanHandle = handle.trim();
+  const now = new Date().toISOString();
 
   try {
+    if (await isRateLimited(cleanHandle, now)) {
+      return Response.json(
+        { error: "Too many submissions. Try again later." },
+        { status: 429 },
+      );
+    }
+
+    const triage = triageChallenge(claimedFixes, now);
+    const record: ChallengeRecord = {
+      handle: cleanHandle,
+      challenge: challenge.trim(),
+      claimedFixes,
+      status: triage.status,
+      verifiedFixes: triage.verifiedFixes,
+      submittedAt: now,
+      verifiedAt: triage.verifiedAt,
+    };
+
     await addChallenge(record);
     return Response.json({ record }, { status: 201 });
   } catch {
