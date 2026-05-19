@@ -10,7 +10,7 @@ are never read.
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .hashing import load_or_create_salt, project_hash
 from .parsers import (cost_breakdown, find_logs, load_pricing, match_model,
@@ -20,6 +20,9 @@ from .parsers import (cost_breakdown, find_logs, load_pricing, match_model,
 _TOOL_NAME = {"claude": "claude-code", "codex": "codex"}
 _DAY_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 
+# Selectable leaderboard windows. 'all' disables filtering (local audit only).
+_PERIODS = ("day", "week", "month", "year", "all")
+
 
 def _utc_day(timestamp: str | None) -> str | None:
     """Extract a 'YYYY-MM-DD' UTC day from an ISO-8601 timestamp."""
@@ -27,6 +30,68 @@ def _utc_day(timestamp: str | None) -> str | None:
         return None
     m = _DAY_RE.match(timestamp)
     return m.group(1) if m else None
+
+
+def _parse_instant(timestamp: str | None) -> datetime | None:
+    """Parse an ISO-8601 session timestamp into an aware UTC datetime.
+
+    'Z' is normalised to '+00:00'; naive timestamps are assumed UTC.
+    Returns None when the timestamp is missing or unparseable.
+    """
+    if not timestamp:
+        return None
+    try:
+        dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _calendar_window(period: str,
+                     now: datetime) -> tuple[datetime, datetime] | None:
+    """Return the [since, until) UTC calendar bucket containing `now`.
+
+    'all' returns None (no filtering). Buckets are calendar-aligned, not
+    rolling: day/week (ISO, Monday start)/month/year all snap to a fixed
+    boundary so every builder is ranked over the same interval.
+    """
+    if period == "all":
+        return None
+    day0 = now.astimezone(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    if period == "day":
+        return day0, day0 + timedelta(days=1)
+    if period == "week":
+        since = day0 - timedelta(days=day0.weekday())
+        return since, since + timedelta(weeks=1)
+    if period == "month":
+        since = day0.replace(day=1)
+        if since.month == 12:
+            until = since.replace(year=since.year + 1, month=1)
+        else:
+            until = since.replace(month=since.month + 1)
+        return since, until
+    if period == "year":
+        since = day0.replace(month=1, day=1)
+        return since, since.replace(year=since.year + 1)
+    raise ValueError(f"unknown period: {period!r}")
+
+
+def _in_window(sp, window: tuple[datetime, datetime] | None) -> bool:
+    """Whether session `sp` belongs to `window` (attributed by start time).
+
+    None window means no filtering. A session whose timestamp cannot be
+    parsed is excluded when a window is active — it cannot prove membership.
+    """
+    if window is None:
+        return True
+    instant = _parse_instant(sp.timestamp)
+    if instant is None:
+        return False
+    since, until = window
+    return since <= instant < until
 
 
 def _schema_token_count(tool: str, tok: dict) -> dict:
@@ -63,12 +128,18 @@ def _verification(price_confidence: str) -> dict:
     }
 
 
-def collect(pricing: dict, salt: str) -> dict:
+def collect(pricing: dict, salt: str, period: str = "all",
+            now: datetime | None = None) -> dict:
     """Scan every local session log and aggregate into grouped rows.
 
     Each log file is one session. Files that fail to parse or carry zero
-    tokens are skipped.
+    tokens are skipped. When `period` is not 'all', sessions are filtered
+    to the calendar window containing `now` (defaults to the current UTC
+    instant); a session is attributed by its first-line start timestamp.
     """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    window = _calendar_window(period, now)
     groups: dict[tuple, dict] = {}
     for tool in ("claude", "codex"):
         parse = parse_claude if tool == "claude" else parse_codex
@@ -78,6 +149,8 @@ def collect(pricing: dict, salt: str) -> dict:
             except (ValueError, OSError, json.JSONDecodeError):
                 continue
             if sum(sp.tokens.values()) == 0:
+                continue
+            if not _in_window(sp, window):
                 continue
             phash = project_hash(sp.project_slug, salt)
             key = (tool, sp.model, phash)
@@ -96,12 +169,28 @@ def collect(pricing: dict, salt: str) -> dict:
 
 
 def build_envelope(pricing: dict, salt: str,
-                   generated_at: str | None = None) -> dict:
-    """Assemble the Burn Summary envelope (schemaVersion 1)."""
+                   generated_at: str | None = None,
+                   period: str = "week") -> dict:
+    """Assemble the Burn Summary envelope (schemaVersion 2).
+
+    `period` selects the calendar window (day/week/month/year/all). The
+    window end and `generatedAt` are anchored to the same instant. Raises
+    ValueError when `period` is unknown or no sessions fall in the window.
+    """
+    if period not in _PERIODS:
+        raise ValueError(f"unknown period: {period!r}")
     if generated_at is None:
-        generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        now = datetime.now(timezone.utc)
+        generated_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    else:
+        now = _parse_instant(generated_at)
+        if now is None:
+            raise ValueError(f"invalid generatedAt: {generated_at!r}")
+        # Re-derive from the parsed instant so an offset/fractional-second
+        # input still serialises as schema-valid second-precision UTC 'Z'.
+        generated_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     fallback_day = generated_at[:10]
-    groups = collect(pricing, salt)
+    groups = collect(pricing, salt, period=period, now=now)
     rows = []
     total_tokens = 0
     total_cost = 0.0
@@ -126,9 +215,22 @@ def build_envelope(pricing: dict, salt: str,
         })
         total_tokens += row_total
         total_cost += cost
+    if not rows:
+        raise ValueError(f"no sessions in period '{period}'")
+    window = _calendar_window(period, now)
+    if window is None:
+        since_iso = until_iso = None
+    else:
+        since_iso = window[0].strftime("%Y-%m-%dT%H:%M:%SZ")
+        until_iso = window[1].strftime("%Y-%m-%dT%H:%M:%SZ")
     return {
-        "schemaVersion": "1",
+        "schemaVersion": "2",
         "generatedAt": generated_at,
+        "periodWindow": {
+            "period": period,
+            "since": since_iso,
+            "until": until_iso,
+        },
         "rows": rows,
         "grandTotal": {
             "totalTokens": total_tokens,
@@ -142,6 +244,11 @@ def print_table(envelope: dict) -> None:
     print("=== CoconutLabs Burn Summary ===")
     print(f"  schemaVersion:  {envelope['schemaVersion']}")
     print(f"  generatedAt:    {envelope['generatedAt']}")
+    pw = envelope.get("periodWindow")
+    if pw:
+        span = (f"{pw['since']} .. {pw['until']}"
+                if pw["since"] else "(unfiltered)")
+        print(f"  period:         {pw['period']}  [{span}]")
     print(f"  rows:           {len(envelope['rows'])}")
     print("  --- per group (tool / model / projectHash) ---")
     for r in envelope["rows"]:

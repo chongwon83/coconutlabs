@@ -7,9 +7,12 @@ prove the collector never echoes message content into its output.
 """
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+
+UTC = timezone.utc
 
 from coconut_collector import collect as collect_mod
 from coconut_collector.collect import build_envelope
@@ -158,7 +161,8 @@ def test_envelope_passes_jsonschema(tmp_path, monkeypatch):
 
     monkeypatch.setattr(collect_mod, "find_logs", fake_find_logs)
     envelope = build_envelope(load_pricing(), SALT,
-                              generated_at="2026-05-19T12:00:00Z")
+                              generated_at="2026-05-19T12:00:00Z",
+                              period="all")
     jsonschema.validate(envelope, schema)  # raises on failure
     assert len(envelope["rows"]) == 2
     assert envelope["grandTotal"]["totalTokens"] > 0
@@ -176,13 +180,15 @@ def test_no_content_fields_in_output(tmp_path, monkeypatch):
         return [cl] if tool == "claude" else [cx]
 
     monkeypatch.setattr(collect_mod, "find_logs", fake_find_logs)
-    envelope = build_envelope(load_pricing(), SALT,
-                              generated_at="2026-05-19T12:00:00Z")
-    blob = json.dumps(envelope, ensure_ascii=False)
-    assert SECRET not in blob
-    # raw project path slugs must not survive either — only the hash
-    assert "/Users/x/proj-b" not in blob
-    assert "proj-a" not in blob
+    for period in ("all", "week"):
+        envelope = build_envelope(load_pricing(), SALT,
+                                  generated_at="2026-05-19T12:00:00Z",
+                                  period=period)
+        blob = json.dumps(envelope, ensure_ascii=False)
+        assert SECRET not in blob
+        # raw project path slugs must not survive either — only the hash
+        assert "/Users/x/proj-b" not in blob
+        assert "proj-a" not in blob
 
 
 # --- test 7: estimate_cost.py --all shim equivalence ---------------------
@@ -222,3 +228,158 @@ def test_find_logs_uses_standard_paths():
     pricing = load_pricing()
     _, conf = match_model(pricing.get("claude", {}), "claude-opus-4-7")
     assert conf == "high"
+
+
+# --- test 8: period='week' excludes sessions outside the window ----------
+
+def test_week_period_excludes_out_of_window(tmp_path, monkeypatch):
+    """generatedAt 2026-05-19 (Tue) -> week [2026-05-18, 2026-05-25). Two
+    sessions inside, one before -> only the two inside are aggregated."""
+    inside1 = write_claude_log(tmp_path / "a", "proj-a", "claude-opus-4-7",
+                               ts="2026-05-18T09:00:00Z", ntok=100)
+    inside2 = write_claude_log(tmp_path / "b", "proj-a", "claude-opus-4-7",
+                               ts="2026-05-19T09:00:00Z", ntok=200)
+    outside = write_claude_log(tmp_path / "c", "proj-a", "claude-opus-4-7",
+                               ts="2026-05-10T09:00:00Z", ntok=400)
+
+    def fake_find_logs(tool):
+        return [inside1, inside2, outside] if tool == "claude" else []
+
+    monkeypatch.setattr(collect_mod, "find_logs", fake_find_logs)
+    week = build_envelope(load_pricing(), SALT,
+                          generated_at="2026-05-19T12:00:00Z", period="week")
+    assert week["periodWindow"]["period"] == "week"
+    assert week["periodWindow"]["since"] == "2026-05-18T00:00:00Z"
+    assert week["periodWindow"]["until"] == "2026-05-25T00:00:00Z"
+    assert sum(r["sessionCount"] for r in week["rows"]) == 2
+
+
+# --- test 9: period='all' regression — same fixture, no filtering --------
+
+def test_all_period_includes_everything(tmp_path, monkeypatch):
+    s1 = write_claude_log(tmp_path / "a", "proj-a", "claude-opus-4-7",
+                          ts="2026-05-18T09:00:00Z", ntok=100)
+    s2 = write_claude_log(tmp_path / "b", "proj-a", "claude-opus-4-7",
+                          ts="2026-05-19T09:00:00Z", ntok=200)
+    s3 = write_claude_log(tmp_path / "c", "proj-a", "claude-opus-4-7",
+                          ts="2026-05-10T09:00:00Z", ntok=400)
+
+    def fake_find_logs(tool):
+        return [s1, s2, s3] if tool == "claude" else []
+
+    monkeypatch.setattr(collect_mod, "find_logs", fake_find_logs)
+    allp = build_envelope(load_pricing(), SALT,
+                          generated_at="2026-05-19T12:00:00Z", period="all")
+    assert allp["periodWindow"] == {"period": "all", "since": None,
+                                    "until": None}
+    assert sum(r["sessionCount"] for r in allp["rows"]) == 3
+
+
+# --- test 10: calendar bucket boundary arithmetic ------------------------
+
+def test_calendar_window_boundaries(tmp_path, monkeypatch):
+    """[since, until) is closed-open; rollover crosses month/year cleanly."""
+
+    def in_window_count(period, now, timestamps):
+        paths = [write_claude_log(tmp_path / f"{period}{i}", "p",
+                                  "claude-opus-4-7", ts=ts)
+                 for i, ts in enumerate(timestamps)]
+        monkeypatch.setattr(collect_mod, "find_logs",
+                            lambda tool: paths if tool == "claude" else [])
+        groups = collect_mod.collect(load_pricing(), SALT,
+                                     period=period, now=now)
+        return sum(g["sessions"] for g in groups.values())
+
+    # week: Monday 00:00:00Z included, prior Sunday 23:59:59Z excluded
+    assert in_window_count("week", datetime(2026, 5, 20, 12, tzinfo=UTC),
+                           ["2026-05-18T00:00:00Z",
+                            "2026-05-17T23:59:59Z"]) == 1
+    # month: Mar 1 included, Feb 28 excluded (rollover)
+    assert in_window_count("month", datetime(2026, 3, 15, 12, tzinfo=UTC),
+                           ["2026-03-01T00:00:00Z",
+                            "2026-02-28T23:00:00Z"]) == 1
+    # year: Jan 1 included, prior Dec 31 excluded (Dec->Jan rollover)
+    assert in_window_count("year", datetime(2026, 6, 1, 12, tzinfo=UTC),
+                           ["2026-01-01T00:00:00Z",
+                            "2025-12-31T23:00:00Z"]) == 1
+
+
+# --- test 11: sessions with no timestamp ---------------------------------
+
+def test_session_without_timestamp(tmp_path, monkeypatch):
+    """A session whose log carries no line-level timestamp is excluded from
+    a windowed period (cannot prove membership) but kept under 'all'."""
+    line = json.dumps({
+        "type": "assistant",
+        "message": {
+            "model": "claude-opus-4-7",
+            "content": [{"type": "text", "text": SECRET}],
+            "usage": {"input_tokens": 100, "output_tokens": 50,
+                      "cache_read_input_tokens": 10,
+                      "cache_creation": {"ephemeral_5m_input_tokens": 5,
+                                         "ephemeral_1h_input_tokens": 2}},
+        },
+    })
+    d = tmp_path / "nots"
+    d.mkdir(parents=True)
+    p = d / "session.jsonl"
+    p.write_text(line + "\n", encoding="utf-8")
+
+    monkeypatch.setattr(collect_mod, "find_logs",
+                        lambda tool: [p] if tool == "claude" else [])
+    week = collect_mod.collect(load_pricing(), SALT, period="week",
+                               now=datetime(2026, 5, 19, 12, tzinfo=UTC))
+    allp = collect_mod.collect(load_pricing(), SALT, period="all")
+    assert len(week) == 0
+    assert len(allp) == 1
+
+
+# --- test 12: empty window raises ValueError -----------------------------
+
+def test_empty_period_raises(tmp_path, monkeypatch):
+    """A window with no sessions must raise rather than emit a rows=[]
+    envelope that violates the schema's minItems: 1."""
+    old = write_claude_log(tmp_path / "old", "proj-a", "claude-opus-4-7",
+                           ts="2020-01-01T00:00:00Z")
+
+    monkeypatch.setattr(collect_mod, "find_logs",
+                        lambda tool: [old] if tool == "claude" else [])
+    with pytest.raises(ValueError, match="no sessions in period 'day'"):
+        build_envelope(load_pricing(), SALT,
+                       generated_at="2026-05-19T12:00:00Z", period="day")
+
+
+# --- test 13: schemaVersion 2 + periodWindow shape -----------------------
+
+def test_envelope_schema_version_and_period_window(tmp_path, monkeypatch):
+    cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7",
+                          ts="2026-05-19T09:00:00Z")
+
+    monkeypatch.setattr(collect_mod, "find_logs",
+                        lambda tool: [cl] if tool == "claude" else [])
+    env = build_envelope(load_pricing(), SALT,
+                         generated_at="2026-05-19T12:00:00Z", period="week")
+    assert env["schemaVersion"] == "2"
+    assert set(env["periodWindow"]) == {"period", "since", "until"}
+    assert env["periodWindow"]["period"] == "week"
+    assert env["periodWindow"]["since"] is not None
+
+    with pytest.raises(ValueError, match="unknown period"):
+        build_envelope(load_pricing(), SALT,
+                       generated_at="2026-05-19T12:00:00Z", period="bogus")
+
+
+# --- test 14: generatedAt is normalised to second-precision UTC 'Z' ------
+
+def test_generated_at_normalised(tmp_path, monkeypatch):
+    """A non-'Z' generatedAt (offset / fractional seconds) must still be
+    serialised as schema-valid second-precision UTC."""
+    cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7",
+                          ts="2026-05-19T09:00:00Z")
+
+    monkeypatch.setattr(collect_mod, "find_logs",
+                        lambda tool: [cl] if tool == "claude" else [])
+    env = build_envelope(load_pricing(), SALT,
+                         generated_at="2026-05-19T12:00:00.500+00:00",
+                         period="week")
+    assert env["generatedAt"] == "2026-05-19T12:00:00Z"
