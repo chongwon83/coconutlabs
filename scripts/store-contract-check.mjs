@@ -12,9 +12,11 @@
 //   UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=... \
 //     node scripts/store-contract-check.mjs          # redis mode
 //
-// The 5 scenarios mirror the approved plan's "검증 4" list. GET-based
+// The 7 scenarios mirror the approved plan's "검증" list. GET-based
 // assertions run in either mode; assertions that read .data/*.json directly
-// are file-mode only (skipped with a note under redis).
+// are file-mode only (skipped with a note under redis). Scenarios 5-7 cover
+// Task C: triage (small claim auto-verified, large claim unverified) and the
+// per-handle rate-limit (6th submission inside the window → 429).
 //
 // Non-destructive: every run uses unique handles (contract-<ts>-*), so it
 // never wipes or collides with existing store data.
@@ -78,15 +80,21 @@ async function postEnvelope(handle, envelope) {
   }
 }
 
-async function postChallenge(handle, challenge, claimedFixes) {
+// Returns the raw HTTP status — callers that expect a specific status (429 for
+// rate-limit, 201 for accepted) assert on it themselves.
+async function postChallengeRaw(handle, challenge, claimedFixes) {
   const res = await fetch(`${BASE}/api/challenge`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ handle, challenge, claimedFixes }),
   });
-  if (res.status !== 201) {
-    const text = await res.text();
-    throw new Error(`POST /api/challenge → ${res.status}: ${text}`);
+  return res.status;
+}
+
+async function postChallenge(handle, challenge, claimedFixes) {
+  const status = await postChallengeRaw(handle, challenge, claimedFixes);
+  if (status !== 201) {
+    throw new Error(`POST /api/challenge → ${status} (expected 201)`);
   }
 }
 
@@ -97,7 +105,7 @@ async function getCard(handle) {
   return entries.find((e) => e.handle === handle);
 }
 
-// --- the 5 contract scenarios ----------------------------------------------
+// --- the 7 contract scenarios ----------------------------------------------
 
 const results = [];
 function check(name, ok, detail) {
@@ -171,20 +179,59 @@ async function runScenarios() {
     }
   }
 
-  // 5. A challenge submission → reflected in the challenge store.
-  const hChallenge = `${RUN}-challenge`;
-  await postChallenge(hChallenge, "c1", 3);
+  // 5. A small claim (claimedFixes <= TRIAGE_THRESHOLD=5) → auto-verified at
+  //    submission time, with verifiedFixes set to the claim.
+  const hSmall = `${RUN}-triage-small`;
+  await postChallenge(hSmall, "c1", 3);
   if (REDIS_MODE) {
-    check("challenge POST → stored", true, "[skipped: redis mode — no GET endpoint; verify on Vercel preview]");
+    check("small claim → auto-verified", true, "[skipped: redis mode — no GET endpoint; verify on Vercel preview]");
   } else {
     const challenges = await readJsonArray(".data/challenges.json");
-    const found = challenges.find((c) => c.handle === hChallenge);
+    const found = challenges.find((c) => c.handle === hSmall);
     check(
-      "challenge POST → reflected in challenge store",
-      found != null && found.status === "unverified" && found.claimedFixes === 3,
-      found ? `status=${found.status} claimedFixes=${found.claimedFixes}` : "record missing",
+      "small claim (3 <= 5) → auto-verified, verifiedFixes set",
+      found != null &&
+        found.status === "verified" &&
+        found.claimedFixes === 3 &&
+        found.verifiedFixes === 3 &&
+        found.verifiedAt != null,
+      found ? `status=${found.status} verifiedFixes=${found.verifiedFixes}` : "record missing",
     );
   }
+
+  // 6. A large claim (claimedFixes > TRIAGE_THRESHOLD) → stays unverified for
+  //    owner review; verifiedFixes/verifiedAt stay null.
+  const hLarge = `${RUN}-triage-large`;
+  await postChallenge(hLarge, "c2", 10);
+  if (REDIS_MODE) {
+    check("large claim → unverified", true, "[skipped: redis mode — no GET endpoint; verify on Vercel preview]");
+  } else {
+    const challenges = await readJsonArray(".data/challenges.json");
+    const found = challenges.find((c) => c.handle === hLarge);
+    check(
+      "large claim (10 > 5) → unverified, verifiedFixes null",
+      found != null &&
+        found.status === "unverified" &&
+        found.verifiedFixes === null &&
+        found.verifiedAt === null,
+      found ? `status=${found.status} verifiedFixes=${found.verifiedFixes}` : "record missing",
+    );
+  }
+
+  // 7. Rate-limit: a handle may submit RATE_LIMIT_MAX=5 challenges inside the
+  //    window; the 6th in the same window is rejected with 429. Backend-
+  //    agnostic — asserts on HTTP status, so it runs in both modes.
+  const hFlood = `${RUN}-ratelimit`;
+  let accepted = 0;
+  for (let i = 0; i < 5; i += 1) {
+    if ((await postChallengeRaw(hFlood, "c1", 1)) === 201) accepted += 1;
+  }
+  const sixth = await postChallengeRaw(hFlood, "c1", 1);
+  check(
+    "rate-limit → 5 accepted, 6th in window → 429",
+    accepted === 5 && sixth === 429,
+    `accepted=${accepted} sixth=${sixth}`,
+  );
 }
 
 async function readJsonArray(rel) {
@@ -247,7 +294,7 @@ async function main() {
   let exitCode = 0;
   try {
     await waitForReady();
-    console.log("server ready — running 5 contract scenarios:\n");
+    console.log("server ready — running 7 contract scenarios:\n");
     await runScenarios();
   } catch (err) {
     console.error(`\nERROR: ${err.message}`);
