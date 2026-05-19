@@ -12,6 +12,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { ImportedEntry } from "@/lib/data";
+import { withLock, atomicWriteJson } from "@/lib/server/atomic";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const STORE_PATH = path.join(DATA_DIR, "leaderboard.json");
@@ -28,22 +29,16 @@ export async function readEntries(): Promise<ImportedEntry[]> {
   }
 }
 
-// Atomic write: serialize to a sibling .tmp file, fsync, then rename over the
-// target. A crash mid-write leaves the previous good file intact — the store
-// is never observed in a partially-written state.
-async function writeEntries(entries: ImportedEntry[]): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const tmp = `${STORE_PATH}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(entries, null, 2), "utf-8");
-  await fs.rename(tmp, STORE_PATH);
-}
-
 // Upsert by handle (a re-import replaces the older card), newest first.
 // Returns the full list after the write so callers can echo it to the client.
+// The whole read-modify-write runs under withLock so two concurrent imports
+// cannot each read stale state and lose one of the writes.
 export async function upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
-  const prev = await readEntries();
-  const next = [entry, ...prev.filter((e) => e.handle !== entry.handle)];
-  next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
-  await writeEntries(next);
-  return next;
+  return withLock(STORE_PATH, async () => {
+    const prev = await readEntries();
+    const next = [entry, ...prev.filter((e) => e.handle !== entry.handle)];
+    next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
+    await atomicWriteJson(STORE_PATH, next);
+    return next;
+  });
 }

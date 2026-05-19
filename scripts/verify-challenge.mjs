@@ -5,12 +5,15 @@
 // repo + CI, which CoconutLabs does not have. So the owner confirms manually
 // after inspecting the claimed work:
 //
-//   node scripts/verify-challenge.mjs <handle> --fixes <N>
-//   node scripts/verify-challenge.mjs <handle> --reject
+//   node scripts/verify-challenge.mjs <handle> --fixes <N> [--challenge <id>]
+//   node scripts/verify-challenge.mjs <handle> --reject   [--challenge <id>]
 //
 // It flips the most recent UNVERIFIED submission for <handle> to verified
-// (with verifiedFixes = N) or rejected. Run from the web/ directory — the
-// store lives at web/.data/challenges.json, the same file the API writes.
+// (with verifiedFixes = N) or rejected. When a handle has pending submissions
+// for several challenges, pass --challenge <id> to target the right one —
+// otherwise the most recent unverified submission across all challenges is
+// taken. Run from the web/ directory — the store lives at
+// web/.data/challenges.json, the same file the API writes.
 
 import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -21,19 +24,21 @@ function parseArgs(argv) {
   const [handle, ...rest] = argv;
   let fixes = null;
   let reject = false;
+  let challenge = null;
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === "--fixes") fixes = Number(rest[++i]);
     else if (rest[i] === "--reject") reject = true;
+    else if (rest[i] === "--challenge") challenge = rest[++i];
   }
-  return { handle, fixes, reject };
+  return { handle, fixes, reject, challenge };
 }
 
 async function main() {
-  const { handle, fixes, reject } = parseArgs(process.argv.slice(2));
+  const { handle, fixes, reject, challenge } = parseArgs(process.argv.slice(2));
 
   if (!handle) {
     console.error(
-      "Usage: node scripts/verify-challenge.mjs <handle> --fixes <N> | --reject",
+      "Usage: node scripts/verify-challenge.mjs <handle> --fixes <N> | --reject [--challenge <id>]",
     );
     process.exit(1);
   }
@@ -53,10 +58,16 @@ async function main() {
   }
 
   const idx = records.findIndex(
-    (r) => r.handle === handle && r.status === "unverified",
+    (r) =>
+      r.handle === handle &&
+      r.status === "unverified" &&
+      (challenge == null || r.challenge === challenge),
   );
   if (idx === -1) {
-    console.error(`Error: no unverified submission for handle "${handle}".`);
+    const scope = challenge == null ? "" : ` and challenge "${challenge}"`;
+    console.error(
+      `Error: no unverified submission for handle "${handle}"${scope}.`,
+    );
     process.exit(1);
   }
 
@@ -76,7 +87,8 @@ async function main() {
   await rename(tmp, STORE);
 
   console.log(
-    `${handle}: ${rec.status}${reject ? "" : ` (verifiedFixes=${fixes})`}`,
+    `${handle} [${rec.challenge}]: ${rec.status}` +
+      (reject ? "" : ` (verifiedFixes=${fixes})`),
   );
 }
 
