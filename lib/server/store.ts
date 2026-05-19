@@ -1,53 +1,27 @@
-// store.ts — server-side JSON file store for the Burn Index leaderboard.
+// store.ts — the Burn Index leaderboard's public read/write surface.
 //
 // The leaderboard is a shared resource: an import done in one browser must be
-// visible to every other browser hitting the same server (incognito included).
-// localStorage cannot do that, so imports persist here instead.
+// visible to every other browser hitting the same server. This module is the
+// stable API the route layer imports; the actual persistence lives behind a
+// BurnStore (fileStore for local dev, redisStore for Vercel) chosen by
+// getStore(). The exported signatures are unchanged from the pre-BurnStore
+// version — route.ts is untouched by the migration.
 //
-// SECURITY: this file holds ONLY the derived ImportedEntry (handle, avatar,
-// verif level, token/cost totals, period bounds, importedAt). The raw
+// SECURITY: a BurnStore holds ONLY the derived ImportedEntry. The raw
 // envelope, raw content, file paths, and secrets never reach this layer —
 // route.ts builds the entry via buildImportedEntry before calling upsertEntry.
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import type { ImportedEntry } from "@/lib/data";
-import { withLock, atomicWriteJson } from "@/lib/server/atomic";
-import { recordImportHistory } from "@/lib/server/importHistory";
+import { getStore } from "@/lib/server/burnStore";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
-const STORE_PATH = path.join(DATA_DIR, "leaderboard.json");
-
-// Read the full leaderboard. A missing or corrupt file yields [] rather than
-// throwing — the server's first boot, or a hand-deleted .data/, must not 500.
+// The full leaderboard, newest import first. An empty store yields [].
 export async function readEntries(): Promise<ImportedEntry[]> {
-  try {
-    const raw = await fs.readFile(STORE_PATH, "utf-8");
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as ImportedEntry[]) : [];
-  } catch {
-    return [];
-  }
+  return getStore().readEntries();
 }
 
-// Upsert by handle (a re-import replaces the older card), newest first.
-// Returns the full list after the write so callers can echo it to the client.
-// The whole read-modify-write runs under withLock so two concurrent imports
-// cannot each read stale state and lose one of the writes.
+// Upsert by handle (a re-import replaces the older card) and, for a weekly
+// import, record its history point — one atomic step inside the BurnStore.
+// Returns the full leaderboard (newest first) so callers can echo it back.
 export async function upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
-  return withLock(STORE_PATH, async () => {
-    const prev = await readEntries();
-    const next = [entry, ...prev.filter((e) => e.handle !== entry.handle)];
-    next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
-    // Record history first (week-only — see recordImportHistory). The two
-    // files are not transactionally atomic: if recordImportHistory throws,
-    // the leaderboard write below is skipped and both stay unwritten; if it
-    // succeeds but the leaderboard write fails, history holds a point the
-    // leaderboard lacks. That window is rare and self-heals — the next
-    // re-import of the same (handle, week) overwrites the history point and
-    // re-runs this upsert (both idempotent by handle).
-    await recordImportHistory(entry);
-    await atomicWriteJson(STORE_PATH, next);
-    return next;
-  });
+  return getStore().upsertEntry(entry);
 }
