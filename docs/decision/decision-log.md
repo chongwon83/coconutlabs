@@ -200,3 +200,21 @@ S0에서 작성, S10에서 회고 2줄 추가.
   "스냅샷을 쌓는다"는 코드가 있으면 그 트리거(cron/CI/launchd)가 실제 등록됐는지를
   파이프라인 완성 시점에 grep 한 번으로 확인한다. 또 trend가 totalTokens 기반이라
   "burn 증가 = 추이 상승"으로 읽히는 프레이밍은 'usage trend' 재라벨 후속 과제로 남김.
+
+---
+
+### 2026-05-20 주간 회고 — E+C+D 묶음 배포 (worktree 병렬)
+
+- 무엇이 잘 됐나: Codex 6건 사전 적대적 리뷰가 HIGH 3건(LIST "newest-first" 계약
+  파괴, file/redis rate-limit 발산, fast-forward 머지로 인한 revert 불가)을 코드
+  작성 0줄 시점에서 차단. C·D를 worktree로 분리해 파일 충돌 0 + `--no-ff`로
+  개별 revert 가능 상태로 한 번에 배포 — 5/20 01:30 머지 → push → production
+  HTTP 200까지 의도한 동선 그대로 흘러감. `lib/data.ts`·store 계층·package.json
+  무수정 계약이 1주 35커밋 동안 회귀 0건으로 유지됨.
+- 다음엔 무엇을 바꿀까: ① 헤비 작업(B/C/D 모두 3파일+ / 영속 데이터)인데
+  `tasks/<id>/criteria.md` Evaluator 산출물을 분리하지 않아 Review Harness #2
+  평가기준 통과 표가 plan 본문에 섞여 검증 분리 1패스가 흐릿했다. 다음 헤비부터
+  criteria.md 분리 의무. ② Pre-S0 Vault 조회 보고 누락 — `INDEX-by-stack.md`
+  매칭이 적은 신생 스택이라도 명시적 "0건" 보고가 있어야 C2 `usage_count`
+  데이터가 쌓인다. ③ 22~01시 야간 집중(25/35 = 71%) 패턴에서 owner 세션 2시간
+  점검 룰이 자가준수에 의존 — 다음 헤비는 plan에 시간 박스 명시 후 시작.
