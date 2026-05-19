@@ -101,3 +101,28 @@ S0에서 작성, S10에서 회고 2줄 추가.
   단계에 차단. Codex 교차 리뷰가 15-테스트 그린이 숨긴 latent 버그를 잡아냄.
 - 다음엔 무엇을 바꿀까: 픽스처를 한 형태(`Z`)로만 만들면 다른 형태의 버그가
   영원히 안 보임 — 타임스탬프 다루는 코드는 픽스처에 offset 변형을 1건 섞자.
+
+---
+
+### 2026-05-19 리더보드 v2 envelope 연동 + 라이브 반영
+
+- 문제: collector가 v2(`schemaVersion "2"` + `periodWindow`)만 emit하는데
+  웹 소비 측은 v1만 알아 collector 산출 파일이 import에서 전부 거부됨. import된
+  envelope도 미리보기까지만 도달, 실제 리더보드엔 미반영.
+- 버린 대안: v1 backward-compat shim. collector가 v2만 emit하므로 v1은 구버전
+  산출물 — shim은 미사용 코드. v2 전용 하드 스위치로 결정.
+- 핵심 트레이드오프: envelope에 fixes/VES/7d-trend가 없어 import 빌더를 mock
+  VES 랭킹에 섞으면 거짓 순위 → 별도 "Your imports" 블록으로 분리(rank/ves `—`).
+- 선택 이유: 검증·타입 v2화 + 라이브 반영(localStorage 영속)까지. 신뢰 경계인
+  import 경로에 `additionalProperties:false` 6레벨 미러 유지.
+- 강한 증거: Codex 교차 리뷰가 tsc/eslint 그린 + 브라우저 E2E가 놓친 결함 3건
+  검출 — ① `checkPeriodWindow` 편측 경계 통과(week+한쪽만 null → "All time"
+  오표시) ② `grandTotal.estimatedCostUsd` 미대조(변조 비용 표시 가능)
+  ③ `isImportedEntry` shape guard 느슨(verif 임의 문자열·period 불변식 미강제).
+
+- 무엇이 잘 됐나: Codex가 "통과한 경로"(tsc/eslint/E2E 5종 거부 확인)가 숨긴
+  논리 결함 3건을 검출 — 음성 테스트가 커버한 케이스의 인접 변형(both-null은
+  막되 one-sided는 누락)을 교차 모델이 노출. 검증 분리 원칙 실효 재확인.
+- 다음엔 무엇을 바꿀까: 불변식("A iff B")을 코드로 강제할 땐 음성 픽스처를
+  양극단(둘 다 위반)만이 아니라 편측(한쪽만 위반)까지 만들자 — `bothNull`
+  단일 플래그가 one-sided를 통과시킨 게 정확히 이 누락.
