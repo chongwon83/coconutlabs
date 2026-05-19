@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   V3_BUILDERS,
   fmtTokensCompact,
@@ -12,9 +12,28 @@ import { Sparkline } from "@/components/Sparkline";
 
 type Filter = "all" | "provider" | "device" | "estimated" | "selfrep";
 
+type Tier = "verified" | "estimated" | "selfrep";
+
 interface BurnIndexSectionProps {
   imported?: ImportedEntry[];
 }
+
+const TIER_ORDER: Tier[] = ["verified", "estimated", "selfrep"];
+
+const TIER_META: Record<Tier, { label: string; caption: string }> = {
+  verified: {
+    label: "Verified",
+    caption: "Provider or device-synced — measured at the source.",
+  },
+  estimated: {
+    label: "Estimated",
+    caption: "Derived from partial signals.",
+  },
+  selfrep: {
+    label: "Self-reported",
+    caption: "Submitted by the builder, not yet confirmed.",
+  },
+};
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return <div className="section-eyebrow">{children}</div>;
@@ -29,6 +48,28 @@ function matchesFilter(verif: string, filter: Filter): boolean {
   return true;
 }
 
+// Map a verification level to its trust tier. Unknown strings fall back to
+// "selfrep" — the lowest-trust bucket — so no row can escape grouping.
+function verifTier(verif: string): Tier {
+  if (verif === "Provider-synced" || verif === "Device-synced") return "verified";
+  if (verif === "Estimated") return "estimated";
+  return "selfrep";
+}
+
+// Partition rows into the 3 tier buckets, preserving input order within each
+// bucket (input is VES/rank-sorted, so VES order survives).
+function groupByTier<T extends { verif: string }>(
+  rows: T[],
+): Record<Tier, T[]> {
+  const buckets: Record<Tier, T[]> = {
+    verified: [],
+    estimated: [],
+    selfrep: [],
+  };
+  for (const row of rows) buckets[verifTier(row.verif)].push(row);
+  return buckets;
+}
+
 // Calendar window label for an imported card — "all" has no bounds.
 function periodLabel(entry: ImportedEntry): string {
   if (entry.period === "all" || !entry.since || !entry.until) return "All time";
@@ -41,6 +82,16 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
 
   const filtered = V3_BUILDERS.filter((b) => matchesFilter(b.verif, filter));
   const filteredImports = imported.filter((e) => matchesFilter(e.verif, filter));
+
+  const grouped = groupByTier(filtered);
+
+  // Imported block stays a single grid — tier-sort only (verified first),
+  // no sub-headers. Array.sort is stable, so VES order holds within a tier.
+  const sortedImports = [...filteredImports].sort(
+    (a, b) =>
+      TIER_ORDER.indexOf(verifTier(a.verif)) -
+      TIER_ORDER.indexOf(verifTier(b.verif)),
+  );
 
   return (
     <section className="section" id="burn">
@@ -79,28 +130,44 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
             <span className="lb-col-spark">Spark</span>
           </div>
 
-          {filtered.map((b) => (
-            <div key={b.handle} className="lb-row">
-              <span className="lb-col-rank lb-rank">{b.rank}</span>
-              <span className="lb-col-builder">
-                <Avatar initials={b.avatar} size="sm" />
-                <span className="lb-handle">{b.handle}</span>
-              </span>
-              <span className="lb-col-verif">
-                <VerifBadge level={b.verif} />
-              </span>
-              <span className="lb-col-tokens lb-mono">{b.tokens}</span>
-              <span className="lb-col-cost lb-mono">{b.cost}</span>
-              <span className="lb-col-fixes lb-mono">{b.fixes}</span>
-              <span className="lb-col-ves lb-ves">{b.ves}</span>
-              <span className="lb-col-trend">
-                <Trend dir={b.trend} value={b.trendVal} />
-              </span>
-              <span className="lb-col-spark">
-                <Sparkline handle={b.handle} />
-              </span>
-            </div>
-          ))}
+          {TIER_ORDER.map((tier) => {
+            const bucket = grouped[tier];
+            if (bucket.length === 0) return null;
+            const meta = TIER_META[tier];
+            return (
+              <Fragment key={tier}>
+                <div className={`lb-tier-head lb-tier-${tier}`}>
+                  <div className="lb-tier-headrow">
+                    <span className="lb-tier-label">{meta.label}</span>
+                    <span className="lb-tier-count">{bucket.length}</span>
+                  </div>
+                  <p className="lb-tier-caption">{meta.caption}</p>
+                </div>
+                {bucket.map((b) => (
+                  <div key={b.handle} className={`lb-row lb-row-${tier}`}>
+                    <span className="lb-col-rank lb-rank">{b.rank}</span>
+                    <span className="lb-col-builder">
+                      <Avatar initials={b.avatar} size="sm" />
+                      <span className="lb-handle">{b.handle}</span>
+                    </span>
+                    <span className="lb-col-verif">
+                      <VerifBadge level={b.verif} />
+                    </span>
+                    <span className="lb-col-tokens lb-mono">{b.tokens}</span>
+                    <span className="lb-col-cost lb-mono">{b.cost}</span>
+                    <span className="lb-col-fixes lb-mono">{b.fixes}</span>
+                    <span className="lb-col-ves lb-ves">{b.ves}</span>
+                    <span className="lb-col-trend">
+                      <Trend dir={b.trend} value={b.trendVal} />
+                    </span>
+                    <span className="lb-col-spark">
+                      <Sparkline handle={b.handle} />
+                    </span>
+                  </div>
+                ))}
+              </Fragment>
+            );
+          })}
         </div>
 
         {imported.length > 0 && (
@@ -108,8 +175,8 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
             <h3 className="lb-imported-title">Your imports</h3>
             <p className="lb-imported-cap">
               Imported from your local Burn Summary — shared across every
-              browser. Fixes &amp; VES populate once your challenge
-              submissions are verified.
+              browser. Verified rows sort to the top. Fixes &amp; VES populate
+              once your challenge submissions are verified.
             </p>
             <div className="lb-v3">
               <div className="lb-head">
@@ -124,8 +191,11 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
                 <span className="lb-col-spark">Spark</span>
               </div>
 
-              {filteredImports.map((e) => (
-                <div key={e.handle} className="lb-row lb-imported-row">
+              {sortedImports.map((e) => (
+                <div
+                  key={e.handle}
+                  className={`lb-row lb-imported-row lb-row-${verifTier(e.verif)}`}
+                >
                   <span className="lb-col-rank lb-rank">—</span>
                   <span className="lb-col-builder">
                     <Avatar initials={e.avatar} size="sm" />
@@ -165,7 +235,7 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
                 </div>
               ))}
 
-              {filteredImports.length === 0 && (
+              {sortedImports.length === 0 && (
                 <p className="lb-imported-empty">
                   No imports match this filter.
                 </p>
