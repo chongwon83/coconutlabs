@@ -51,11 +51,13 @@ def _parse_instant(timestamp: str | None) -> datetime | None:
 
 def _calendar_window(period: str,
                      now: datetime) -> tuple[datetime, datetime] | None:
-    """Return the [since, until) UTC calendar bucket containing `now`.
+    """Return the [since, until) UTC calendar bucket for `now`.
 
     'all' returns None (no filtering). Buckets are calendar-aligned, not
-    rolling: day/week (ISO, Monday start)/month/year all snap to a fixed
-    boundary so every builder is ranked over the same interval.
+    rolling: day/month/year snap to the bucket containing `now`. 'week' is
+    the LAST COMPLETED ISO week (prior Monday..this Monday), not the
+    in-progress one — so a Monday and a Sunday importer compete over the
+    same fully-elapsed 7 days.
     """
     if period == "all":
         return None
@@ -64,8 +66,8 @@ def _calendar_window(period: str,
     if period == "day":
         return day0, day0 + timedelta(days=1)
     if period == "week":
-        since = day0 - timedelta(days=day0.weekday())
-        return since, since + timedelta(weeks=1)
+        this_monday = day0 - timedelta(days=day0.weekday())
+        return this_monday - timedelta(weeks=1), this_monday
     if period == "month":
         since = day0.replace(day=1)
         if since.month == 12:

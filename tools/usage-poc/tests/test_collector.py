@@ -172,9 +172,14 @@ def test_envelope_passes_jsonschema(tmp_path, monkeypatch):
 
 def test_no_content_fields_in_output(tmp_path, monkeypatch):
     """The synthetic logs embed SECRET_CONTENT_LEAK in content/instructions
-    fields. A serialized envelope must not contain it (handoff §8)."""
-    cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7")
-    cx = write_codex_log(tmp_path, "x", "/Users/x/proj-b", "gpt-5.5")
+    fields. A serialized envelope must not contain it (handoff §8).
+
+    generatedAt 2026-05-19 -> week = [2026-05-11, 2026-05-18); fixtures are
+    dated 2026-05-12 so the 'week' branch keeps them."""
+    cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7",
+                          ts="2026-05-12T10:00:00Z")
+    cx = write_codex_log(tmp_path, "x", "/Users/x/proj-b", "gpt-5.5",
+                         ts="2026-05-12T11:00:00Z")
 
     def fake_find_logs(tool):
         return [cl] if tool == "claude" else [cx]
@@ -233,14 +238,15 @@ def test_find_logs_uses_standard_paths():
 # --- test 8: period='week' excludes sessions outside the window ----------
 
 def test_week_period_excludes_out_of_window(tmp_path, monkeypatch):
-    """generatedAt 2026-05-19 (Tue) -> week [2026-05-18, 2026-05-25). Two
-    sessions inside, one before -> only the two inside are aggregated."""
+    """generatedAt 2026-05-19 (Tue) -> last completed week
+    [2026-05-11, 2026-05-18). Two sessions inside, one in the in-progress
+    week -> only the two completed-week sessions are aggregated."""
     inside1 = write_claude_log(tmp_path / "a", "proj-a", "claude-opus-4-7",
-                               ts="2026-05-18T09:00:00Z", ntok=100)
+                               ts="2026-05-12T09:00:00Z", ntok=100)
     inside2 = write_claude_log(tmp_path / "b", "proj-a", "claude-opus-4-7",
-                               ts="2026-05-19T09:00:00Z", ntok=200)
+                               ts="2026-05-15T09:00:00Z", ntok=200)
     outside = write_claude_log(tmp_path / "c", "proj-a", "claude-opus-4-7",
-                               ts="2026-05-10T09:00:00Z", ntok=400)
+                               ts="2026-05-19T09:00:00Z", ntok=400)
 
     def fake_find_logs(tool):
         return [inside1, inside2, outside] if tool == "claude" else []
@@ -249,8 +255,8 @@ def test_week_period_excludes_out_of_window(tmp_path, monkeypatch):
     week = build_envelope(load_pricing(), SALT,
                           generated_at="2026-05-19T12:00:00Z", period="week")
     assert week["periodWindow"]["period"] == "week"
-    assert week["periodWindow"]["since"] == "2026-05-18T00:00:00Z"
-    assert week["periodWindow"]["until"] == "2026-05-25T00:00:00Z"
+    assert week["periodWindow"]["since"] == "2026-05-11T00:00:00Z"
+    assert week["periodWindow"]["until"] == "2026-05-18T00:00:00Z"
     assert sum(r["sessionCount"] for r in week["rows"]) == 2
 
 
@@ -290,10 +296,13 @@ def test_calendar_window_boundaries(tmp_path, monkeypatch):
                                      period=period, now=now)
         return sum(g["sessions"] for g in groups.values())
 
-    # week: Monday 00:00:00Z included, prior Sunday 23:59:59Z excluded
+    # week: last completed week. now=Wed 2026-05-20 -> [2026-05-11,
+    # 2026-05-18). since Monday 00:00:00Z included; the prior Sunday
+    # 23:59:59Z and the until Monday 00:00:00Z both excluded.
     assert in_window_count("week", datetime(2026, 5, 20, 12, tzinfo=UTC),
-                           ["2026-05-18T00:00:00Z",
-                            "2026-05-17T23:59:59Z"]) == 1
+                           ["2026-05-11T00:00:00Z",
+                            "2026-05-10T23:59:59Z",
+                            "2026-05-18T00:00:00Z"]) == 1
     # month: Mar 1 included, Feb 28 excluded (rollover)
     assert in_window_count("month", datetime(2026, 3, 15, 12, tzinfo=UTC),
                            ["2026-03-01T00:00:00Z",
@@ -357,8 +366,10 @@ def test_envelope_schema_version_and_period_window(tmp_path, monkeypatch):
 
     monkeypatch.setattr(collect_mod, "find_logs",
                         lambda tool: [cl] if tool == "claude" else [])
+    # generatedAt 2026-05-26 -> last completed week [2026-05-18, 2026-05-25)
+    # contains the 2026-05-19 fixture.
     env = build_envelope(load_pricing(), SALT,
-                         generated_at="2026-05-19T12:00:00Z", period="week")
+                         generated_at="2026-05-26T12:00:00Z", period="week")
     assert env["schemaVersion"] == "2"
     assert set(env["periodWindow"]) == {"period", "since", "until"}
     assert env["periodWindow"]["period"] == "week"
@@ -380,6 +391,6 @@ def test_generated_at_normalised(tmp_path, monkeypatch):
     monkeypatch.setattr(collect_mod, "find_logs",
                         lambda tool: [cl] if tool == "claude" else [])
     env = build_envelope(load_pricing(), SALT,
-                         generated_at="2026-05-19T12:00:00.500+00:00",
+                         generated_at="2026-05-26T12:00:00.500+00:00",
                          period="week")
-    assert env["generatedAt"] == "2026-05-19T12:00:00Z"
+    assert env["generatedAt"] == "2026-05-26T12:00:00Z"
