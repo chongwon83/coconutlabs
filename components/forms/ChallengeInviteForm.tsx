@@ -39,13 +39,23 @@ export function ChallengeInviteForm({ onSuccess }: ChallengeInviteFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ handle: trimmed, challenge, claimedFixes }),
       });
-      const data: { error?: string } = await res.json().catch(() => ({}));
+      const data: { error?: string; record?: { status?: string } } = await res
+        .json()
+        .catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Could not submit. Try again.");
         return;
       }
+      // Triage runs server-side: small claims auto-verify, larger ones queue
+      // for owner review. Trust record.status only — never the threshold.
+      const fixWord = `fix${claimedFixes === 1 ? "" : "es"}`;
+      const status = data.record?.status;
       onSuccess?.(
-        `Submission received — ${claimedFixes} fix${claimedFixes === 1 ? "" : "es"} pending owner verification.`,
+        status === "verified"
+          ? `${claimedFixes} ${fixWord} verified — counted toward your VES.`
+          : status === "unverified"
+            ? `${claimedFixes} ${fixWord} submitted — pending owner verification.`
+            : `Submission received — ${claimedFixes} ${fixWord} recorded.`,
       );
       setHandle("");
       setFixes("");
