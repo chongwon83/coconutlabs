@@ -4,15 +4,17 @@ import { useState } from "react";
 import { Button } from "@/components/primitives";
 import { BurnIndexPreviewCard } from "@/components/BurnIndexPreviewCard";
 import { validateSummary, type BurnSummaryEnvelope } from "@/lib/validateSummary";
+import { buildImportedEntry, type ImportedEntry } from "@/lib/data";
 
 interface JoinBurnIndexFormProps {
   onSuccess?: (msg: string) => void;
+  onImport?: (entry: ImportedEntry) => void;
 }
 
 // Local Burn Index import. The user runs the CoconutLabs collector on their
 // own machine, then uploads or pastes the resulting Burn Summary JSON. It is
 // validated entirely client-side (validateSummary) — no backend, no upload.
-export function JoinBurnIndexForm({ onSuccess }: JoinBurnIndexFormProps) {
+export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProps) {
   const [handle, setHandle] = useState("");
   const [raw, setRaw] = useState("");
   const [fileName, setFileName] = useState("");
@@ -48,14 +50,34 @@ export function JoinBurnIndexForm({ onSuccess }: JoinBurnIndexFormProps) {
   }
 
   function handleConfirm() {
-    const label = handle.trim() || "your builder card";
-    onSuccess?.(`Burn Summary validated — ${label} is ready for the Burn Index.`);
+    const trimmed = handle.trim();
+    if (!trimmed) {
+      setError("Enter a handle to join the Burn Index.");
+      return;
+    }
+    if (!envelope) return;
+    onImport?.(buildImportedEntry(envelope, trimmed));
+    onSuccess?.(`Burn Summary validated — ${trimmed} added to the Burn Index.`);
   }
 
   if (envelope) {
     return (
       <div className="form-card">
         <BurnIndexPreviewCard envelope={envelope} />
+        <div className="form-field">
+          <label className="form-label" htmlFor="jbi-handle-confirm">
+            GitHub / X handle
+          </label>
+          <input
+            id="jbi-handle-confirm"
+            className="form-input"
+            type="text"
+            placeholder="@yourhandle"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value)}
+          />
+        </div>
+        {error && <p className="form-error">{error}</p>}
         <Button variant="primary" size="lg" type="button" onClick={handleConfirm}>
           Add to Burn Index
         </Button>
@@ -66,6 +88,7 @@ export function JoinBurnIndexForm({ onSuccess }: JoinBurnIndexFormProps) {
             setEnvelope(null);
             setRaw("");
             setFileName("");
+            setError("");
           }}
         >
           Import a different file
@@ -84,7 +107,7 @@ export function JoinBurnIndexForm({ onSuccess }: JoinBurnIndexFormProps) {
 
       <div className="form-field">
         <label className="form-label" htmlFor="jbi-handle">
-          GitHub / X handle <span className="form-note">(label only)</span>
+          GitHub / X handle <span className="form-note">(required)</span>
         </label>
         <input
           id="jbi-handle"
@@ -118,7 +141,7 @@ export function JoinBurnIndexForm({ onSuccess }: JoinBurnIndexFormProps) {
           id="jbi-paste"
           className="form-input"
           rows={5}
-          placeholder='{ "schemaVersion": "1", "rows": [ … ] }'
+          placeholder='{ "schemaVersion": "2", "periodWindow": { … }, "rows": [ … ] }'
           value={raw}
           onChange={(e) => {
             setRaw(e.target.value);

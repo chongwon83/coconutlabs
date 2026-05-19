@@ -1,6 +1,6 @@
 "use client";
 
-import type { BurnSummaryEnvelope } from "@/lib/validateSummary";
+import type { BurnSummaryEnvelope, PeriodWindow } from "@/lib/validateSummary";
 import { deriveVerifLevel } from "@/lib/data";
 import { VerifBadge } from "@/components/primitives";
 
@@ -10,6 +10,14 @@ interface BurnIndexPreviewCardProps {
 
 function fmtTokens(n: number): string {
   return n.toLocaleString("en-US");
+}
+
+// Human caption for the calendar window the collector aggregated over.
+// "all" has no bounds; every other period carries an ISO date range.
+export function fmtPeriodWindow(pw: PeriodWindow): string {
+  if (pw.period === "all" || !pw.since || !pw.until) return "All time";
+  const day = (iso: string) => iso.slice(0, 10);
+  return `This ${pw.period} · ${day(pw.since)} – ${day(pw.until)}`;
 }
 
 function fmtCost(n: number): string {
@@ -23,7 +31,7 @@ function fmtCost(n: number): string {
 // the verification axes via deriveVerifLevel — the file's own `level` is a
 // hint and is never trusted. See coconutlabs-verification-model.md §0-A.
 export function BurnIndexPreviewCard({ envelope }: BurnIndexPreviewCardProps) {
-  const { rows, grandTotal, generatedAt } = envelope;
+  const { rows, grandTotal, generatedAt, periodWindow } = envelope;
   return (
     <div className="burn-preview">
       <h3 className="form-title">Burn Summary preview</h3>
@@ -31,6 +39,7 @@ export function BurnIndexPreviewCard({ envelope }: BurnIndexPreviewCardProps) {
         Validated locally — nothing was uploaded. {rows.length} row
         {rows.length === 1 ? "" : "s"}, generated {generatedAt}.
       </p>
+      <p className="bp-period">{fmtPeriodWindow(periodWindow)}</p>
 
       <div className="bp-list">
         {rows.map((r, i) => (

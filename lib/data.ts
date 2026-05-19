@@ -228,11 +228,39 @@ export interface BurnSummary {
   verification: BurnVerification;
 }
 
+export type Period = "day" | "week" | "month" | "year" | "all";
+
+// The calendar window the collector aggregated over. `since`/`until` are
+// ISO-8601 UTC `Z` strings forming a closed-open range [since, until); both
+// are null exactly when `period` is "all" (no bound). See collect.py
+// _period_window and burn-summary.schema.json (schema v2).
+export interface PeriodWindow {
+  period: Period;
+  since: string | null;
+  until: string | null;
+}
+
 export interface BurnSummaryEnvelope {
-  schemaVersion: "1";
+  schemaVersion: "2";
   generatedAt: string;
+  periodWindow: PeriodWindow;
   rows: BurnSummary[];
   grandTotal: { totalTokens: number; estimatedCostUsd: number };
+}
+
+// A builder card derived from an imported envelope. Rank/fixes/VES/trend are
+// absent because the envelope only carries tokens/cost/period — those fields
+// populate once challenge submissions are verified.
+export interface ImportedEntry {
+  handle: string;
+  avatar: string;
+  verif: VerifLevel;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  period: Period;
+  since: string | null;
+  until: string | null;
+  importedAt: string;
 }
 
 // Recompute the display verification level from the two orthogonal axes +
@@ -244,6 +272,68 @@ export function deriveVerifLevel(v: BurnVerification): VerifLevel {
   if (v.costBasis === "native") return "Provider-synced";
   // device + estimated: unmatched model price downgrades to Estimated
   return v.priceConfidence === "high" ? "Device-synced" : "Estimated";
+}
+
+// The trust level of a multi-row summary is its weakest row — one
+// Self-reported row drags the whole card down, so an aggregate can never
+// claim more confidence than its least-verified component. Each row's level
+// is recomputed via deriveVerifLevel (the file's own `level` is untrusted).
+const VERIF_RANK: Record<VerifLevel, number> = {
+  "Self-reported": 0,
+  Estimated: 1,
+  "Device-synced": 2,
+  "Provider-synced": 3,
+};
+const VERIF_BY_RANK: VerifLevel[] = [
+  "Self-reported",
+  "Estimated",
+  "Device-synced",
+  "Provider-synced",
+];
+
+export function aggregateVerifLevel(rows: BurnSummary[]): VerifLevel {
+  if (rows.length === 0) return "Self-reported";
+  let weakest = 3;
+  for (const r of rows) {
+    weakest = Math.min(weakest, VERIF_RANK[deriveVerifLevel(r.verification)]);
+  }
+  return VERIF_BY_RANK[weakest];
+}
+
+// Derive an avatar's two-letter initials from a handle (strips a leading @).
+function avatarFor(handle: string): string {
+  const name = handle.replace(/^@+/, "").trim();
+  return (name.slice(0, 2) || "??").toUpperCase();
+}
+
+// Collapse a validated envelope into a single leaderboard card.
+export function buildImportedEntry(
+  env: BurnSummaryEnvelope,
+  handle: string,
+): ImportedEntry {
+  return {
+    handle,
+    avatar: avatarFor(handle),
+    verif: aggregateVerifLevel(env.rows),
+    totalTokens: env.grandTotal.totalTokens,
+    estimatedCostUsd: env.grandTotal.estimatedCostUsd,
+    period: env.periodWindow.period,
+    since: env.periodWindow.since,
+    until: env.periodWindow.until,
+    importedAt: new Date().toISOString(),
+  };
+}
+
+// Compact token count: 1.2M / 340K / 980 — for the dense leaderboard grid.
+export function fmtTokensCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return String(n);
+}
+
+// Cost rounded to whole dollars with thousands separators: $1,234.
+export function fmtCostShort(n: number): string {
+  return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
 // Deterministic sparkline seed — LCG with handle as seed

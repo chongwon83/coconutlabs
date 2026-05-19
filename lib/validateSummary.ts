@@ -13,13 +13,18 @@ import type {
   BurnSummaryEnvelope,
   BurnTokenCount,
   BurnVerification,
+  PeriodWindow,
 } from "@/lib/data";
 
 export type ValidationResult =
   | { ok: true; envelope: BurnSummaryEnvelope }
   | { ok: false; error: string };
 
-const ENVELOPE_KEYS = ["schemaVersion", "generatedAt", "rows", "grandTotal"];
+const ENVELOPE_KEYS = [
+  "schemaVersion", "generatedAt", "periodWindow", "rows", "grandTotal",
+];
+const PERIOD_WINDOW_KEYS = ["period", "since", "until"];
+const PERIODS = ["day", "week", "month", "year", "all"];
 const GRAND_TOTAL_KEYS = ["totalTokens", "estimatedCostUsd"];
 const ROW_KEYS = [
   "tool", "model", "tokenCount", "totalTokens", "estimatedCostUsd",
@@ -35,6 +40,10 @@ const VERIFICATION_KEYS = ["tokenSource", "costBasis", "priceConfidence", "level
 // a tampered file cannot smuggle a path/command/secret into this field —
 // the client mirror of the collector's _safe_model and the schema pattern.
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
+
+// ISO-8601 UTC instant, e.g. "2026-05-19T00:00:00Z" — the only timestamp
+// shape the collector emits (generatedAt + periodWindow bounds).
+const ISO_Z_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 const TOOLS = ["claude-code", "codex"];
 const TOKEN_SOURCES = ["device", "self"];
@@ -87,6 +96,34 @@ function checkVerification(v: unknown, where: string): string | null {
   return null;
 }
 
+// The JSON schema can't express "since/until are null iff period is all" —
+// the import path is the trust boundary, so we enforce it here. A tampered
+// file claiming period "week" with null bounds (or "all" with bounds) is
+// rejected rather than rendered with a nonsensical caption.
+function checkPeriodWindow(pw: unknown): string | null {
+  if (!isObject(pw)) return "periodWindow must be an object.";
+  const bad = unexpectedKey(pw, PERIOD_WINDOW_KEYS);
+  if (bad) return `periodWindow has unexpected key "${bad}".`;
+  if (!PERIODS.includes(pw.period as string))
+    return "periodWindow.period must be day, week, month, year, or all.";
+  for (const k of ["since", "until"] as const) {
+    if (pw[k] !== null && (typeof pw[k] !== "string" || !ISO_Z_RE.test(pw[k] as string)))
+      return `periodWindow.${k} must be null or an ISO-8601 UTC timestamp.`;
+  }
+  // period "all" iff BOTH bounds are null. A one-sided window (one bound
+  // null, the other set) is rejected for every period — it would otherwise
+  // be rendered with a nonsensical "All time" caption.
+  const sinceNull = pw.since === null;
+  const untilNull = pw.until === null;
+  if (pw.period === "all") {
+    if (!sinceNull || !untilNull)
+      return 'periodWindow: period "all" requires since and until to be null.';
+  } else if (sinceNull || untilNull) {
+    return `periodWindow: period "${pw.period}" requires non-null since and until.`;
+  }
+  return null;
+}
+
 function checkRow(row: unknown, i: number): string | null {
   const where = `rows[${i}]`;
   if (!isObject(row)) return `${where} must be an object`;
@@ -129,11 +166,18 @@ export function validateSummary(raw: string): ValidationResult {
   const bad = unexpectedKey(parsed, ENVELOPE_KEYS);
   if (bad) return { ok: false, error: `Envelope has unexpected key "${bad}".` };
 
-  if (parsed.schemaVersion !== "1")
-    return { ok: false, error: 'schemaVersion must be "1".' };
-  if (typeof parsed.generatedAt !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(parsed.generatedAt))
+  if (parsed.schemaVersion === "1")
+    return {
+      ok: false,
+      error: "This file is schema v1. Re-run the collector to emit v2.",
+    };
+  if (parsed.schemaVersion !== "2")
+    return { ok: false, error: 'schemaVersion must be "2".' };
+  if (typeof parsed.generatedAt !== "string" || !ISO_Z_RE.test(parsed.generatedAt))
     return { ok: false, error: "generatedAt must be an ISO-8601 UTC timestamp." };
+
+  const pwErr = checkPeriodWindow(parsed.periodWindow);
+  if (pwErr) return { ok: false, error: pwErr };
 
   if (!Array.isArray(parsed.rows)) return { ok: false, error: "rows must be an array." };
   if (parsed.rows.length === 0) return { ok: false, error: "rows is empty — nothing to import." };
@@ -160,9 +204,27 @@ export function validateSummary(raw: string): ValidationResult {
       error: `grandTotal.totalTokens (${gt.totalTokens}) does not equal the sum of row totals (${rowsTotal}).`,
     };
 
+  // grandTotal.estimatedCostUsd must equal the sum of every row's cost.
+  // Costs are floats (collector rounds to 4 decimals), so reconcile within a
+  // 1-cent tolerance rather than exact equality. Without this, a tampered
+  // but valid-shape file could display an arbitrary leaderboard cost.
+  const rowsCost = (parsed.rows as { estimatedCostUsd: number }[])
+    .reduce((s, r) => s + r.estimatedCostUsd, 0);
+  if (Math.abs(gt.estimatedCostUsd - rowsCost) > 0.01)
+    return {
+      ok: false,
+      error: `grandTotal.estimatedCostUsd (${gt.estimatedCostUsd}) does not equal the sum of row costs (${rowsCost.toFixed(4)}).`,
+    };
+
   // Shape is proven — the cast is now safe.
   return { ok: true, envelope: parsed as unknown as BurnSummaryEnvelope };
 }
 
 // Re-exported for convenience in consuming components.
-export type { BurnSummary, BurnSummaryEnvelope, BurnTokenCount, BurnVerification };
+export type {
+  BurnSummary,
+  BurnSummaryEnvelope,
+  BurnTokenCount,
+  BurnVerification,
+  PeriodWindow,
+};
