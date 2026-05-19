@@ -13,6 +13,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { ImportedEntry } from "@/lib/data";
 import { withLock, atomicWriteJson } from "@/lib/server/atomic";
+import { recordImportHistory } from "@/lib/server/importHistory";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const STORE_PATH = path.join(DATA_DIR, "leaderboard.json");
@@ -38,6 +39,14 @@ export async function upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]
     const prev = await readEntries();
     const next = [entry, ...prev.filter((e) => e.handle !== entry.handle)];
     next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
+    // Record history first (week-only — see recordImportHistory). The two
+    // files are not transactionally atomic: if recordImportHistory throws,
+    // the leaderboard write below is skipped and both stay unwritten; if it
+    // succeeds but the leaderboard write fails, history holds a point the
+    // leaderboard lacks. That window is rare and self-heals — the next
+    // re-import of the same (handle, week) overwrites the history point and
+    // re-runs this upsert (both idempotent by handle).
+    await recordImportHistory(entry);
     await atomicWriteJson(STORE_PATH, next);
     return next;
   });

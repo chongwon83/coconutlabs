@@ -265,8 +265,8 @@ export interface ImportedEntry {
   importedAt: string;
   fixes?: number;
   ves?: number;
-  // 7d trend, filled by the /api/burnindex GET from daily snapshots. Absent
-  // until 7 snapshots accumulate (see lib/server/trend.ts) — renders "—".
+  // trend, filled by the /api/burnindex GET from each handle's weekly import
+  // history (see lib/server/trend.ts). Absent until 2 weekly imports — renders "—".
   trendDir?: TrendDir;
   trendPct?: number;
   trendSeries?: number[];
