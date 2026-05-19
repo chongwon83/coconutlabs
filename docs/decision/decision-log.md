@@ -72,3 +72,10 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 강한 증거: A3 금칙어 grep이 실 로그 기반 envelope(`/tmp/cc_env.json`)에서
   `/Users/`·경로·content 토큰 0건 확인. Codex도 "scope-dependent 잔여 이견"
   으로 분류 — 정책 경계(envelope vs 프로세스 전체) 차이일 뿐 결함 아님.
+
+- 무엇이 잘 됐나: 합성 fixture 테스트(test #6)보다 실 로그 기반 A3 grep이
+  더 강한 음성 검증이었음 — 실제 환경 유출 0건을 직접 입증. Codex 교차 리뷰가
+  Claude 단독 리뷰가 놓친 8건을 검출(7건 수정), 검증 분리 원칙의 실효 확인.
+- 다음엔 무엇을 바꿀까: P2-4 같은 "정책 경계" 이견은 2라운드 토론 전에 owner가
+  검증 범위(envelope-only vs 프로세스 전체)를 먼저 못박으면 라운드 절약 가능.
+  교차 리뷰 시작 시 scope 선언을 plan에 명시하는 절차 추가 검토.
