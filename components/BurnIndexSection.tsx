@@ -149,9 +149,18 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
                   <span className="lb-col-ves lb-ves">
                     {e.ves != null ? e.ves.toFixed(1) : "—"}
                   </span>
-                  <span className="lb-col-trend">—</span>
+                  <span className="lb-col-trend">
+                    {e.trendDir != null && e.trendPct != null ? (
+                      <Trend
+                        dir={e.trendDir}
+                        value={`${e.trendPct > 0 ? "+" : ""}${e.trendPct}%`}
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </span>
                   <span className="lb-col-spark">
-                    <Sparkline handle={e.handle} />
+                    <Sparkline handle={e.handle} series={e.trendSeries} />
                   </span>
                 </div>
               ))}
