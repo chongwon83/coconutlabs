@@ -107,9 +107,9 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
           <div className="lb-imported">
             <h3 className="lb-imported-title">Your imports</h3>
             <p className="lb-imported-cap">
-              Imported from your local Burn Summary — stored only in this
-              browser. Fixes &amp; VES populate once challenge submissions are
-              verified.
+              Imported from your local Burn Summary — shared across every
+              browser. Fixes &amp; VES populate once your challenge
+              submissions are verified.
             </p>
             <div className="lb-v3">
               <div className="lb-head">
@@ -143,8 +143,12 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
                   <span className="lb-col-cost lb-mono">
                     {fmtCostShort(e.estimatedCostUsd)}
                   </span>
-                  <span className="lb-col-fixes lb-mono">—</span>
-                  <span className="lb-col-ves lb-ves">—</span>
+                  <span className="lb-col-fixes lb-mono">
+                    {e.fixes != null ? e.fixes.toLocaleString("en-US") : "—"}
+                  </span>
+                  <span className="lb-col-ves lb-ves">
+                    {e.ves != null ? e.ves.toFixed(1) : "—"}
+                  </span>
                   <span className="lb-col-trend">—</span>
                   <span className="lb-col-spark">
                     <Sparkline handle={e.handle} />

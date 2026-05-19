@@ -7,23 +7,75 @@ interface ChallengeInviteFormProps {
   onSuccess?: (msg: string) => void;
 }
 
+// Challenge submission. A builder claims how many verified fixes they shipped
+// for a challenge. The claim is POSTed to /api/challenge and stored
+// unverified — it never touches the leaderboard's Fixes/VES columns until the
+// owner confirms it with scripts/verify-challenge.mjs.
 export function ChallengeInviteForm({ onSuccess }: ChallengeInviteFormProps) {
-  const [email, setEmail] = useState("");
+  const [handle, setHandle] = useState("");
   const [challenge, setChallenge] = useState("lighthouse");
+  const [fixes, setFixes] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Placeholder — no backend
-    onSuccess?.(`Challenge invite requested! Check ${email} for your invite.`);
-    setEmail("");
+    const trimmed = handle.trim();
+    if (!trimmed) {
+      setError("Enter the handle your fixes should count toward.");
+      return;
+    }
+    const claimedFixes = Number(fixes);
+    if (!Number.isInteger(claimedFixes) || claimedFixes < 1) {
+      setError("Claimed fixes must be a whole number of at least 1.");
+      return;
+    }
+    if (submitting) return;
+    setError("");
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle: trimmed, challenge, claimedFixes }),
+      });
+      const data: { error?: string } = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Could not submit. Try again.");
+        return;
+      }
+      onSuccess?.(
+        `Submission received — ${claimedFixes} fix${claimedFixes === 1 ? "" : "es"} pending owner verification.`,
+      );
+      setHandle("");
+      setFixes("");
+    } catch {
+      setError("Could not reach the server. Check your connection and retry.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <form className="form-card" onSubmit={handleSubmit}>
-      <h3 className="form-title">Get Challenge Invite</h3>
+      <h3 className="form-title">Submit Challenge Fixes</h3>
       <p className="form-desc">
-        Compete on verified efficiency. Judged by VES — no vanity metrics.
+        Claim the fixes you shipped for a challenge. Submissions stay unverified
+        until reviewed — only verified fixes count toward your VES.
       </p>
+      <div className="form-field">
+        <label className="form-label" htmlFor="ci-handle">
+          GitHub / X handle <span className="form-note">(required)</span>
+        </label>
+        <input
+          id="ci-handle"
+          className="form-input"
+          type="text"
+          placeholder="@yourhandle"
+          value={handle}
+          onChange={(e) => setHandle(e.target.value)}
+        />
+      </div>
       <div className="form-field">
         <label className="form-label" htmlFor="ci-challenge">
           Challenge
@@ -40,23 +92,25 @@ export function ChallengeInviteForm({ onSuccess }: ChallengeInviteFormProps) {
         </select>
       </div>
       <div className="form-field">
-        <label className="form-label" htmlFor="ci-email">
-          Email
+        <label className="form-label" htmlFor="ci-fixes">
+          Verified fixes claimed <span className="form-note">(required)</span>
         </label>
         <input
-          id="ci-email"
+          id="ci-fixes"
           className="form-input"
-          type="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
+          type="number"
+          min="1"
+          step="1"
+          placeholder="e.g. 3"
+          value={fixes}
+          onChange={(e) => setFixes(e.target.value)}
         />
       </div>
-      <Button variant="primary" size="lg" type="submit">
-        Request invite
+      {error && <p className="form-error">{error}</p>}
+      <Button variant="primary" size="lg" type="submit" disabled={submitting}>
+        {submitting ? "Submitting…" : "Submit for verification"}
       </Button>
-      <p className="form-note">Limited spots per challenge round</p>
+      <p className="form-note">Owner-verified · No vanity metrics</p>
     </form>
   );
 }

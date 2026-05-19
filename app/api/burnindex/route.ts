@@ -10,15 +10,25 @@
 // paths, or secrets cannot smuggle data into the store.
 
 import { validateSummary } from "@/lib/validateSummary";
-import { buildImportedEntry } from "@/lib/data";
+import { buildImportedEntry, computeVes } from "@/lib/data";
 import { readEntries, upsertEntry } from "@/lib/server/store";
+import { verifiedFixesByHandle } from "@/lib/server/challenge";
 
 // The store must reflect every prior import; never prerender GET.
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   const entries = await readEntries();
-  return Response.json({ entries });
+  const verifiedFixes = await verifiedFixesByHandle();
+  // Join verified challenge submissions onto each card. A handle with no
+  // verified fixes is returned untouched, so its fixes/VES render "—".
+  const joined = entries.map((entry) => {
+    const fixes = verifiedFixes.get(entry.handle);
+    if (fixes == null) return entry;
+    const ves = computeVes(fixes, entry.estimatedCostUsd);
+    return ves == null ? { ...entry, fixes } : { ...entry, fixes, ves };
+  });
+  return Response.json({ entries: joined });
 }
 
 export async function POST(request: Request): Promise<Response> {

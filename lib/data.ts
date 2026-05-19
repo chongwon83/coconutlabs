@@ -248,9 +248,11 @@ export interface BurnSummaryEnvelope {
   grandTotal: { totalTokens: number; estimatedCostUsd: number };
 }
 
-// A builder card derived from an imported envelope. Rank/fixes/VES/trend are
-// absent because the envelope only carries tokens/cost/period — those fields
-// populate once challenge submissions are verified.
+// A builder card derived from an imported envelope. The envelope only carries
+// tokens/cost/period, so `fixes`/`ves` are absent at import time — the
+// /api/burnindex GET fills them in by joining verified challenge submissions
+// (see lib/server/challenge.ts). A card with no verified submission keeps both
+// undefined and renders "—".
 export interface ImportedEntry {
   handle: string;
   avatar: string;
@@ -261,6 +263,16 @@ export interface ImportedEntry {
   since: string | null;
   until: string | null;
   importedAt: string;
+  fixes?: number;
+  ves?: number;
+}
+
+// VES — Verified Efficiency Score: verified fixes per dollar of AI spend.
+// Returns null when cost is non-positive (cannot divide), so a free or
+// zero-cost card shows "—" rather than Infinity.
+export function computeVes(verifiedFixes: number, costUsd: number): number | null {
+  if (costUsd <= 0) return null;
+  return verifiedFixes / costUsd;
 }
 
 // Recompute the display verification level from the two orthogonal axes +
