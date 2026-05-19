@@ -126,3 +126,24 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 다음엔 무엇을 바꿀까: 불변식("A iff B")을 코드로 강제할 땐 음성 픽스처를
   양극단(둘 다 위반)만이 아니라 편측(한쪽만 위반)까지 만들자 — `bothNull`
   단일 플래그가 one-sided를 통과시킨 게 정확히 이 누락.
+
+---
+
+### 2026-05-19 실제 리더보드 서버 + fixes/VES/7d-trend 파이프라인 (S0)
+
+- 문제: import이 `localStorage`에만 저장돼 다른 기기·시크릿 창에서 안 보임 —
+  "리더보드"가 사실상 1인용. import 빌더의 fixes/VES/7d-trend는 envelope에
+  데이터가 없어 `—`로 고정.
+- 버린 대안: ① 별도 백엔드 서비스(Express 등) — 인프라·배포 비용 과대, 프로토
+  타입 부적정. ② Vercel KV/Postgres — 신규 의존성·계정 결합, 로컬 검증 단계엔
+  과함. ③ 자동 fixes 검증(제출자 CI 연동) — 저장소·CI 접근 없이 자동 판정 불가.
+- 핵심 트레이드오프: JSON 파일 store는 신규 의존성 0·인프라 0이지만 단일 서버
+  인스턴스 공유에 한정(배포 시 ephemeral FS → KV 전환 필요). fixes 자동 검증
+  불가 → owner 수동 CLI 게이트로 정직하게 한정.
+- 선택 이유: Next.js Route Handlers(`app/api/`) + 서버 JSON 파일 store
+  (`web/.data/`, atomic write). 신규 npm 의존성 0. POST 시 서버에서
+  `validateSummary` 재실행 → 클라 우회 불가능한 신뢰 경계. fixes는 challenge
+  제출(unverified) → owner CLI 검증(verified) → VES = verifiedFixes/cost.
+- 강한 증거: 직전 v2 연동 사이클 decision-log가 "백엔드 없음 → localStorage,
+  실제 서버는 후속 과제"로 명시 — 본 작업이 그 후속. Codex 교차 리뷰가 v2
+  연동에서 음성 테스트 사각지대 3건을 검출한 선례 → 서버 신뢰 경계도 교차 리뷰.
