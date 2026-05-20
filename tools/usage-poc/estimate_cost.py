@@ -25,6 +25,7 @@ import json
 import sys
 from pathlib import Path
 
+from coconut_collector.hashing import load_or_create_salt
 from coconut_collector.parsers import cost_breakdown  # noqa: F401
 from coconut_collector.parsers import (find_logs, match_model, parse_claude,
                                        parse_codex)
@@ -52,7 +53,8 @@ def detect_tool(path: Path) -> str:
 
 def build_result(tool: str, path: Path, pricing: dict) -> dict:
     """Parse the log and assemble the aggregate-only result."""
-    sp = parse_claude(path) if tool == "claude" else parse_codex(path)
+    salt = load_or_create_salt()
+    sp = parse_claude(path, salt) if tool == "claude" else parse_codex(path, salt)
     model, tok = sp.model, sp.tokens
     price, confidence = match_model(pricing.get(tool, {}), model)
     breakdown = cost_breakdown(tok, price)
@@ -80,12 +82,13 @@ def aggregate_sessions(pricing: dict) -> dict:
     groups: dict[tuple[str, str], dict] = {}
     scanned = {t: {"files": 0, "ok": 0, "skipped": 0}
                for t in ("claude", "codex")}
+    salt = load_or_create_salt()
     for tool in ("claude", "codex"):
         parse = parse_claude if tool == "claude" else parse_codex
         for path in find_logs(tool):
             scanned[tool]["files"] += 1
             try:
-                sp = parse(path)
+                sp = parse(path, salt)
             except (ValueError, OSError, json.JSONDecodeError):
                 scanned[tool]["skipped"] += 1
                 continue

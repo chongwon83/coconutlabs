@@ -12,7 +12,7 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
-from .hashing import load_or_create_salt, project_hash
+from .hashing import load_or_create_salt
 from .parsers import (cost_breakdown, find_logs, load_pricing, match_model,
                       parse_claude, parse_codex)
 
@@ -147,15 +147,14 @@ def collect(pricing: dict, salt: str, period: str = "all",
         parse = parse_claude if tool == "claude" else parse_codex
         for path in find_logs(tool):
             try:
-                sp = parse(path)
+                sp = parse(path, salt)
             except (ValueError, OSError, json.JSONDecodeError):
                 continue
             if sum(sp.tokens.values()) == 0:
                 continue
             if not _in_window(sp, window):
                 continue
-            phash = project_hash(sp.project_slug, salt)
-            key = (tool, sp.model, phash)
+            key = (tool, sp.model, sp.project_hash)
             grp = groups.get(key)
             if grp is None:
                 grp = {"tokens": {k: 0 for k in sp.tokens},
