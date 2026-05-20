@@ -1,6 +1,9 @@
 # Production rollout gate for the ?auto-detect=1 feature flag.
 #
-# Triggers when a PR touches the flag condition or default value in JoinBurnIndexForm.
+# Runs on every PR so that the "gate-pass" required check always resolves.
+# PRs that don't touch JoinBurnIndexForm.tsx skip the live evaluation and
+# auto-pass. Only PRs touching that file trigger the full 7-axis check.
+#
 # Evaluates all 7 axes:
 #   Axes 1-3: live metrics from /api/internal/rollout-gate-metrics (runtime data)
 #   Axes 4-7: vitest CI checks (parity-test and security-test workflows)
@@ -17,8 +20,6 @@ name: production-rollout-gate
 
 on:
   pull_request:
-    paths:
-      - "components/forms/JoinBurnIndexForm.tsx"
 
 jobs:
   gate:
@@ -28,8 +29,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check if gate-relevant file changed
+        id: check_files
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "components/forms/JoinBurnIndexForm.tsx"; then
+            echo "gate_relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "gate_relevant=false" >> "$GITHUB_OUTPUT"
+            echo "PR does not touch JoinBurnIndexForm.tsx — gate auto-pass." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Evaluate rollout gate (Axes 1-3)
         id: gate
+        if: steps.check_files.outputs.gate_relevant == 'true'
         env:
           GATE_METRICS_URL: ${{ secrets.GATE_METRICS_URL }}
           ROLLOUT_GATE_SECRET: ${{ secrets.ROLLOUT_GATE_SECRET }}
@@ -106,3 +119,7 @@ jobs:
         run: |
           echo "Gate secrets not configured — skipping live evaluation."
           echo "Configure GATE_METRICS_URL and ROLLOUT_GATE_SECRET to enable."
+
+      - name: Pass (not gate-relevant PR)
+        if: steps.check_files.outputs.gate_relevant == 'false'
+        run: echo "Gate not required for this PR."
