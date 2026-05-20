@@ -18,7 +18,7 @@ name: production-rollout-gate
 on:
   pull_request:
     paths:
-      - "web/components/forms/JoinBurnIndexForm.tsx"
+      - "components/forms/JoinBurnIndexForm.tsx"
 
 jobs:
   gate:
