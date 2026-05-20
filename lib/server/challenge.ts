@@ -42,27 +42,40 @@ export async function addChallenge(record: ChallengeRecord): Promise<void> {
 // owner confirms a claim.
 //
 // A handle may re-submit the SAME challenge (a later run shipped more fixes),
-// and the owner may verify more than one of those. Counting every verified
-// record would double-count one challenge. So we keep only the LATEST verified
-// record per (handle, challenge) — keyed by verifiedAt — then sum those across
-// the handle's distinct challenges.
+// and the owner may verify more than one of those. The owner may also reverse
+// an earlier decision (verify → reject, or reject → verify via --force in
+// manage-unverified.mjs) by appending a new ChallengeRecord — every decision
+// is append-only, so the audit trail keeps every row.
+//
+// Dedup is therefore "pick the LATEST decision per (handle, challenge), then
+// count only if that decision is verified". Both verified and rejected
+// records carry verifiedAt (set at decision time by triageChallenge and by
+// manage-unverified.mjs) — that's the decisionAt timestamp the picker uses.
+// Filtering by status BEFORE picking the latest would let an old verified
+// record outlive a later reject of the same submission, double-counting.
 export async function verifiedFixesByHandle(): Promise<Map<string, number>> {
   const records = await readChallenges();
 
-  // (handle challenge) -> latest verified record
+  // (handle challenge) -> latest DECIDED record (verified or rejected). We
+  // skip "unverified" (no decision yet — still pending) and any decided row
+  // without a timestamp to compare; the latter shouldn't happen because every
+  // code path that sets status=verified/rejected also stamps verifiedAt.
   const latest = new Map<string, ChallengeRecord>();
   for (const r of records) {
-    if (r.status !== "verified" || r.verifiedFixes == null) continue;
+    if (r.status === "unverified") continue;
+    if (r.verifiedAt == null) continue;
     const key = `${r.handle} ${r.challenge}`;
     const cur = latest.get(key);
-    if (cur == null || (r.verifiedAt ?? "") > (cur.verifiedAt ?? "")) {
+    if (cur == null || r.verifiedAt > (cur.verifiedAt ?? "")) {
       latest.set(key, r);
     }
   }
 
+  // Only count if the latest decision is verified — a later reject cancels.
   const totals = new Map<string, number>();
   for (const r of latest.values()) {
-    totals.set(r.handle, (totals.get(r.handle) ?? 0) + (r.verifiedFixes ?? 0));
+    if (r.status !== "verified" || r.verifiedFixes == null) continue;
+    totals.set(r.handle, (totals.get(r.handle) ?? 0) + r.verifiedFixes);
   }
   return totals;
 }

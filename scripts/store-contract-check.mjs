@@ -12,17 +12,19 @@
 //   UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=... \
 //     node scripts/store-contract-check.mjs          # redis mode
 //
-// The 7 scenarios mirror the approved plan's "검증" list. GET-based
-// assertions run in either mode; assertions that read .data/*.json directly
-// are file-mode only (skipped with a note under redis). Scenarios 5-7 cover
-// Task C: triage (small claim auto-verified, large claim unverified) and the
-// per-handle rate-limit (6th submission inside the window → 429).
+// Scenarios mirror the approved plan's "검증" list. GET-based assertions run
+// in either mode; assertions that read .data/*.json directly are file-mode
+// only (skipped with a note under redis). Scenarios 5-7 cover Task C: triage
+// (small claim auto-verified, large claim unverified) and the per-handle
+// rate-limit (6th submission inside the window → 429). Scenario 8 guards the
+// dedup-then-filter regression — a later REJECT must cancel a prior verified
+// record for the same (handle, challenge).
 //
 // Non-destructive: every run uses unique handles (contract-<ts>-*), so it
 // never wipes or collides with existing store data.
 
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const WEB_ROOT = path.dirname(import.meta.dirname);
@@ -105,7 +107,7 @@ async function getCard(handle) {
   return entries.find((e) => e.handle === handle);
 }
 
-// --- the 7 contract scenarios ----------------------------------------------
+// --- the 8 contract scenarios ----------------------------------------------
 
 const results = [];
 function check(name, ok, detail) {
@@ -232,6 +234,70 @@ async function runScenarios() {
     accepted === 5 && sixth === 429,
     `accepted=${accepted} sixth=${sixth}`,
   );
+
+  // 8. Dedup-then-filter regression: a later REJECT decision for the same
+  //    (handle, challenge) MUST cancel the prior verified record, so the
+  //    leaderboard card's `fixes` field becomes absent. The HTTP surface only
+  //    writes verified or unverified at submission time — rejections are an
+  //    owner-CLI write (manage-unverified.mjs --reject). To exercise the
+  //    dedup path here we inject the reject record directly into
+  //    .data/challenges.json, which the file store reads on its next call.
+  //    Redis mode has no equivalent surface from this script; the same
+  //    dedup logic in verifiedFixesByHandle() is exercised on Vercel preview
+  //    when an owner runs the CLI against UPSTASH_*.
+  if (REDIS_MODE) {
+    check(
+      "reject cancels prior verified (dedup-then-filter)",
+      true,
+      "[skipped: redis mode — verify on Vercel preview via manage-unverified.mjs --reject --force]",
+    );
+  } else {
+    const hCancel = `${RUN}-reject-cancel`;
+    // Pre-state: import an envelope so the handle has a leaderboard card to
+    // join `fixes` onto, then submit a small claim that is auto-verified.
+    await postEnvelope(
+      hCancel,
+      makeEnvelope({ period: "week", since: W1, until: W1_END, tokens: 100, cost: 1 }),
+    );
+    await postChallenge(hCancel, "c1", 3);
+    const cardBefore = await getCard(hCancel);
+    const preOk = cardBefore?.fixes === 3;
+    check(
+      "reject-cancel precondition (verified record gives fixes=3)",
+      preOk,
+      `fixes=${cardBefore?.fixes ?? "absent"}`,
+    );
+    if (preOk) {
+      // Append a later REJECT decision for the SAME (handle, challenge). The
+      // file store prepends newest-first, so insert at the head with a
+      // verifiedAt strictly after the existing verified record.
+      const challengesPath = path.join(WEB_ROOT, ".data/challenges.json");
+      const existing = JSON.parse(await readFile(challengesPath, "utf-8"));
+      const ours = existing.find(
+        (c) => c.handle === hCancel && c.challenge === "c1",
+      );
+      const laterAt = new Date(Date.parse(ours.verifiedAt) + 60_000).toISOString();
+      const rejectRecord = {
+        handle: hCancel,
+        challenge: "c1",
+        claimedFixes: 3,
+        status: "rejected",
+        verifiedFixes: null,
+        submittedAt: laterAt,
+        verifiedAt: laterAt,
+      };
+      await writeFile(
+        challengesPath,
+        JSON.stringify([rejectRecord, ...existing], null, 2),
+      );
+      const cardAfter = await getCard(hCancel);
+      check(
+        "reject cancels prior verified (dedup-then-filter)",
+        cardAfter != null && cardAfter.fixes == null,
+        cardAfter ? `fixes=${cardAfter.fixes ?? "absent"}` : "card missing",
+      );
+    }
+  }
 }
 
 async function readJsonArray(rel) {
@@ -294,7 +360,7 @@ async function main() {
   let exitCode = 0;
   try {
     await waitForReady();
-    console.log("server ready — running 7 contract scenarios:\n");
+    console.log("server ready — running 8 contract scenarios:\n");
     await runScenarios();
   } catch (err) {
     console.error(`\nERROR: ${err.message}`);
