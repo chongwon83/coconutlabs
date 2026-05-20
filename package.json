@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:parity": "vitest run __tests__/burn-parity.test.ts",
+    "test:security": "vitest run __tests__/burn-security.test.ts __tests__/burn-server-whitelist.test.ts __tests__/burn-telemetry-privacy.test.ts"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",

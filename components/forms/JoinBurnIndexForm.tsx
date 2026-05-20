@@ -1,15 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/primitives";
 import { BurnIndexPreviewCard } from "@/components/BurnIndexPreviewCard";
+import { PostUploadSurvey } from "@/components/forms/PostUploadSurvey";
 import { validateSummary, type BurnSummaryEnvelope } from "@/lib/validateSummary";
 import { COLLECTOR_REPO_URL, type ImportedEntry } from "@/lib/data";
 import { saveHandle, loadHandle, ensurePermission } from "@/lib/client/burn/handles";
 import { loadOrCreateSalt, importSalt } from "@/lib/client/burn/hashing";
 import { runImport, type RunImportArgs } from "@/lib/client/burn/import";
 import type { Period } from "@/lib/client/burn/collect";
+import {
+  makeAutoDetectStartedEvent,
+  makeAutoDetectCompletedEvent,
+  makeAutoDetectFailedEvent,
+  sendTelemetryEvent,
+  startDurationTimer,
+  type DurationBucket,
+} from "@/lib/client/burn/telemetry";
 
 interface JoinBurnIndexFormProps {
   onSuccess?: (msg: string) => void;
@@ -69,6 +78,11 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
   const [saltInput, setSaltInput] = useState("");
   const [saltMsg, setSaltMsg] = useState("");
 
+  // Telemetry state (Axes 2–3)
+  const durationTimerRef = useRef<(() => DurationBucket) | null>(null);
+  const [uploadTimeBucket, setUploadTimeBucket] = useState<DurationBucket | null>(null);
+  const [showSurvey, setShowSurvey] = useState(false);
+
   // Load persisted salt and handles from IndexedDB on mount (FSA path only).
   useEffect(() => {
     if (!autoDetect) return;
@@ -117,6 +131,11 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
     setFsaError("");
     setFsaEnvelope(null);
     setFsaLoading(true);
+
+    // Telemetry: mark flow start and begin duration timer.
+    sendTelemetryEvent(makeAutoDetectStartedEvent(true));
+    durationTimerRef.current = startDurationTimer();
+
     try {
       // Re-verify permissions before iterating (revoked after navigation).
       const handles: [FileSystemDirectoryHandle, "claude" | "codex"][] = [];
@@ -127,6 +146,8 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
         if (perm !== "granted") {
           setFsaError("Read permission was denied. Re-select the folder and try again.");
           setFsaLoading(false);
+          const bucket = durationTimerRef.current?.() ?? "0-1m";
+          sendTelemetryEvent(makeAutoDetectFailedEvent(bucket, "permission_denied", "scan"));
           return;
         }
       }
@@ -139,6 +160,8 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
       const result = await runImport(args);
       setFsaEnvelope(result);
     } catch (e) {
+      const bucket = durationTimerRef.current?.() ?? "0-1m";
+      sendTelemetryEvent(makeAutoDetectFailedEvent(bucket, "parse_failed", "parse"));
       setFsaError(
         e instanceof Error ? e.message : "Import failed — check the browser console.",
       );
@@ -167,12 +190,20 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
         .json()
         .catch(() => ({}));
       if (!res.ok) {
+        const bucket = durationTimerRef.current?.() ?? "0-1m";
+        sendTelemetryEvent(makeAutoDetectFailedEvent(bucket, "upload_failed", "upload"));
         setFsaError(data.error ?? "Could not add to the Burn Index. Try again.");
         return;
       }
+      const bucket = durationTimerRef.current?.() ?? "0-1m";
+      sendTelemetryEvent(makeAutoDetectCompletedEvent(bucket, "upload_accepted"));
       if (data.entries) onImport?.(data.entries);
-      onSuccess?.(`Burn Summary validated — ${trimmed} added to the Burn Index.`);
+      // Show post-upload survey before calling onSuccess.
+      setUploadTimeBucket(bucket);
+      setShowSurvey(true);
     } catch {
+      const bucket = durationTimerRef.current?.() ?? "0-1m";
+      sendTelemetryEvent(makeAutoDetectFailedEvent(bucket, "upload_failed", "upload"));
       setFsaError("Could not reach the server. Check your connection and retry.");
     } finally {
       setFsaSubmitting(false);
@@ -264,6 +295,20 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
   }
 
   // ── FSA render path (auto-detect=1 + showDirectoryPicker available) ───────
+
+  // Show post-upload survey after a successful FSA upload.
+  if (autoDetect && showSurvey && uploadTimeBucket) {
+    return (
+      <PostUploadSurvey
+        setupTimeBucket={uploadTimeBucket}
+        onDone={() => {
+          setShowSurvey(false);
+          onSuccess?.(`Burn Summary validated — ${fsaHandle.trim()} added to the Burn Index.`);
+        }}
+      />
+    );
+  }
+
   if (autoDetect) {
     return (
       <div className="form-card">

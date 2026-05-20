@@ -218,3 +218,23 @@ S0에서 작성, S10에서 회고 2줄 추가.
   매칭이 적은 신생 스택이라도 명시적 "0건" 보고가 있어야 C2 `usage_count`
   데이터가 쌓인다. ③ 22~01시 야간 집중(25/35 = 71%) 패턴에서 owner 세션 2시간
   점검 룰이 자가준수에 의존 — 다음 헤비는 plan에 시간 박스 명시 후 시작.
+
+---
+
+### 2026-05-20 Production rollout gate (7-axis) 자동화 인프라
+
+- 문제: `?auto-detect=1` flag ON 전환을 owner 직감으로 결정하면 privacy invariant
+  (9-field) 위반 위험. 5축은 plan에 정의돼 있으나 측정 인프라 0. Codex 5라운드
+  적대적 검토를 통해 5축 → 7축(Axis 6 서버 화이트리스트, Axis 7 텔레메트리
+  프라이버시)으로 보강하고 완전 자동 측정으로 확정.
+- 버린 대안: ① 수동 체크리스트 — owner 자기준수 의존 → 솔로에서 가장 흔한
+  실패 패턴. ② 게이트 + ON 전환 PR 동시 진행 — Axis 1~3 데이터 없이 결정은
+  게이트의 존재 의미 부정.
+- 핵심 트레이드오프: 완전 자동화 vs 측정 인프라 구축 비용(텔레메트리 자체가
+  9-field 위반 가능 — Codex R4 메타-프라이버시 invariant 추가 필요).
+- 선택 이유: 사용자 영향(privacy 침해 시 raw data 유출) 비대칭적으로 큼.
+  게이트의 존재 의미는 owner 직감을 강제로 제약하는 것. 텔레메트리도
+  `additionalProperties:false` 화이트리스트로 측정 자체가 유출 경로가 되지 않도록.
+- 강한 증거: Codex R4 "측정 자체가 9-field 위반 가능"을 구조 설계 전에 검출 →
+  telemetry.ts `FORBIDDEN_KEY_RE` + per-event ALLOWED_KEYS 화이트리스트로 차단.
+  7축 98 vitest 테스트 — 6·7축 64건이 서버/텔레메트리 경계를 코드 실행 증거로 검증.

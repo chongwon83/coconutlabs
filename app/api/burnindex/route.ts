@@ -14,6 +14,7 @@ import { buildImportedEntry, computeVes } from "@/lib/data";
 import { readEntries, upsertEntry } from "@/lib/server/store";
 import { verifiedFixesByHandle } from "@/lib/server/challenge";
 import { trendByHandle } from "@/lib/server/trend";
+import { recordSubmission } from "@/lib/server/burn/metrics";
 
 // The store must reflect every prior import; never prerender GET.
 export const dynamic = "force-dynamic";
@@ -71,6 +72,10 @@ export async function POST(request: Request): Promise<Response> {
   const entry = buildImportedEntry(result.envelope, handle.trim());
   try {
     const entries = await upsertEntry(entry);
+    // Record distinct project_hash values for Axis 1 gate measurement.
+    // Fire-and-forget: a metrics failure must never break the leaderboard POST.
+    const projectHashes = result.envelope.rows.map((r) => r.projectHash);
+    recordSubmission(projectHashes).catch(() => {});
     return Response.json({ entry, entries }, { status: 201 });
   } catch {
     return Response.json({ error: "Could not save to the leaderboard. Try again." }, { status: 500 });
