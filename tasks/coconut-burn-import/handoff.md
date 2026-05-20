@@ -52,10 +52,13 @@ These are Python PoC defects. Browser shipping path (TS) unaffected. Address in 
 
 ### Remaining for next session
 
-- **7th codex re-audit** (rate-limit permitting): confirm F4-DUP CLOSED, 0 new HIGH on `parsers.ts` — run `codex exec --sandbox read-only` re-audit. Expected: F4-CROSS/F4-DEPTH/F4-DUP all CLOSED, F5/F6/F7 still deferred (Python PoC, expected).
-- **Vercel preview verify**: check PR #1 Vercel preview (`chongwon5026@gmail.com`) builds clean with `?auto-detect=1` in Chrome.
 - **Production rollout**: default OFF (Phase 1 quickstart visible to all until 5-axis Gate passes — separate PR).
 - **F5/F6/F7**: address in a separate "PoC hardening" sprint after Phase 2 lands.
+
+### Completed in last session (2026-05-20, post-compaction)
+
+- **7th codex re-audit** ✅: F4-CROSS/F4-DEPTH/F4-DUP all CLOSED, 0 new HIGH on `parsers.ts`. F5/F6/F7 Python PoC deferred (expected).
+- **Vercel preview verify** ✅: PR #1 preview (`coconutlabs-git-feat-burn-import-fsa-chongwon-shins-projects.vercel.app`) builds **Ready** on all 3 branch commits incl. `d0bf164`. `?auto-detect=1` opens FSA dialog (STEP 1 folder selectors + STEP 2 period picker + Scan & preview). Zero app errors in Chrome console.
 
 ---
 
