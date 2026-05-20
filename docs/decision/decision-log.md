@@ -244,3 +244,30 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 다음엔 무엇을 바꿀까: 워크플로우 경로(`web/` 접두사) 버그는 git root 확인 체크를
   plan 단계에 명시하면 방지 가능. GitHub Free 플랜의 branch protection 미지원은
   저장소 공개 또는 Pro 업그레이드 전까지 수동 주의로 대체.
+
+---
+
+### 2026-05-20 F5/F6/F7 Python PoC 하드닝 (parsers.py HIGH 3건 해소)
+
+- 문제: 7차 Codex 감사(`feat/burn-import-fsa`)에서 Python PoC `parsers.py`에
+  HIGH 3건 검출. F5 — `SessionParse.project_slug`가 raw path-slug를 필드로
+  노출(미래 caller가 실수로 emit 가능). F6 — `_as_int` 상한 없어 browser TS
+  `Number.MAX_SAFE_INTEGER`(2^53-1)과 cross-runtime 불일치 가능. F7 —
+  `(payload.get("info") or {}).get(...)` 패턴이 truthy 비-dict에서 AttributeError.
+- 버린 대안: F5 — dataclass는 그대로 두고 "slug를 절대 emit하지 말라"는 주석만 추가.
+  →미래 caller 실수를 차단 불가, defense-in-depth 위반.
+- 핵심 트레이드오프: Option A(해시 인라인)는 parse_* 시그니처에 salt 추가가 필요
+  → 모든 caller(collect.py·estimate_cost.py·test) 변경. 하지만 raw slug이 dataclass에
+  존재하지 않으면 어떤 caller도 실수로 emit할 경로가 사라짐.
+- 선택 이유: /codex consult 18개 개선점 반영 후 Option A 확정. F6 상한은 브라우저
+  TS의 `Number.MAX_SAFE_INTEGER`와 동기화(2^53-1). F7은 `isinstance(info, dict)`로
+  명시 교체. production 경로(브라우저 TS)는 무영향.
+- 강한 증거: 19 pytest 그린 (기존 14 + 신규 5종). CLI smoke — 27행 envelope에
+  `projectHash` 정상 출력, 홈 경로 누출 0건. `project_slug` grep 결과 =
+  hashing.py 함수 파라미터만 잔존 (parsers·collect·estimate_cost 0건).
+
+- 무엇이 잘 됐나: /codex consult가 plan의 결함(test 3개 파괴, estimate_cost.py
+  에서 salt 로드 위치 오류 등)을 구현 전에 잡아냄 — 리뷰 분리 원칙이 또 실효.
+  PR branch protection이 바로 작동해서 feature branch → PR 흐름이 정상 확인됨.
+- 다음엔 무엇을 바꿀까: HIGH 결함이 deferred로 분류되면 plan 파일에 "다음 가용 sprint
+  진입 조건"을 명시해서 자연스럽게 소환되게 하자. 이번은 수동 백로그 확인으로만 재발굴.
