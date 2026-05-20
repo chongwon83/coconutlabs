@@ -52,6 +52,12 @@ export const V3_NAV: NavLink[] = [
   { label: "Trust & Safety", href: "#safety" },
 ];
 
+// Single source of truth for the collector repo URL — referenced from
+// JoinBurnIndexForm Step 1 ("View collector source ↗") and the quickstart
+// `git clone` line. If the collector moves to its own repo, change this one
+// constant and the copy button stays in sync.
+export const COLLECTOR_REPO_URL = "https://github.com/chongwon83/coconutlabs";
+
 export const V3_BUILDERS: Builder[] = [
   {
     rank: 1,

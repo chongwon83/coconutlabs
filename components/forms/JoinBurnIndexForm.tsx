@@ -1,15 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/primitives";
 import { BurnIndexPreviewCard } from "@/components/BurnIndexPreviewCard";
 import { validateSummary, type BurnSummaryEnvelope } from "@/lib/validateSummary";
-import type { ImportedEntry } from "@/lib/data";
+import { COLLECTOR_REPO_URL, type ImportedEntry } from "@/lib/data";
+import { saveHandle, loadHandle, ensurePermission } from "@/lib/client/burn/handles";
+import { loadOrCreateSalt, importSalt } from "@/lib/client/burn/hashing";
+import { runImport, type RunImportArgs } from "@/lib/client/burn/import";
+import type { Period } from "@/lib/client/burn/collect";
 
 interface JoinBurnIndexFormProps {
   onSuccess?: (msg: string) => void;
   onImport?: (entries: ImportedEntry[]) => void;
 }
+
+// The quickstart commands rendered in Step 1. `git clone` uses
+// COLLECTOR_REPO_URL so a future repo move stays in sync with the source link.
+// Python 3.11+ is the only host requirement (the collector is stdlib-only).
+const QUICKSTART_COMMANDS = [
+  "# 1. Get the collector (one-time)",
+  `git clone ${COLLECTOR_REPO_URL}.git`,
+  "cd coconutlabs/web/tools/usage-poc",
+  "",
+  "# 2. Run (Python 3.11+, no dependencies)",
+  "python -m coconut_collector --json > burn-summary.json",
+  "",
+  "# 3. Upload burn-summary.json below ↓",
+].join("\n");
 
 // Burn Index import. The user runs the CoconutLabs collector on their own
 // machine, then uploads or pastes the resulting Burn Summary JSON. It is
@@ -17,12 +36,173 @@ interface JoinBurnIndexFormProps {
 // which re-validates (the real trust boundary) and stores it so the
 // leaderboard is shared across every browser.
 export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProps) {
+  // Phase 1 state
   const [handle, setHandle] = useState("");
   const [raw, setRaw] = useState("");
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [envelope, setEnvelope] = useState<BurnSummaryEnvelope | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Phase 2 FSA state
+  // NOTE: useSearchParams requires this component to be wrapped in <Suspense>
+  // at the call site. The feature flag is only active when:
+  //   1. ?auto-detect=1 is present in the URL, AND
+  //   2. showDirectoryPicker is available (Chrome 86+, Edge 86+).
+  const params = useSearchParams();
+  const autoDetect =
+    params.get("auto-detect") === "1" &&
+    typeof window !== "undefined" &&
+    "showDirectoryPicker" in window;
+
+  const [claudeHandle, setClaudeHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [codexHandle, setCodexHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [salt, setSalt] = useState<string>("");
+  const [fsaPeriod, setFsaPeriod] = useState<Period>("week");
+  const [fsaEnvelope, setFsaEnvelope] = useState<BurnSummaryEnvelope | null>(null);
+  const [fsaError, setFsaError] = useState("");
+  const [fsaLoading, setFsaLoading] = useState(false);
+  const [fsaHandle, setFsaHandle] = useState("");
+  const [fsaSubmitting, setFsaSubmitting] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [saltInput, setSaltInput] = useState("");
+  const [saltMsg, setSaltMsg] = useState("");
+
+  // Load persisted salt and handles from IndexedDB on mount (FSA path only).
+  useEffect(() => {
+    if (!autoDetect) return;
+    loadOrCreateSalt().then(setSalt).catch(() => {});
+    loadHandle("claude").then((h) => h && setClaudeHandle(h)).catch(() => {});
+    loadHandle("codex").then((h) => h && setCodexHandle(h)).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoDetect]);
+
+  // ── FSA handlers ──────────────────────────────────────────────────────────
+
+  async function pickFolder(kind: "claude" | "codex") {
+    try {
+      // showDirectoryPicker is a browser API — not available in SSR/node
+      const picker = (window as Window & typeof globalThis & {
+        showDirectoryPicker(opts?: { mode?: string }): Promise<FileSystemDirectoryHandle>;
+      }).showDirectoryPicker;
+      const h = await picker({ mode: "read" });
+      const expectedName = kind === "claude" ? "projects" : "sessions";
+      if (h.name !== expectedName) {
+        setFsaError(
+          `Selected folder must be the .claude/projects (or .codex/sessions) directory itself, not your home directory. You selected "${h.name}".`,
+        );
+        return;
+      }
+      setFsaError("");
+      await saveHandle(kind, h);
+      if (kind === "claude") setClaudeHandle(h);
+      else setCodexHandle(h);
+    } catch (e) {
+      // User cancelled the picker — not an error
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setFsaError("Could not open the folder picker. Check browser permissions.");
+    }
+  }
+
+  async function handleFsaScan() {
+    if (!claudeHandle && !codexHandle) {
+      setFsaError("Select at least one folder before scanning.");
+      return;
+    }
+    if (!salt) {
+      setFsaError("Salt not ready — please wait a moment and try again.");
+      return;
+    }
+    setFsaError("");
+    setFsaEnvelope(null);
+    setFsaLoading(true);
+    try {
+      // Re-verify permissions before iterating (revoked after navigation).
+      const handles: [FileSystemDirectoryHandle, "claude" | "codex"][] = [];
+      if (claudeHandle) handles.push([claudeHandle, "claude"]);
+      if (codexHandle) handles.push([codexHandle, "codex"]);
+      for (const [h] of handles) {
+        const perm = await ensurePermission(h);
+        if (perm !== "granted") {
+          setFsaError("Read permission was denied. Re-select the folder and try again.");
+          setFsaLoading(false);
+          return;
+        }
+      }
+      const args: RunImportArgs = {
+        claudeHandle: claudeHandle,
+        codexHandle: codexHandle,
+        salt,
+        period: fsaPeriod,
+      };
+      const result = await runImport(args);
+      setFsaEnvelope(result);
+    } catch (e) {
+      setFsaError(
+        e instanceof Error ? e.message : "Import failed — check the browser console.",
+      );
+    } finally {
+      setFsaLoading(false);
+    }
+  }
+
+  async function handleFsaUpload() {
+    const trimmed = fsaHandle.trim();
+    if (!trimmed) {
+      setFsaError("Enter a handle to join the Burn Index.");
+      return;
+    }
+    if (!fsaEnvelope || fsaSubmitting) return;
+    setFsaError("");
+    setFsaSubmitting(true);
+    try {
+      const raw = JSON.stringify(fsaEnvelope);
+      const res = await fetch("/api/burnindex", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle: trimmed, raw }),
+      });
+      const data: { entries?: ImportedEntry[]; error?: string } = await res
+        .json()
+        .catch(() => ({}));
+      if (!res.ok) {
+        setFsaError(data.error ?? "Could not add to the Burn Index. Try again.");
+        return;
+      }
+      if (data.entries) onImport?.(data.entries);
+      onSuccess?.(`Burn Summary validated — ${trimmed} added to the Burn Index.`);
+    } catch {
+      setFsaError("Could not reach the server. Check your connection and retry.");
+    } finally {
+      setFsaSubmitting(false);
+    }
+  }
+
+  async function handleImportSalt() {
+    setSaltMsg("");
+    try {
+      const newSalt = await importSalt(saltInput);
+      setSalt(newSalt);
+      setSaltInput("");
+      setSaltMsg("Python salt imported. Your browser and Python collector now share the same project identity.");
+    } catch (e) {
+      setSaltMsg(e instanceof Error ? e.message : "Invalid salt value.");
+    }
+  }
+
+  // ── Phase 1 handlers ──────────────────────────────────────────────────────
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(QUICKSTART_COMMANDS);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API may be unavailable on insecure origins or older browsers —
+      // fail silently and let the user select+copy manually from the visible code block.
+    }
+  }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -83,6 +263,164 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
     }
   }
 
+  // ── FSA render path (auto-detect=1 + showDirectoryPicker available) ───────
+  if (autoDetect) {
+    return (
+      <div className="form-card">
+        <h3 className="form-title">Auto-detect Burn Summary</h3>
+        <p className="form-desc">
+          Point this page at your{" "}
+          <code className="form-code-inline">.claude/projects</code> and{" "}
+          <code className="form-code-inline">.codex/sessions</code> folders.
+          Token counts are aggregated locally — only the 9 anonymised fields
+          join the Burn Index.
+        </p>
+
+        <div className="form-step">
+          <div className="form-step-label">Step 1 · Select folders</div>
+          <div className="form-step-desc">
+            Select only the exact directory shown below — not your home folder.
+          </div>
+          <div className="form-fsa-pickers">
+            <button
+              type="button"
+              className={`form-fsa-picker${claudeHandle ? " form-fsa-picker--selected" : ""}`}
+              onClick={() => pickFolder("claude")}
+            >
+              {claudeHandle ? `✓ ${claudeHandle.name}` : "Select .claude/projects folder"}
+            </button>
+            <button
+              type="button"
+              className={`form-fsa-picker${codexHandle ? " form-fsa-picker--selected" : ""}`}
+              onClick={() => pickFolder("codex")}
+            >
+              {codexHandle ? `✓ ${codexHandle.name}` : "Select .codex/sessions folder"}
+            </button>
+          </div>
+        </div>
+
+        <div className="form-step">
+          <div className="form-step-label">Step 2 · Choose period</div>
+          <div className="form-fsa-period-row">
+            {(["day", "week", "month", "year", "all"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`form-fsa-period-btn${fsaPeriod === p ? " form-fsa-period-btn--active" : ""}`}
+                onClick={() => setFsaPeriod(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {fsaError && <p className="form-error">{fsaError}</p>}
+
+        <Button
+          variant="primary"
+          size="lg"
+          type="button"
+          onClick={handleFsaScan}
+          disabled={fsaLoading || (!claudeHandle && !codexHandle)}
+        >
+          {fsaLoading ? "Scanning…" : "Scan & preview"}
+        </Button>
+
+        {fsaEnvelope && (
+          <>
+            <BurnIndexPreviewCard envelope={fsaEnvelope} />
+
+            <div className="form-field">
+              <label className="form-label" htmlFor="jbi-fsa-handle">
+                GitHub / X handle <span className="form-note">(required)</span>
+              </label>
+              <input
+                id="jbi-fsa-handle"
+                className="form-input"
+                type="text"
+                placeholder="@yourhandle"
+                value={fsaHandle}
+                onChange={(e) => setFsaHandle(e.target.value)}
+              />
+            </div>
+
+            <Button
+              variant="primary"
+              size="lg"
+              type="button"
+              onClick={handleFsaUpload}
+              disabled={fsaSubmitting}
+            >
+              {fsaSubmitting ? "Uploading…" : "Upload to leaderboard"}
+            </Button>
+
+            <button
+              type="button"
+              className="form-link"
+              onClick={() => { setFsaEnvelope(null); setFsaError(""); }}
+            >
+              Scan again
+            </button>
+          </>
+        )}
+
+        <div className="form-advanced">
+          <button
+            type="button"
+            className="form-link"
+            onClick={() => setShowAdvanced((v) => !v)}
+          >
+            {showAdvanced ? "▲ Hide" : "▼ Advanced"} — import Python salt
+          </button>
+          {showAdvanced && (
+            <div className="form-advanced-body">
+              <p className="form-note">
+                Using a separate browser salt means projects imported here will
+                appear under different projectHash values than your Python
+                collector unless you import the Python salt above.
+              </p>
+              <p className="form-note">
+                To share the same identity, open{" "}
+                <code className="form-code-inline">~/.coconutlabs/salt</code> and
+                paste its 64-character hex value below.
+              </p>
+              <div className="form-field">
+                <label className="form-label" htmlFor="jbi-salt-import">
+                  ~/.coconutlabs/salt contents
+                </label>
+                <input
+                  id="jbi-salt-import"
+                  className="form-input"
+                  type="text"
+                  placeholder="64 lowercase hex characters"
+                  value={saltInput}
+                  onChange={(e) => setSaltInput(e.target.value)}
+                />
+              </div>
+              {saltMsg && (
+                <p className={saltMsg.startsWith("Python salt") ? "form-note" : "form-error"}>
+                  {saltMsg}
+                </p>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={handleImportSalt}
+                disabled={!saltInput.trim()}
+              >
+                Import salt
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Phase 1 render path (file upload / JSON paste) ────────────────────────
+
   if (envelope) {
     return (
       <div className="form-card">
@@ -130,10 +468,40 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
     <form className="form-card" onSubmit={handleValidate}>
       <h3 className="form-title">Join Burn Index</h3>
       <p className="form-desc">
-        Run the CoconutLabs collector locally, then import your Burn Summary.
         Only the aggregated token and cost totals join the shared Burn Index —
         never your prompts, code, or file paths.
       </p>
+
+      <div className="form-step">
+        <div className="form-step-label">Step 1 · Run the collector</div>
+        <div className="form-step-desc">
+          Python 3.11+ required · No dependencies ·{" "}
+          <a
+            href={COLLECTOR_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="form-link-inline"
+          >
+            View collector source ↗
+          </a>
+        </div>
+        <div className="form-code-block">
+          <pre>
+            <code>{QUICKSTART_COMMANDS}</code>
+          </pre>
+          <button
+            type="button"
+            data-copied={copied}
+            className="form-copy-btn"
+            onClick={handleCopy}
+            aria-label="Copy quickstart commands"
+          >
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+      </div>
+
+      <div className="form-step-label">Step 2 · Upload your Burn Summary</div>
 
       <div className="form-field">
         <label className="form-label" htmlFor="jbi-handle">
