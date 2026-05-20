@@ -7,6 +7,14 @@ cost-per-fix challenges, and verified workflow drops.
 
 ---
 
+## Demo
+
+![CoconutLabs upload flow](public/coconutlabs-upload-demo.gif)
+
+*Run the collector → upload your Burn Summary → appear on the leaderboard*
+
+---
+
 ## Setup
 
 ```bash
