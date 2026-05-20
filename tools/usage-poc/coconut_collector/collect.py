@@ -207,7 +207,6 @@ def build_envelope(pricing: dict, salt: str,
             "tool": _TOOL_NAME[tool],
             "model": model,
             "tokenCount": token_count,
-            "totalTokens": row_total,
             "estimatedCostUsd": cost,
             "timestampBucket": days[-1] if days else fallback_day,
             "sessionCount": grp["sessions"],
@@ -255,8 +254,9 @@ def print_table(envelope: dict) -> None:
     print("  --- per group (tool / model / projectHash) ---")
     for r in envelope["rows"]:
         v = r["verification"]
+        row_total = sum(r["tokenCount"].values())
         print(f"  [{r['tool']}] {r['model']}  {r['projectHash']}  ({v['level']})")
-        print(f"    {r['totalTokens']:>15,} tokens"
+        print(f"    {row_total:>15,} tokens"
               f"    ${r['estimatedCostUsd']:>12.4f}"
               f"    {r['sessionCount']} sessions / {r['activeDays']} active days")
     gt = envelope["grandTotal"]

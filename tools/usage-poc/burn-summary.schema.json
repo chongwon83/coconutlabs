@@ -51,7 +51,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "tool", "model", "tokenCount", "totalTokens", "estimatedCostUsd",
+        "tool", "model", "tokenCount", "estimatedCostUsd",
         "timestampBucket", "sessionCount", "activeDays", "projectHash", "verification"
       ],
       "properties": {
@@ -59,7 +59,7 @@
         "model": {
           "type": "string",
           "description": "Provider model identifier (not secret). Charset-restricted so a tampered file cannot smuggle a path/secret here.",
-          "pattern": "\\A[A-Za-z0-9][A-Za-z0-9._-]{0,79}\\Z"
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
         },
         "tokenCount": {
           "type": "object",
@@ -73,7 +73,6 @@
             "cachedInput": { "type": "integer", "minimum": 0 }
           }
         },
-        "totalTokens": { "type": "integer", "minimum": 0 },
         "estimatedCostUsd": { "type": "number", "minimum": 0 },
         "timestampBucket": {
           "type": "string",

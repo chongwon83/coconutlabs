@@ -23,15 +23,40 @@ PRICING_PATH = Path(__file__).parent.parent / "model-pricing.json"
 # log cannot smuggle a path or secret into the whitelisted `model` field.
 _MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
 
+# Provider-prefix allowlist. Mirrors TS `KNOWN_MODEL_PREFIXES` in
+# web/lib/client/burn/parsers.ts so the Python and browser collectors agree
+# on which model strings can be carried as-is vs. coerced to 'unknown'.
+# Match policy: `raw == prefix` or `raw.startswith(prefix + "-")` — the
+# hyphen boundary blocks 'claude-opus-5' (allow) vs. 'claude-opus5' (deny)
+# style smuggling. Unknown families (e.g. 'gemini-3-pro') downgrade to
+# 'unknown', which `match_model` then prices via `_default` + 'low'.
+_KNOWN_MODEL_PREFIXES = frozenset({
+    "claude-opus",
+    "claude-sonnet",
+    "claude-haiku",
+    "gpt",
+    "o3",
+    "o4",
+})
+
 
 def _safe_model(raw: object) -> str | None:
-    """Return raw only if it looks like a model id, else None.
+    """Return raw only if it looks like a model id AND matches an allowed
+    provider-family prefix, else None.
+
+    Two-stage gate:
+      1. shape gate (_MODEL_RE.fullmatch) — rejects paths, whitespace, quotes
+      2. family gate (_KNOWN_MODEL_PREFIXES) — rejects unknown providers so
+         a tampered log cannot inject an unfamiliar 'model' string
 
     fullmatch (not match) is required: Python's `$` also matches just before
     a trailing newline, so `match` would accept 'model\\n'.
     """
-    if isinstance(raw, str) and _MODEL_RE.fullmatch(raw):
-        return raw
+    if not isinstance(raw, str) or not _MODEL_RE.fullmatch(raw):
+        return None
+    for prefix in _KNOWN_MODEL_PREFIXES:
+        if raw == prefix or raw.startswith(prefix + "-"):
+            return raw
     return None
 
 
