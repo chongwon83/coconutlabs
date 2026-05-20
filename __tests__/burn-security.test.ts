@@ -117,7 +117,6 @@ describe("validateSummary — 9-field whitelist", () => {
         tool: "claude-code" as const,
         model: "claude-opus-4-7",
         tokenCount: { input: 100, output: 50, cacheRead: 0, cacheWrite: 0, cachedInput: 0 },
-        totalTokens: 150,
         estimatedCostUsd: 0.0015,
         timestampBucket: "2026-05-20",
         sessionCount: 3,

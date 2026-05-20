@@ -27,7 +27,7 @@ const PERIOD_WINDOW_KEYS = ["period", "since", "until"];
 const PERIODS = ["day", "week", "month", "year", "all"];
 const GRAND_TOTAL_KEYS = ["totalTokens", "estimatedCostUsd"];
 const ROW_KEYS = [
-  "tool", "model", "tokenCount", "totalTokens", "estimatedCostUsd",
+  "tool", "model", "tokenCount", "estimatedCostUsd",
   "timestampBucket", "sessionCount", "activeDays", "projectHash",
   "verification",
 ];
@@ -134,13 +134,6 @@ function checkRow(row: unknown, i: number): string | null {
     return `${where}.model must be a model identifier (letters, digits, . _ -; 1–80 chars)`;
   const tcErr = checkTokenCount(row.tokenCount, where);
   if (tcErr) return tcErr;
-  if (!isIntAtLeastZero(row.totalTokens)) return `${where}.totalTokens must be an integer ≥ 0`;
-  // totalTokens must equal the sum of its five tokenCount components — the
-  // collector guarantees this, so a mismatch means the file was tampered.
-  const tc = row.tokenCount as Record<string, number>;
-  const tcSum = TOKEN_COUNT_KEYS.reduce((s, k) => s + tc[k], 0);
-  if (row.totalTokens !== tcSum)
-    return `${where}.totalTokens (${row.totalTokens}) does not equal the sum of tokenCount (${tcSum})`;
   if (!isFiniteNonNeg(row.estimatedCostUsd)) return `${where}.estimatedCostUsd must be a number ≥ 0`;
   if (typeof row.timestampBucket !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.timestampBucket))
     return `${where}.timestampBucket must be a YYYY-MM-DD date`;
@@ -195,9 +188,14 @@ export function validateSummary(raw: string): ValidationResult {
   if (!isFiniteNonNeg(gt.estimatedCostUsd))
     return { ok: false, error: "grandTotal.estimatedCostUsd must be a number ≥ 0." };
 
-  // grandTotal.totalTokens must equal the sum of every row's totalTokens.
-  const rowsTotal = (parsed.rows as { totalTokens: number }[])
-    .reduce((s, r) => s + r.totalTokens, 0);
+  // grandTotal.totalTokens must equal the sum of every row's tokenCount
+  // sub-fields. Rows no longer carry a redundant `totalTokens` (9-field
+  // whitelist), so we compute each row's total here from its tokenCount.
+  const rowsTotal = (parsed.rows as { tokenCount: Record<string, number> }[])
+    .reduce(
+      (s, r) => s + TOKEN_COUNT_KEYS.reduce((sum, k) => sum + r.tokenCount[k], 0),
+      0,
+    );
   if (gt.totalTokens !== rowsTotal)
     return {
       ok: false,

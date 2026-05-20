@@ -225,7 +225,6 @@ export interface BurnSummary {
   tool: "claude-code" | "codex";
   model: string;
   tokenCount: BurnTokenCount;
-  totalTokens: number;
   estimatedCostUsd: number;
   timestampBucket: string; // "YYYY-MM-DD" UTC day
   sessionCount: number;

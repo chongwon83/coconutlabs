@@ -1,6 +1,10 @@
 "use client";
 
-import type { BurnSummaryEnvelope, PeriodWindow } from "@/lib/validateSummary";
+import type {
+  BurnSummary,
+  BurnSummaryEnvelope,
+  PeriodWindow,
+} from "@/lib/validateSummary";
 import { deriveVerifLevel } from "@/lib/data";
 import { VerifBadge } from "@/components/primitives";
 
@@ -10,6 +14,14 @@ interface BurnIndexPreviewCardProps {
 
 function fmtTokens(n: number): string {
   return n.toLocaleString("en-US");
+}
+
+// Row total derived from the 5 tokenCount sub-fields. Rows themselves no
+// longer carry a redundant `totalTokens` (the 9-field whitelist excludes it);
+// the grand total is the only authoritative aggregate in the envelope.
+function rowTotalTokens(r: BurnSummary): number {
+  const t = r.tokenCount;
+  return t.input + t.output + t.cacheRead + t.cacheWrite + t.cachedInput;
 }
 
 // Human caption for the calendar window the collector aggregated over.
@@ -52,7 +64,7 @@ export function BurnIndexPreviewCard({ envelope }: BurnIndexPreviewCardProps) {
               <VerifBadge level={deriveVerifLevel(r.verification)} />
             </div>
             <div className="bp-nums">
-              <span className="bp-tokens">{fmtTokens(r.totalTokens)}</span>
+              <span className="bp-tokens">{fmtTokens(rowTotalTokens(r))}</span>
               <span className="bp-cost">{fmtCost(r.estimatedCostUsd)}</span>
             </div>
           </div>

@@ -273,10 +273,17 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
     setError("");
     setSubmitting(true);
     try {
+      // Send the validated envelope, not the original `raw` string. A pasted
+      // file with duplicate JSON keys can validate (JSON.parse keeps the last
+      // value) while still carrying the hidden earlier value over the wire —
+      // serialising from the parsed envelope strips that channel and keeps
+      // the manual-upload path on the same canonical-form contract as the
+      // FSA path (lib/client/burn/import.ts also POSTs JSON.stringify).
+      const canonicalRaw = JSON.stringify(envelope);
       const res = await fetch("/api/burnindex", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle: trimmed, raw }),
+        body: JSON.stringify({ handle: trimmed, raw: canonicalRaw }),
       });
       const data: { entries?: ImportedEntry[]; error?: string } = await res
         .json()
