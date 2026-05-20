@@ -5,15 +5,19 @@ detect_tool / find_logs / cost_breakdown / parse_claude / parse_codex from
 here. collect.py imports the same primitives to build a Burn Summary.
 
 SECURITY: parse_claude / parse_codex extract ONLY whitelisted numeric token
-keys, the session timestamp, the model name, and a project-path slug. The
-slug is hash input only and is never emitted. content / message.content /
-payload text fields are never read or serialized.
+keys, the session timestamp, the model name, and a salted project hash. The
+raw path slug is used only as hash input inside the parsers and is NEVER
+emitted. content / message.content / payload text fields are never read or
+serialized. SessionParse carries only the 12-hex projectHash — callers cannot
+accidentally emit a raw slug because the field does not exist.
 """
 
 import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+from .hashing import project_hash
 
 # model-pricing.json sits one directory up (usage-poc/), not inside the package.
 PRICING_PATH = Path(__file__).parent.parent / "model-pricing.json"
@@ -60,15 +64,24 @@ def _safe_model(raw: object) -> str | None:
     return None
 
 
+# Matches JS Number.MAX_SAFE_INTEGER (2^53-1) so Python and browser runtimes
+# agree on the maximum token value — a log carrying a larger int coerces to 0.
+_MAX_SAFE_INT = (1 << 53) - 1
+
+
 def _as_int(v: object) -> int:
-    """Coerce a token field to a non-negative int; 0 if not a clean int.
+    """Coerce a token field to a non-negative int ≤ MAX_SAFE_INTEGER; 0 otherwise.
 
     Guards against a malformed log carrying a string/float/bool where a
     token count is expected (bool is rejected despite subclassing int).
+    Values above 2^53-1 are rejected to match JS Number.MAX_SAFE_INTEGER
+    and prevent cross-runtime parity failures.
     """
     if isinstance(v, bool):
         return 0
-    return v if isinstance(v, int) and v >= 0 else 0
+    if isinstance(v, int) and 0 <= v <= _MAX_SAFE_INT:
+        return v
+    return 0
 
 
 @dataclass
@@ -81,15 +94,16 @@ class SessionParse:
                   PoC's historical `tok` dict so estimate_cost.py output
                   stays byte-identical.
     timestamp:    ISO 8601 string of the session, or None.
-    project_slug: path-derived project identifier. HASH INPUT ONLY — callers
-                  must never emit this raw.
+    project_hash: 12-hex salted hash of the raw path slug. The raw slug is
+                  consumed inside parse_claude/parse_codex and NEVER stored
+                  here — callers cannot accidentally emit it.
     """
 
     tool: str
     model: str
     tokens: dict
     timestamp: str | None
-    project_slug: str
+    project_hash: str
 
 
 def load_pricing() -> dict:
@@ -137,11 +151,12 @@ def detect_tool(path: Path) -> str:
     raise ValueError("cannot auto-detect tool; pass --tool")
 
 
-def parse_claude(path: Path) -> SessionParse:
+def parse_claude(path: Path, salt: str) -> SessionParse:
     """Sum per-message usage across all assistant lines (per-message billing).
 
-    project_slug is the parent directory name under ~/.claude/projects/
-    (a path slug); timestamp is the first line-level timestamp seen.
+    The raw slug (parent directory name under ~/.claude/projects/) is hashed
+    with `salt` inline; the raw slug is NEVER stored or returned.
+    timestamp is the first line-level timestamp seen.
     """
     model = "unknown"
     timestamp: str | None = None
@@ -179,14 +194,16 @@ def parse_claude(path: Path) -> SessionParse:
             tok["cache_read"] += _as_int(usage.get("cache_read_input_tokens"))
             tok["cache_write_5m"] += _as_int(cc.get("ephemeral_5m_input_tokens"))
             tok["cache_write_1h"] += _as_int(cc.get("ephemeral_1h_input_tokens"))
-    return SessionParse("claude", model, tok, timestamp, path.parent.name)
+    raw_slug = path.parent.name
+    return SessionParse("claude", model, tok, timestamp,
+                        project_hash(raw_slug, salt))
 
 
-def parse_codex(path: Path) -> SessionParse:
+def parse_codex(path: Path, salt: str) -> SessionParse:
     """Take the final token_count event (total_token_usage is cumulative).
 
-    project_slug is taken from the session-meta payload's `cwd` — read ONLY
-    as salted-hash input, never emitted. timestamp is the first line-level
+    The raw cwd from the session-meta payload is used only as salted-hash
+    input and is NEVER stored or returned. timestamp is the first line-level
     timestamp seen.
     """
     model = "unknown"
@@ -215,7 +232,12 @@ def parse_codex(path: Path) -> SessionParse:
             if m:
                 model = m
             if payload.get("type") == "token_count":
-                ttu = (payload.get("info") or {}).get("total_token_usage")
+                # F7: explicit isinstance guard — `or {}` would pass a truthy
+                # non-dict (list, str) through and cause AttributeError on .get().
+                info = payload.get("info")
+                if not isinstance(info, dict):
+                    continue
+                ttu = info.get("total_token_usage")
                 if isinstance(ttu, dict):
                     final = ttu
     if final is None:
@@ -225,7 +247,8 @@ def parse_codex(path: Path) -> SessionParse:
     tok = {"input": max(_as_int(final.get("input_tokens")) - cached, 0),
            "cached_input": cached,
            "output": _as_int(final.get("output_tokens"))}
-    return SessionParse("codex", model, tok, timestamp, cwd)
+    return SessionParse("codex", model, tok, timestamp,
+                        project_hash(cwd, salt))
 
 
 def cost_breakdown(tok: dict, price: dict) -> dict:

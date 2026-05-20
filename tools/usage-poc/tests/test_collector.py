@@ -76,29 +76,40 @@ def write_codex_log(root: Path, name: str, cwd: str, model: str,
     return p
 
 
-# --- test 1: parse_claude returns timestamp + slug -----------------------
+# --- test 1: parse_claude returns timestamp + project_hash ---------------
 
 def test_parse_claude_returns_timestamp_and_slug(tmp_path):
-    p = write_claude_log(tmp_path, "my-project", "claude-opus-4-7")
-    sp = parse_claude(p)
+    # Use a meaningful path so the hash covers a real slug value.
+    projects_root = tmp_path / "projects"
+    p = write_claude_log(projects_root, "my-project", "claude-opus-4-7")
+    sp = parse_claude(p, SALT)
     assert sp.tool == "claude"
     assert sp.model == "claude-opus-4-7"
     assert sp.timestamp == "2026-05-19T10:00:00Z"
-    assert sp.project_slug == "my-project"
+    # raw slug must NOT be present as a field
+    assert not hasattr(sp, "project_slug")
+    # project_hash must be the 12-hex salted hash of the parent dir name
+    assert sp.project_hash == project_hash("my-project", SALT)
+    assert len(sp.project_hash) == 12
+    assert all(c in "0123456789abcdef" for c in sp.project_hash)
     assert sp.tokens["input"] == 100
     assert sp.tokens["cache_write_5m"] == 5
     assert sp.tokens["cache_write_1h"] == 2
 
 
-# --- test 2: parse_codex returns timestamp + slug ------------------------
+# --- test 2: parse_codex returns timestamp + project_hash ----------------
 
 def test_parse_codex_returns_timestamp_and_slug(tmp_path):
     p = write_codex_log(tmp_path, "abc", "/Users/x/secret-project", "gpt-5.5")
-    sp = parse_codex(p)
+    sp = parse_codex(p, SALT)
     assert sp.tool == "codex"
     assert sp.model == "gpt-5.5"
     assert sp.timestamp == "2026-05-19T11:00:00Z"
-    assert sp.project_slug == "/Users/x/secret-project"
+    # raw slug must NOT be present as a field
+    assert not hasattr(sp, "project_slug")
+    # project_hash must be the 12-hex salted hash of the cwd
+    assert sp.project_hash == project_hash("/Users/x/secret-project", SALT)
+    assert len(sp.project_hash) == 12
     # input_tokens includes cached as a subset -> split, no double-bill
     assert sp.tokens["input"] == 160
     assert sp.tokens["cached_input"] == 40
@@ -213,8 +224,8 @@ def test_estimate_cost_shim_equivalence(tmp_path, monkeypatch):
     result = estimate_cost.build_aggregate_result(load_pricing())
 
     # independent ground truth straight from the parsers
-    claude_tok = sum(parse_claude(cl).tokens.values())
-    codex_tok = sum(parse_codex(cx).tokens.values())
+    claude_tok = sum(parse_claude(cl, SALT).tokens.values())
+    codex_tok = sum(parse_codex(cx, SALT).tokens.values())
     assert result["grand_total_tokens"] == claude_tok + codex_tok
     assert {m["model"] for m in result["per_model"]} == {
         "claude-opus-4-7", "gpt-5.5"}
@@ -394,3 +405,144 @@ def test_generated_at_normalised(tmp_path, monkeypatch):
                          generated_at="2026-05-26T12:00:00.500+00:00",
                          period="week")
     assert env["generatedAt"] == "2026-05-26T12:00:00Z"
+
+
+# --- test 15 (F6): _as_int rejects values above MAX_SAFE_INTEGER ----------
+
+def test_parsers_reject_oversize_int(tmp_path):
+    """F6: integer above 2^53-1 must coerce to 0; boundary value (2^53-1)
+    must be accepted; Codex-style int must also be capped."""
+    MAX = (1 << 53) - 1
+
+    # Claude log: huge input_tokens, normal output
+    cl = tmp_path / "projects" / "raw-secret-project" / "session.jsonl"
+    cl.parent.mkdir(parents=True)
+    cl.write_text(
+        json.dumps({
+            "timestamp": "2026-05-20T00:00:00Z",
+            "type": "assistant",
+            "message": {
+                "model": "claude-opus-4-7",
+                "usage": {
+                    "input_tokens": 1 << 60,   # over MAX_SAFE_INT -> 0
+                    "output_tokens": 1,
+                },
+            },
+        }) + "\n",
+        encoding="utf-8",
+    )
+    sp = parse_claude(cl, SALT)
+    assert sp.tokens["input"] == 0       # oversized -> 0
+    assert sp.tokens["output"] == 1
+
+    # Claude log: exactly MAX_SAFE_INT must pass through
+    cl2 = tmp_path / "projects2" / "p2" / "session.jsonl"
+    cl2.parent.mkdir(parents=True)
+    cl2.write_text(
+        json.dumps({
+            "timestamp": "2026-05-20T00:00:01Z",
+            "type": "assistant",
+            "message": {
+                "model": "claude-opus-4-7",
+                "usage": {"input_tokens": MAX, "output_tokens": 1},
+            },
+        }) + "\n",
+        encoding="utf-8",
+    )
+    sp2 = parse_claude(cl2, SALT)
+    assert sp2.tokens["input"] == MAX    # exactly at boundary -> accepted
+
+    # Codex log: over-size cached_input_tokens
+    cx = tmp_path / "rollout-huge.jsonl"
+    cx.write_text(
+        json.dumps({
+            "timestamp": "2026-05-20T00:00:02Z",
+            "payload": {"type": "session_meta", "cwd": "/tmp/p", "model": "gpt-5.5"},
+        }) + "\n" +
+        json.dumps({
+            "timestamp": "2026-05-20T00:00:03Z",
+            "payload": {
+                "type": "token_count",
+                "info": {"total_token_usage": {
+                    "input_tokens": 1 << 60,
+                    "cached_input_tokens": 0,
+                    "output_tokens": 5,
+                }},
+            },
+        }) + "\n",
+        encoding="utf-8",
+    )
+    sp3 = parse_codex(cx, SALT)
+    assert sp3.tokens["input"] == 0     # oversized -> 0 (coerced before subtraction)
+    assert sp3.tokens["output"] == 5
+
+
+# --- test 16 (F7): non-dict payload.info does not raise AttributeError ----
+
+def test_parsers_handle_non_dict_info(tmp_path):
+    """F7: payload.info as list, string, or None must be skipped safely;
+    a subsequent valid token_count event must still be picked up."""
+    p = tmp_path / "rollout-badinfo.jsonl"
+    p.write_text(
+        # list info — must be skipped, no AttributeError
+        json.dumps({
+            "timestamp": "2026-05-20T00:00:00Z",
+            "payload": {"type": "token_count", "info": [1, 2, 3]},
+        }) + "\n" +
+        # string info — must be skipped
+        json.dumps({
+            "timestamp": "2026-05-20T00:00:01Z",
+            "payload": {"type": "token_count", "info": "oops"},
+        }) + "\n" +
+        # valid event with cwd — picked up as the final result
+        json.dumps({
+            "timestamp": "2026-05-20T00:00:02Z",
+            "payload": {
+                "type": "token_count",
+                "model": "gpt-5.5",
+                "cwd": "/Users/x/proj",
+                "info": {"total_token_usage": {
+                    "input_tokens": 10,
+                    "cached_input_tokens": 0,
+                    "output_tokens": 5,
+                }},
+            },
+        }) + "\n",
+        encoding="utf-8",
+    )
+    sp = parse_codex(p, SALT)   # must not raise
+    assert sp.tokens["input"] == 10
+    assert sp.tokens["output"] == 5
+
+
+# --- test 17 (F5): SessionParse has no raw slug field ---------------------
+
+def test_session_parse_does_not_expose_raw_slug():
+    """F5: SessionParse must expose project_hash, not project_slug.
+    Verified via dataclass field introspection so a future rename cannot
+    silently reintroduce the raw field."""
+    import dataclasses
+    field_names = {f.name for f in dataclasses.fields(
+        __import__("coconut_collector.parsers", fromlist=["SessionParse"]).SessionParse
+    )}
+    assert "project_slug" not in field_names, (
+        "project_slug must not be a field — callers could accidentally emit it"
+    )
+    assert "project_hash" in field_names
+
+
+# --- test 18 (F5): raw slug never surfaces in dataclasses.asdict values ---
+
+def test_raw_slug_not_in_asdict_values(tmp_path):
+    """F5 caller-level: raw project path must not appear in any field value
+    returned by the parser — only the 12-hex hash should be present."""
+    import dataclasses
+    projects_root = tmp_path / "projects"
+    p = write_claude_log(projects_root, "raw-secret-project", "claude-opus-4-7")
+    sp = parse_claude(p, SALT)
+    all_values = str(dataclasses.asdict(sp))
+    assert "raw-secret-project" not in all_values, (
+        "raw slug must not appear in any SessionParse field"
+    )
+    # the hash must be present
+    assert sp.project_hash in all_values
