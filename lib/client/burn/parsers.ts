@@ -215,10 +215,23 @@ const POISON_TTU_KEYS: ReadonlySet<string> = new Set([
   "output_tokens",
 ]);
 
-function poisonedTokenKeys(line: string): ReadonlySet<string> {
-  const out = new Set<string>();
+type PoisonedKeys = { usage: ReadonlySet<string>; cc: ReadonlySet<string>; ttu: ReadonlySet<string> };
+
+function poisonedTokenKeys(line: string): PoisonedKeys {
+  const usageOut = new Set<string>();
+  const ccOut = new Set<string>();
+  const ttuOut = new Set<string>();
+  let bailed = false;
   let i = 0;
   const n = line.length;
+
+  // Returns path-scoped poison sets. On depth-overflow bail, returns the full
+  // key set for every path so an attacker cannot benefit from incomplete scans.
+  function result(): PoisonedKeys {
+    return bailed
+      ? { usage: new Set(POISON_USAGE_KEYS), cc: new Set(POISON_CC_KEYS), ttu: new Set(POISON_TTU_KEYS) }
+      : { usage: usageOut, cc: ccOut, ttu: ttuOut };
+  }
 
   function ws(): void {
     while (i < n && (line[i] === " " || line[i] === "\t" || line[i] === "\r" || line[i] === "\n")) i++;
@@ -297,7 +310,8 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
   }
 
   function skipObj(d: number): boolean {
-    if (d > 64 || i >= n || line[i] !== "{") return false;
+    if (d > 64) { bailed = true; return false; }
+    if (i >= n || line[i] !== "{") return false;
     i++; ws();
     if (i < n && line[i] === "}") { i++; return true; }
     while (i < n) {
@@ -316,7 +330,8 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
   }
 
   function skipArr(d: number): boolean {
-    if (d > 64 || i >= n || line[i] !== "[") return false;
+    if (d > 64) { bailed = true; return false; }
+    if (i >= n || line[i] !== "[") return false;
     i++; ws();
     if (i < n && line[i] === "]") { i++; return true; }
     while (i < n) {
@@ -354,8 +369,8 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
   // Callers pass a path-specific key set so scans for sibling objects cannot
   // clobber each other's entries in `out` (disjoint key sets guarantee this).
   // Uses last-write-wins semantics for any duplicate key occurrences.
-  function scanLeaf(keys: ReadonlySet<string>): void {
-    if (i >= n || line[i] !== "{") return;
+  function scanLeaf(keys: ReadonlySet<string>, target: Set<string>): void {
+    if (i >= n || line[i] !== "{") { skipVal(0); return; }
     i++; ws();
     if (i < n && line[i] === "}") { i++; return; }
     const res = new Map<string, boolean>();
@@ -376,9 +391,9 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
       if (line[i] === "}") { i++; break; }
       if (line[i] === ",") { i++; ws(); } else return;
     }
-    // Commit: add to out if float, remove if integer (last-write-wins clears
+    // Commit: add to target if float, remove if integer (last-write-wins clears
     // any prior accumulation from a duplicate-key earlier occurrence).
-    for (const [k, f] of res) { if (f) out.add(k); else out.delete(k); }
+    for (const [k, f] of res) { if (f) target.add(k); else target.delete(k); }
   }
 
   // Scan message.usage: direct token keys + cache_creation descent.
@@ -386,7 +401,7 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
   // for usage-level keys can never delete entries that scanLeaf wrote for
   // cache_creation (and vice-versa).
   function scanUsage(): void {
-    if (i >= n || line[i] !== "{") return;
+    if (i >= n || line[i] !== "{") { skipVal(0); return; }
     i++; ws();
     if (i < n && line[i] === "}") { i++; return; }
     const res = new Map<string, boolean>();
@@ -398,7 +413,7 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
       if (i >= n || line[i] !== ":") return;
       i++; ws();
       if (k === "cache_creation") {
-        scanLeaf(POISON_CC_KEYS);
+        scanLeaf(POISON_CC_KEYS, ccOut);
       } else if (POISON_USAGE_KEYS.has(k)) {
         res.set(k, isFloatLexeme());
       } else {
@@ -409,14 +424,14 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
       if (line[i] === "}") { i++; break; }
       if (line[i] === ",") { i++; ws(); } else return;
     }
-    for (const [k, f] of res) { if (f) out.add(k); else out.delete(k); }
+    for (const [k, f] of res) { if (f) usageOut.add(k); else usageOut.delete(k); }
   }
 
   // Scan message object: descend into usage, skip everything else.
   // message.content (the array of tool-use blocks) is byte-walked via
   // skipVal without any key inspection — this closes F4a.
   function scanMessage(): void {
-    if (i >= n || line[i] !== "{") return;
+    if (i >= n || line[i] !== "{") { skipVal(0); return; }
     i++; ws();
     if (i < n && line[i] === "}") { i++; return; }
     while (i < n) {
@@ -436,7 +451,7 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
 
   // Scan payload.info: descend into total_token_usage, skip everything else.
   function scanInfo(): void {
-    if (i >= n || line[i] !== "{") return;
+    if (i >= n || line[i] !== "{") { skipVal(0); return; }
     i++; ws();
     if (i < n && line[i] === "}") { i++; return; }
     while (i < n) {
@@ -446,7 +461,7 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
       ws();
       if (i >= n || line[i] !== ":") return;
       i++; ws();
-      if (k === "total_token_usage") { scanLeaf(POISON_TTU_KEYS); } else { if (!skipVal(2)) return; }
+      if (k === "total_token_usage") { scanLeaf(POISON_TTU_KEYS, ttuOut); } else { if (!skipVal(2)) return; }
       ws();
       if (i >= n) return;
       if (line[i] === "}") { i++; return; }
@@ -458,7 +473,7 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
   // payload.extra (and any other sibling keys) are byte-walked — this closes F4a
   // for Codex lines that carry extra fields with token-like names.
   function scanPayload(): void {
-    if (i >= n || line[i] !== "{") return;
+    if (i >= n || line[i] !== "{") { skipVal(0); return; }
     i++; ws();
     if (i < n && line[i] === "}") { i++; return; }
     while (i < n) {
@@ -478,25 +493,25 @@ function poisonedTokenKeys(line: string): ReadonlySet<string> {
 
   // Root object: only `message` and `payload` keys trigger descent.
   ws();
-  if (i >= n || line[i] !== "{") return out;
+  if (i >= n || line[i] !== "{") return result();
   i++; ws();
-  if (i < n && line[i] === "}") return out;
+  if (i < n && line[i] === "}") return result();
   while (i < n) {
-    if (line[i] !== '"') return out;
+    if (line[i] !== '"') return result();
     const k = decodeStr();
-    if (k === null) return out;
+    if (k === null) return result();
     ws();
-    if (i >= n || line[i] !== ":") return out;
+    if (i >= n || line[i] !== ":") return result();
     i++; ws();
     if (k === "message") { scanMessage(); }
     else if (k === "payload") { scanPayload(); }
-    else { if (!skipVal(0)) return out; }
+    else { if (!skipVal(0)) return result(); }
     ws();
-    if (i >= n) return out;
-    if (line[i] === "}") { i++; return out; }
-    if (line[i] === ",") { i++; ws(); } else return out;
+    if (i >= n) return result();
+    if (line[i] === "}") { i++; return result(); }
+    if (line[i] === ",") { i++; ws(); } else return result();
   }
-  return out;
+  return result();
 }
 
 // Longest-prefix-at-hyphen-boundary wins. A "-x" suffix on a pricing key
@@ -726,19 +741,19 @@ export async function parseClaudeFile(
     const m = Object.hasOwn(msg, "model") ? safeModel(msg.model) : null;
     if (m) model = m;
     const cc = readObject(usage, "cache_creation") ?? {};
-    tok.input = safeAdd(tok.input, readInt(usage, "input_tokens", poisoned));
-    tok.output = safeAdd(tok.output, readInt(usage, "output_tokens", poisoned));
+    tok.input = safeAdd(tok.input, readInt(usage, "input_tokens", poisoned.usage));
+    tok.output = safeAdd(tok.output, readInt(usage, "output_tokens", poisoned.usage));
     tok.cache_read = safeAdd(
       tok.cache_read,
-      readInt(usage, "cache_read_input_tokens", poisoned),
+      readInt(usage, "cache_read_input_tokens", poisoned.usage),
     );
     tok.cache_write_5m = safeAdd(
       tok.cache_write_5m,
-      readInt(cc, "ephemeral_5m_input_tokens", poisoned),
+      readInt(cc, "ephemeral_5m_input_tokens", poisoned.cc),
     );
     tok.cache_write_1h = safeAdd(
       tok.cache_write_1h,
-      readInt(cc, "ephemeral_1h_input_tokens", poisoned),
+      readInt(cc, "ephemeral_1h_input_tokens", poisoned.cc),
     );
   }
   return { tool: "claude", model, tokens: tok, timestamp, projectHash };
@@ -765,7 +780,7 @@ export async function parseCodexFile(
   // atomically with `final` so the post-loop readInt calls zero the right
   // keys for the surviving frame (not whichever poison set the loop ended
   // on after subsequent unrelated lines).
-  let finalPoisoned: ReadonlySet<string> | null = null;
+  let finalPoisoned: PoisonedKeys | null = null;
   for await (const line of streamLines(file)) {
     // Per-field poison: scan the raw line for whitelisted token keys that
     // carry a float-shaped number BEFORE JSON.parse collapses the
@@ -808,7 +823,7 @@ export async function parseCodexFile(
     // log schema isn't leaked into thrown messages a UI might display.
     throw new Error("invalid codex session");
   }
-  const poisonForFinal = finalPoisoned ?? undefined;
+  const poisonForFinal = finalPoisoned?.ttu ?? undefined;
   const cached = readInt(final, "cached_input_tokens", poisonForFinal);
   // input_tokens already includes cached_input_tokens as a subset; subtract
   // so the two categories don't double-bill the cached portion.

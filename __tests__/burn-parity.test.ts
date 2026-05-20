@@ -185,6 +185,31 @@ describe("parseClaudeFile — poisonedTokenKeys fixtures", () => {
     expect(result.tokens.cache_write_5m).toBe(8);
   });
 
+  it("F4-cross-claude: payload ttu integer clobber cannot clear message usage float poison", async () => {
+    // Attacker crafts a line with BOTH message.usage.input_tokens:1000.0 (float, poisoned)
+    // AND payload.info.total_token_usage.input_tokens:0 (integer, different path).
+    // Buggy flat `out` Set: scanPayload's commit loop runs out.delete("input_tokens"),
+    // clearing what scanUsage set. Fix: usageOut and ttuOut are independent sets.
+    const raw =
+      '{"type":"assistant","message":{"model":"claude-opus-4-7","usage":{"input_tokens":1000.0,"output_tokens":2}},"payload":{"info":{"total_token_usage":{"input_tokens":0}}}}';
+    const result = await parseClaudeFile(makeFile(raw), PHASH);
+    expect(result.tokens.input).toBe(0);
+    expect(result.tokens.output).toBe(2);
+  });
+
+  it("F4-DEPTH-claude: deep content decoy triggers fail-closed bail — usage float still poisoned", async () => {
+    // message.content precedes message.usage in the JSON; 70-level nesting triggers
+    // skipVal depth overflow (d > 64) before the scanner reaches usage.
+    // Buggy code: bails with empty poison set → readInt sees 1000 as integer.
+    // Fix: depth bail sets bailed=true → result() returns full POISON_USAGE_KEYS.
+    let nested = "{}";
+    for (let d = 0; d < 70; d++) nested = `{"x":${nested}}`;
+    const raw = `{"type":"assistant","message":{"model":"claude-opus-4-7","content":[${nested}],"usage":{"input_tokens":1000.0,"output_tokens":5}}}`;
+    const result = await parseClaudeFile(makeFile(raw), PHASH);
+    expect(result.tokens.input).toBe(0);
+    expect(result.tokens.output).toBe(0);
+  });
+
   it("F4-HIGH cross-clobber: usage.ephemeral_5m=0 must NOT clear cache_creation.ephemeral_5m=1000.0 poison", async () => {
     // An attacker sends usage.ephemeral_5m_input_tokens=0 (integer, not poisoned)
     // alongside cache_creation.ephemeral_5m_input_tokens=1000.0 (float, should be poisoned).
@@ -196,6 +221,18 @@ describe("parseClaudeFile — poisonedTokenKeys fixtures", () => {
     // cache_creation.ephemeral_5m_input_tokens:1000.0 is float → Python _as_int returns 0
     // TS must also return 0 (poison set prevents asInt from returning 1000)
     expect(result.tokens.cache_write_5m).toBe(0);
+  });
+
+  it("F4-DUP-claude: message:null before message:{float} — later float still poisoned (last-key-wins)", async () => {
+    // Duplicate root-level "message" key: first value is null (not an object).
+    // Buggy scanner: sees null, entry guard returns WITHOUT consuming it, parent loop
+    // breaks at the unconsumed 'n', exits before reaching the second "message" key.
+    // Fix: entry guard calls skipVal(0) to consume the non-object value before returning.
+    const raw =
+      '{"type":"assistant","message":null,"message":{"model":"claude-opus-4-7","usage":{"input_tokens":1000.0,"output_tokens":2}}}';
+    const result = await parseClaudeFile(makeFile(raw), PHASH);
+    expect(result.tokens.input).toBe(0);
+    expect(result.tokens.output).toBe(2);
   });
 });
 
@@ -221,6 +258,30 @@ describe("parseCodexFile — poisonedTokenKeys fixtures", () => {
     expect(result.tokens.output).toBe(20);
   });
 
+  it("F4-cross-codex: message usage integer clobber cannot clear ttu float poison (payload precedes message)", async () => {
+    // payload precedes message in JSON → scanPayload runs first, poisons ttu "input_tokens".
+    // message.usage.input_tokens:0 (integer) — buggy flat Set: out.delete clears ttu poison.
+    // Fix: ttuOut independent of usageOut → ttuOut retains poison.
+    const raw =
+      '{"payload":{"type":"token_count","model":"gpt-5.2","info":{"total_token_usage":{"input_tokens":1000.0,"output_tokens":5,"cached_input_tokens":0}}},"message":{"usage":{"input_tokens":0}}}';
+    const result = await parseCodexFile(makeFile(raw), hashSlug);
+    expect(result.tokens.input).toBe(0);
+    expect(result.tokens.output).toBe(5); // output_tokens:5 is integer — not poisoned
+    expect(result.tokens.cached_input).toBe(0);
+  });
+
+  it("F4-DEPTH-codex: deep payload.extra decoy triggers fail-closed bail — ttu float still poisoned", async () => {
+    // payload.extra precedes payload.info; 70-level nesting bails the scanner
+    // before it reaches total_token_usage. Fix: fail-closed → all POISON_TTU_KEYS.
+    let nested = "{}";
+    for (let d = 0; d < 70; d++) nested = `{"x":${nested}}`;
+    const raw = `{"payload":{"type":"token_count","model":"gpt-5.2","extra":${nested},"info":{"total_token_usage":{"input_tokens":1000.0,"output_tokens":5,"cached_input_tokens":0}}}}`;
+    const result = await parseCodexFile(makeFile(raw), hashSlug);
+    expect(result.tokens.input).toBe(0);
+    expect(result.tokens.output).toBe(0);
+    expect(result.tokens.cached_input).toBe(0);
+  });
+
   it("F4f: escaped cached_input_tokens + exponent → cached_input poisoned", async () => {
     const raw =
       '{"payload":{"type":"token_count","model":"gpt-5.2","info":{"total_token_usage":{"input_tokens":2000,"cached\\u005finput_tokens":1e3,"output_tokens":5}}}}';
@@ -230,5 +291,18 @@ describe("parseCodexFile — poisonedTokenKeys fixtures", () => {
     expect(result.tokens.input).toBe(2000);
     expect(result.tokens.cached_input).toBe(0);
     expect(result.tokens.output).toBe(5);
+  });
+
+  it("F4-DUP-codex: payload:null before payload:{float} — later float still poisoned (last-key-wins)", async () => {
+    // Duplicate root-level "payload" key: first value is null (not an object).
+    // Fix: entry guard calls skipVal(0), consuming null so root loop reaches second payload.
+    const raw =
+      '{"payload":null,"payload":{"type":"token_count","model":"gpt-5.2","info":{"total_token_usage":{"input_tokens":1000.0,"output_tokens":5,"cached_input_tokens":0}}}}';
+    const result = await parseCodexFile(makeFile(raw), hashSlug);
+    // input_tokens:1000.0 is float → poisoned → 0; output_tokens:5 integer → 5; cached:0
+    // Codex derivation: input = max(0 - 0, 0) = 0
+    expect(result.tokens.input).toBe(0);
+    expect(result.tokens.output).toBe(5);
+    expect(result.tokens.cached_input).toBe(0);
   });
 });
