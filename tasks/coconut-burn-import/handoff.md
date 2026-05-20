@@ -12,7 +12,7 @@
 |------|--------|-------|
 | A — sanity-grep | ✅ DONE | Findings 1/2/3 all confirmed closed |
 | B — codex 4th audit | ✅ DONE | F4 (new HIGH) surfaced, F5/F6/F7 deferred (Python PoC, out-of-scope §8.3) |
-| **F4 fix** | ✅ **CLOSED** | Path-aware mini JSON tokenizer. Disjoint poison key sets: `POISON_USAGE_KEYS ∩ POISON_CC_KEYS = ∅` prevents cross-clobber. `parsers.ts` lines 163–214 replaced (regex removed, hand-rolled RFC 8259 scanner). Verified by 7/7 fixture tests. |
+| **F4 fix — all sub-findings** | ✅ **FULLY CLOSED** | Three sub-findings closed across three sessions. See F4 technical summary below. |
 | F5 — Python project_slug leak | ⏸ DEFERRED | Python PoC only, not browser path. See §F5/F6/F7 below. |
 | F6 — Python unbounded int | ⏸ DEFERRED | Python PoC only. |
 | F7 — Python AttributeError | ⏸ DEFERRED | Python PoC only. |
@@ -20,11 +20,17 @@
 | C.2 — `handles.ts` | ✅ DONE | IndexedDB FSA handle persistence |
 | C.3 — `import.ts` | ✅ DONE | Orchestrator: stream → parse → collect → validate |
 | C.4 — FSA UI (`JoinBurnIndexForm.tsx`) | ✅ DONE | `?auto-detect=1` feature flag + `"showDirectoryPicker" in window` guard |
-| C.5 — vitest suites | ✅ DONE | 36/36 tests pass: `burn-parity.test.ts` (14), `burn-security.test.ts` (8), `burn-schema.test.ts` (14) |
+| C.5 — vitest suites | ✅ DONE | 29/29 tests pass (after F4-DUP fixtures added): `burn-parity.test.ts` (21), `burn-security.test.ts` (8) |
 | C.6 — E2E manual verify | ✅ DONE | FSA UI renders (two picker buttons, period selector, scan/preview, no upload-before-scan). Fallback (no flag) shows standard form. |
-| C.7 — branch + push + PR | 🔲 NEXT | Branch `feat/burn-import-fsa`, push to chongwon83/coconutlabs, open PR |
+| C.7 — branch + push + PR | ✅ DONE | PR #1 open: https://github.com/chongwon83/coconutlabs/pull/1. F4-DUP commit `e604ad0` pushed. |
 
-### F4 technical summary (path-aware tokenizer)
+### F4 technical summary (path-aware tokenizer — all sub-findings CLOSED)
+
+**F4-CROSS (closed, commit `12221b5`)**: Flat `out: Set<string>` shared across all path scanners allowed commit-loop deletions in one path to clear poison set by another. Fix: `poisonedTokenKeys` now returns `PoisonedKeys = { usage: Set; cc: Set; ttu: Set }` — three independent path-scoped sets. `scanLeaf(keys, target)` signature accepts the relevant set per call site.
+
+**F4-DEPTH (closed, commit `12221b5`)**: `skipVal` returning `false` on depth > 64 without setting `bailed` allowed deeply-nested decoy subtrees to produce an empty poison set, bypassing float detection. Fix: `skipObj`/`skipArr` set `bailed = true` before returning false. `result()` checks `bailed` and returns full key sets for all 3 paths.
+
+**F4-DUP (closed, commit `e604ad0`)**: Scan entry guards (`if (i >= n || line[i] !== "{") return;`) returned immediately without consuming the non-object value. This left `i` at the start of `null` (or other non-object); the parent scanner loop then failed to find `,`/`}` and exited, making any subsequent duplicate key (last-key-wins) unreachable. Fix: all 5 guards changed to `{ skipVal(0); return; }`.
 
 Three disjoint path-specific poison sets prevent cross-clobber between `scanUsage()` and `scanLeaf()`:
 
@@ -34,7 +40,7 @@ POISON_CC_KEYS     — keys inspected at message.usage.cache_creation.*
 POISON_TTU_KEYS    — keys inspected at payload.info.total_token_usage.*
 ```
 
-`POISON_USAGE_KEYS ∩ POISON_CC_KEYS = ∅` (no shared members). When `scanUsage()`'s commit loop fires, it only clears keys it itself added — it cannot clear keys `scanLeaf(POISON_CC_KEYS)` added. F4-HIGH cross-clobber regression confirmed by fixture `F4-HIGH cross-clobber` in `burn-parity.test.ts`.
+Total vitest coverage: 21 parity fixtures + 8 security fixtures = 29 tests (all pass). `npx tsc --noEmit` exits 0.
 
 ### F5/F6/F7 deferral record
 
@@ -46,9 +52,10 @@ These are Python PoC defects. Browser shipping path (TS) unaffected. Address in 
 
 ### Remaining for next session
 
-- **C.7**: push branch + open PR (GitHub `chongwon83/coconutlabs`, Vercel preview `chongwon5026@gmail.com`)
-- **Codex 6th re-audit** (rate-limit permitting): confirm F4 CLOSED, 0 new HIGH on `parsers.ts`
-- Production rollout: default OFF (Phase 1 quickstart visible to all until 5-axis Gate passes — separate PR)
+- **7th codex re-audit** (rate-limit permitting): confirm F4-DUP CLOSED, 0 new HIGH on `parsers.ts` — run `codex exec --sandbox read-only` re-audit. Expected: F4-CROSS/F4-DEPTH/F4-DUP all CLOSED, F5/F6/F7 still deferred (Python PoC, expected).
+- **Vercel preview verify**: check PR #1 Vercel preview (`chongwon5026@gmail.com`) builds clean with `?auto-detect=1` in Chrome.
+- **Production rollout**: default OFF (Phase 1 quickstart visible to all until 5-axis Gate passes — separate PR).
+- **F5/F6/F7**: address in a separate "PoC hardening" sprint after Phase 2 lands.
 
 ---
 
