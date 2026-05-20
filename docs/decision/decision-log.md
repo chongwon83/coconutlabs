@@ -238,3 +238,9 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 강한 증거: Codex R4 "측정 자체가 9-field 위반 가능"을 구조 설계 전에 검출 →
   telemetry.ts `FORBIDDEN_KEY_RE` + per-event ALLOWED_KEYS 화이트리스트로 차단.
   7축 98 vitest 테스트 — 6·7축 64건이 서버/텔레메트리 경계를 코드 실행 증거로 검증.
+- 무엇이 잘 됐나: Codex 5라운드 적대적 검토가 R4(텔레메트리 메타-프라이버시)와 R1
+  (Axis 6·7 추가)를 사전에 잡아냄 — 구현 전 설계 검증이 실제 결함을 차단했다.
+  parity-test/security-test CI 2종이 경로 버그 수정 후 바로 그린.
+- 다음엔 무엇을 바꿀까: 워크플로우 경로(`web/` 접두사) 버그는 git root 확인 체크를
+  plan 단계에 명시하면 방지 가능. GitHub Free 플랜의 branch protection 미지원은
+  저장소 공개 또는 Pro 업그레이드 전까지 수동 주의로 대체.
