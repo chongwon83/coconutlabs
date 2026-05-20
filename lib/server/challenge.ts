@@ -56,13 +56,22 @@ export async function addChallenge(record: ChallengeRecord): Promise<void> {
 export async function verifiedFixesByHandle(): Promise<Map<string, number>> {
   const records = await readChallenges();
 
-  // (handle challenge) -> latest DECIDED record (verified or rejected). We
-  // skip "unverified" (no decision yet — still pending) and any decided row
-  // without a timestamp to compare; the latter shouldn't happen because every
-  // code path that sets status=verified/rejected also stamps verifiedAt.
+  // (handle challenge) -> latest DECIDED record. We allow-list the two decided
+  // statuses explicitly rather than skipping "unverified" — a forward-incompat
+  // status appearing in the store (data corruption, a future migration writing
+  // a new status before this code is updated) must not be allowed to suppress
+  // an older verified row. We also skip any decided row without a timestamp;
+  // the latter shouldn't happen because every code path that sets
+  // status=verified/rejected also stamps verifiedAt.
+  //
+  // Tie-break: when two records for the same (handle, challenge) share the
+  // exact same verifiedAt (ms-precision ISO, theoretically possible in CI or
+  // back-to-back owner CLI runs), `>` keeps the FIRST one we saw. Both stores
+  // return newest-first, so "first seen" == "inserted later" — the later
+  // decision wins on tie, matching the append-only contract.
   const latest = new Map<string, ChallengeRecord>();
   for (const r of records) {
-    if (r.status === "unverified") continue;
+    if (r.status !== "verified" && r.status !== "rejected") continue;
     if (r.verifiedAt == null) continue;
     const key = `${r.handle} ${r.challenge}`;
     const cur = latest.get(key);

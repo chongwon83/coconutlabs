@@ -111,8 +111,15 @@ async function getCard(handle) {
 
 const results = [];
 function check(name, ok, detail) {
-  results.push({ name, ok, detail });
+  results.push({ name, ok, status: "pass-or-fail", detail });
   console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
+}
+// SKIP is recorded so the tally distinguishes scenarios genuinely passed
+// from those that were not exercised in this mode (e.g. redis-only paths
+// when run in file mode, or vice versa). A skip neither passes nor fails.
+function skip(name, detail) {
+  results.push({ name, ok: false, status: "skip", detail });
+  console.log(`  SKIP  ${name}${detail ? ` — ${detail}` : ""}`);
 }
 
 // Week timestamps double as weekKeys (the store keys history by `since`).
@@ -246,10 +253,9 @@ async function runScenarios() {
   //    dedup logic in verifiedFixesByHandle() is exercised on Vercel preview
   //    when an owner runs the CLI against UPSTASH_*.
   if (REDIS_MODE) {
-    check(
+    skip(
       "reject cancels prior verified (dedup-then-filter)",
-      true,
-      "[skipped: redis mode — verify on Vercel preview via manage-unverified.mjs --reject --force]",
+      "redis mode — verify on Vercel preview via manage-unverified.mjs --reject --force",
     );
   } else {
     const hCancel = `${RUN}-reject-cancel`;
@@ -276,6 +282,11 @@ async function runScenarios() {
       const ours = existing.find(
         (c) => c.handle === hCancel && c.challenge === "c1",
       );
+      // manage-unverified.mjs preserves the original submittedAt and stamps a
+      // fresh verifiedAt at decision time; mirror that here so the fixture
+      // matches what the real CLI writes. The dedup picker keys on verifiedAt
+      // (= decisionAt), so submittedAt has no effect on the test outcome —
+      // matching the CLI just keeps the fixture honest.
       const laterAt = new Date(Date.parse(ours.verifiedAt) + 60_000).toISOString();
       const rejectRecord = {
         handle: hCancel,
@@ -283,7 +294,7 @@ async function runScenarios() {
         claimedFixes: 3,
         status: "rejected",
         verifiedFixes: null,
-        submittedAt: laterAt,
+        submittedAt: ours.submittedAt,
         verifiedAt: laterAt,
       };
       await writeFile(
@@ -370,8 +381,17 @@ async function main() {
     stop();
   }
 
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} scenarios passed.`);
+  // SKIP entries are recorded with ok=false but status="skip" so they don't
+  // count as failures — only genuine pass-or-fail scenarios drive the exit
+  // code. Without this split a redis-only skip (or a file-only skip) would
+  // both inflate the "failed" count and trip a non-zero exit, masking real
+  // regressions across the two store backends.
+  const skipped = results.filter((r) => r.status === "skip");
+  const failed = results.filter((r) => !r.ok && r.status !== "skip");
+  const runnable = results.length - skipped.length;
+  const passed = runnable - failed.length;
+  const skipNote = skipped.length > 0 ? ` (${skipped.length} skipped)` : "";
+  console.log(`\n${passed}/${runnable} scenarios passed${skipNote}.`);
   if (failed.length > 0) exitCode = 1;
   process.exit(exitCode);
 }
