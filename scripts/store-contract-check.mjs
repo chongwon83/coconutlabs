@@ -35,8 +35,10 @@ const RUN = `contract-${Date.now()}`;
 
 // --- fixture builders -------------------------------------------------------
 
-// A single-row envelope whose grandTotal reconciles with the row. tokens go
-// entirely to `input` so totalTokens === the row sum === grandTotal.
+// A single-row envelope whose grandTotal reconciles with the row sum. tokens
+// go entirely to `input` so the row's tokenCount sub-fields sum to grandTotal.
+// F8 removed row-level totalTokens from the 9-field whitelist; grandTotal is
+// the only place that token-sum lives.
 function makeEnvelope({ period, since, until, tokens, cost }) {
   const row = {
     tool: "claude-code",
@@ -48,7 +50,6 @@ function makeEnvelope({ period, since, until, tokens, cost }) {
       cacheWrite: 0,
       cachedInput: 0,
     },
-    totalTokens: tokens,
     estimatedCostUsd: cost,
     timestampBucket: "2026-01-05",
     sessionCount: 1,
