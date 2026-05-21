@@ -24,6 +24,18 @@ let cached: BurnStore | undefined;
 
 export function getStore(): BurnStore {
   if (cached !== undefined) return cached;
+
+  // Runtime guard: BURN_STORE=memory is checked BEFORE the Upstash URL, so a
+  // stray Vercel env var would silently route all writes to a process-local Map
+  // (cold-start = data loss, no persistence). Fail fast instead of losing data.
+  if (process.env.BURN_STORE === "memory" && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "BURN_STORE=memory is forbidden in production environments. " +
+        "Remove or unset the BURN_STORE variable in your Vercel project " +
+        "environment variables dashboard, then redeploy.",
+    );
+  }
+
   if (process.env.BURN_STORE === "memory") {
     cached = new MemoryBurnStore();
   } else if (process.env.UPSTASH_REDIS_REST_URL) {
