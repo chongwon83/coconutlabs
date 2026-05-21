@@ -56,12 +56,14 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
 
   // Phase 2 FSA state
   // NOTE: useSearchParams requires this component to be wrapped in <Suspense>
-  // at the call site. The feature flag is only active when:
-  //   1. ?auto-detect=1 is present in the URL, AND
+  // at the call site. The feature flag is active when:
+  //   1. ?auto-detect=1 is present in the URL OR NEXT_PUBLIC_AUTO_DETECT_DEFAULT=true, AND
   //   2. showDirectoryPicker is available (Chrome 86+, Edge 86+).
+  // Kill-switch: set NEXT_PUBLIC_AUTO_DETECT_DEFAULT=false (or unset) to turn OFF globally.
   const params = useSearchParams();
   const autoDetect =
-    params.get("auto-detect") === "1" &&
+    (params.get("auto-detect") === "1" ||
+      process.env.NEXT_PUBLIC_AUTO_DETECT_DEFAULT === "true") &&
     typeof window !== "undefined" &&
     "showDirectoryPicker" in window;
 
