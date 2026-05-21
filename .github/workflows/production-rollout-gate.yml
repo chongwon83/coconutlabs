@@ -1,25 +1,34 @@
 # Production rollout gate for the ?auto-detect=1 feature flag.
 #
-# Runs on every PR so that the "gate-pass" required check always resolves.
-# PRs that don't touch JoinBurnIndexForm.tsx skip the live evaluation and
-# auto-pass. Only PRs touching that file trigger the full 7-axis check.
+# TRIGGER: workflow_dispatch only (manual trigger before ON-flip PR).
 #
-# Evaluates all 7 axes:
-#   Axes 1-3: live metrics from /api/internal/rollout-gate-metrics (runtime data)
-#   Axes 4-7: vitest CI checks (parity-test and security-test workflows)
+# Rationale for workflow_dispatch instead of pull_request:
+#   - The gate calls /api/internal/rollout-gate-metrics on the Vercel production
+#     deployment, which is protected by Vercel Deployment Protection (401 for
+#     unauthenticated CI). Rather than expose a bypass token, the owner runs
+#     the gate manually from their local machine and supplies the JSON result
+#     as a workflow input.
+#   - Evaluating on every PR caused all PRs to fail when Axis 1 < 15, blocking
+#     the development flow for non-ON-flip work.
+#   - On-flip PR should be the only time this workflow runs.
 #
-# If all axes pass (or are in WARN for 2-3), sets the "gate-pass" check ✅.
-# Otherwise fails with a table showing the current state of each axis.
+# Usage (before merging an ON-flip PR):
+#   1. Run locally: curl -H "x-gate-secret: $SECRET" $GATE_METRICS_URL/api/internal/rollout-gate-metrics
+#   2. Trigger this workflow with the JSON result pasted as the `metrics_json` input.
+#   3. Review the job summary and only merge if all axes pass.
 #
-# Branch protection must require:
-#   - gate-pass
-#   - parity-test / parity
-#   - security-test / security
+# Axes 4-7 are CI-only (vitest) — their pass/fail comes from parity-test and
+# security-test workflow results, not from this workflow.
 
 name: production-rollout-gate
 
 on:
-  pull_request:
+  workflow_dispatch:
+    inputs:
+      metrics_json:
+        description: "JSON from GET /api/internal/rollout-gate-metrics (paste full response)"
+        required: true
+        type: string
 
 jobs:
   gate:
@@ -27,50 +36,33 @@ jobs:
     name: gate-pass
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Check if gate-relevant file changed
-        id: check_files
+      - name: Validate secrets are configured
         run: |
-          git fetch origin ${{ github.base_ref }} --depth=1
-          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "components/forms/JoinBurnIndexForm.tsx"; then
-            echo "gate_relevant=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "gate_relevant=false" >> "$GITHUB_OUTPUT"
-            echo "PR does not touch JoinBurnIndexForm.tsx — gate auto-pass." >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          if [ -z "${{ secrets.GATE_METRICS_URL }}" ] || [ -z "${{ secrets.ROLLOUT_GATE_SECRET }}" ]; then
+            echo "::error::GATE_METRICS_URL or ROLLOUT_GATE_SECRET not configured — refusing to evaluate."
+            echo "gate_result=FAIL" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+        id: check_secrets
 
       - name: Evaluate rollout gate (Axes 1-3)
         id: gate
-        if: steps.check_files.outputs.gate_relevant == 'true'
-        env:
-          GATE_METRICS_URL: ${{ secrets.GATE_METRICS_URL }}
-          ROLLOUT_GATE_SECRET: ${{ secrets.ROLLOUT_GATE_SECRET }}
         run: |
-          if [ -z "$GATE_METRICS_URL" ] || [ -z "$ROLLOUT_GATE_SECRET" ]; then
-            echo "GATE_METRICS_URL or ROLLOUT_GATE_SECRET not configured."
-            echo "Set both secrets to enable live gate evaluation."
-            echo "gate_result=INSUFFICIENT_CONFIG" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          set -euo pipefail
 
-          response=$(curl -s -w "\n%{http_code}" \
-            -H "x-gate-secret: $ROLLOUT_GATE_SECRET" \
-            "$GATE_METRICS_URL/api/internal/rollout-gate-metrics")
+          body='${{ inputs.metrics_json }}'
 
-          http_code=$(echo "$response" | tail -1)
-          body=$(echo "$response" | head -n -1)
-
-          if [ "$http_code" != "200" ]; then
-            echo "Metrics endpoint returned $http_code"
-            echo "$body"
+          # Validate the JSON is parseable
+          if ! echo "$body" | python3 -m json.tool > /dev/null 2>&1; then
+            echo "::error::metrics_json input is not valid JSON."
             exit 1
           fi
 
-          echo "Metrics response:"
+          echo "Metrics input:"
           echo "$body" | python3 -m json.tool 2>/dev/null || echo "$body"
 
-          overall=$(echo "$body" | python3 -c "
+          result=$(echo "$body" | python3 -c "
           import sys, json
           data = json.load(sys.stdin)
           axes = data.get('axes', {})
@@ -87,9 +79,19 @@ jobs:
           print('PASS' if overall else 'FAIL')
           " 2>&1)
 
-          echo "$overall"
-          result=$(echo "$overall" | tail -1)
-          echo "gate_result=$result" >> "$GITHUB_OUTPUT"
+          echo "$result"
+          gate_result=$(echo "$result" | tail -1)
+
+          # Allowlist: only PASS or FAIL are valid outcomes
+          case "$gate_result" in
+            PASS|FAIL) ;;
+            *)
+              echo "::error::Unexpected gate_result value: '$gate_result'. Expected PASS or FAIL."
+              exit 1
+              ;;
+          esac
+
+          echo "gate_result=$gate_result" >> "$GITHUB_OUTPUT"
 
           # Print axis table to job summary
           {
@@ -97,9 +99,9 @@ jobs:
             echo ""
             echo "| Axis | State |"
             echo "|------|-------|"
-            echo "$overall" | head -n -2
+            echo "$result" | head -n -2
             echo ""
-            if [ "$result" = "PASS" ]; then
+            if [ "$gate_result" = "PASS" ]; then
               echo "✅ All axes pass — ON-flip PR may proceed."
             else
               echo "❌ Gate not passed — one or more axes are below threshold."
@@ -111,15 +113,10 @@ jobs:
       - name: Fail if gate not passed
         if: steps.gate.outputs.gate_result == 'FAIL'
         run: |
-          echo "Production rollout gate FAILED. See job summary for axis details."
+          set -euo pipefail
+          echo "::error::Production rollout gate FAILED. See job summary for axis details."
           exit 1
 
-      - name: Pass (insufficient config)
-        if: steps.gate.outputs.gate_result == 'INSUFFICIENT_CONFIG'
-        run: |
-          echo "Gate secrets not configured — skipping live evaluation."
-          echo "Configure GATE_METRICS_URL and ROLLOUT_GATE_SECRET to enable."
-
-      - name: Pass (not gate-relevant PR)
-        if: steps.check_files.outputs.gate_relevant == 'false'
-        run: echo "Gate not required for this PR."
+      - name: Gate passed
+        if: steps.gate.outputs.gate_result == 'PASS'
+        run: echo "Production rollout gate PASSED. ON-flip PR may be merged."

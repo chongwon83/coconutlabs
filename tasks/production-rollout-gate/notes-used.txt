@@ -1,0 +1,2 @@
+# notes-used.txt — 사용된 DevVault TIL/Errors 기록 (S10에서 usage_count +1)
+# 형식: <basename> | <적용 여부: ①직접 ②참고>

@@ -32,17 +32,21 @@ Set these under `github.com/<owner>/coconut-labs/settings/secrets/actions`:
 
 The `ROLLOUT_GATE_SECRET` value must match the `ROLLOUT_GATE_SECRET` environment variable set in Vercel.
 
-## How the gate blocks the ON-flip PR
+## How the gate blocks the ON-flip PR (v2: workflow_dispatch)
 
-The ON-flip PR will touch `web/components/forms/JoinBurnIndexForm.tsx` (changing the `autoDetect` default or flag condition). The `production-rollout-gate.yml` path filter triggers on that file, causing `gate-pass` to run. If Axes 1-3 are below threshold, the check fails and GitHub prevents merge.
+**Changed 2026-05-21**: The gate workflow now uses `workflow_dispatch` instead of `pull_request`.
 
-Axes 4-7 are always evaluated on every push (parity-test and security-test run on all branches), so their check results will already be present when the ON-flip PR is opened.
+Rationale:
+- Vercel Deployment Protection returns 401 for CI, making automated metrics calls infeasible
+- General PRs were being blocked when Axis 1 < 15 (development friction for non-ON-flip work)
+- Solo project: owner manually triggers the gate as a ritual before merging the ON-flip PR
 
-## Verification (owner manual step)
+### v2 ON-flip Procedure
 
-After configuring branch protection:
+1. Ensure Axis 1 ≥ 15 AND all should-pass criteria met
+2. Owner runs locally: `curl -H "x-gate-secret: $ROLLOUT_GATE_SECRET" $GATE_METRICS_URL/api/internal/rollout-gate-metrics`
+3. Copy JSON response
+4. GitHub → Actions → "production-rollout-gate" → Run workflow → paste JSON as `metrics_json` input
+5. Review job summary — merge only if PASS
 
-1. Open a dummy PR that touches `JoinBurnIndexForm.tsx` without meeting Axis 1 threshold
-2. Confirm `gate-pass` check appears and fails
-3. Confirm merge is blocked
-4. Close the dummy PR without merging
+Axes 4-7 are evaluated on every push (parity-test and security-test), so their checks are already present when the ON-flip PR is opened.

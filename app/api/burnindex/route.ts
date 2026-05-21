@@ -3,18 +3,21 @@
 // GET  → the full leaderboard list.
 // POST → a raw Burn Summary envelope is validated and stored.
 //
-// SECURITY: POST re-runs validateSummary server-side. Client validation is a
-// UX nicety (instant preview); the trust boundary is HERE. A request crafted
-// to bypass the browser still has to pass the same 9-field whitelist +
-// additionalProperties:false mirror, so a tampered file carrying raw content,
-// paths, or secrets cannot smuggle data into the store.
+// SECURITY: POST requires a valid collector token (Authorization: Bearer <token>)
+// issued by /api/internal/issue-collector-token. This prevents external actors
+// from forging Axis 1 project_hash counts without going through the browser flow.
+//
+// Schema validation also re-runs validateSummary server-side. Client validation
+// is a UX nicety; the trust boundary is HERE.
 
+import type { NextRequest } from "next/server";
 import { validateSummary } from "@/lib/validateSummary";
 import { buildImportedEntry, computeVes } from "@/lib/data";
 import { readEntries, upsertEntry } from "@/lib/server/store";
 import { verifiedFixesByHandle } from "@/lib/server/challenge";
 import { trendByHandle } from "@/lib/server/trend";
 import { recordSubmission } from "@/lib/server/burn/metrics";
+import { verifyAndConsumeToken } from "@/lib/server/burn/token";
 
 // The store must reflect every prior import; never prerender GET.
 export const dynamic = "force-dynamic";
@@ -45,7 +48,23 @@ export async function GET(): Promise<Response> {
   return Response.json({ entries: joined });
 }
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: NextRequest): Promise<Response> {
+  // Verify collector token before any payload processing.
+  const authHeader = request.headers.get("authorization");
+  const rawToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!rawToken) {
+    return Response.json({ error: "Missing Authorization header." }, { status: 401 });
+  }
+  try {
+    const tokenResult = await verifyAndConsumeToken(rawToken, "burnindex");
+    if (!tokenResult.ok) {
+      return Response.json({ error: "Invalid or expired token." }, { status: tokenResult.status });
+    }
+  } catch {
+    // Redis unavailable — fail closed
+    return Response.json({ error: "Token verification temporarily unavailable." }, { status: 503 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -67,6 +86,15 @@ export async function POST(request: Request): Promise<Response> {
   const result = validateSummary(raw);
   if (!result.ok) {
     return Response.json({ error: result.error }, { status: 400 });
+  }
+
+  // Only week-period envelopes belong on the leaderboard. Other periods are
+  // valid for local audit but must never mix into the shared store.
+  if (result.envelope.periodWindow.period !== "week") {
+    return Response.json(
+      { error: "Only 'week' period envelopes can be submitted to the leaderboard." },
+      { status: 400 },
+    );
   }
 
   const entry = buildImportedEntry(result.envelope, handle.trim());

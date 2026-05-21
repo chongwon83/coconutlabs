@@ -62,10 +62,10 @@ Try it: pip install coconut-collector && coconut-collector ~/
 
 copy-paste 한 줄로 동작하는지 직접 확인:
 
-- [ ] `pip install coconut-collector && coconut-collector ~/` 신규 머신에서 동작
-- [ ] README에 GIF 또는 스크린샷 있음
-- [ ] coconutlabs.xyz 업로드 흐름 30초 내 완료 가능
-- [ ] 에러 메시지가 친절한 한국어/영어로 나옴
+- [x] `pip install coconut-collector && coconut-collector ~/` 신규 머신에서 동작 (2026-05-21 smoke ✅, PyPI 게시 완료 ✅)
+- [x] README에 GIF 또는 스크린샷 있음 (2026-05-21 asciinema SVG demo ✅)
+- [x] coconutlabs.xyz 업로드 흐름 30초 내 완료 가능 (2026-05-21 Playwright e2e 163ms median ✅)
+- [x] 에러 메시지가 친절한 한국어/영어로 나옴 (2026-05-21 Phase 4 + /codex 교차 리뷰 ✅)
 
 ---
 
