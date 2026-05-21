@@ -78,6 +78,10 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
   const [fsaPeriod, setFsaPeriod] = useState<Period>("week");
   const [fsaEnvelope, setFsaEnvelope] = useState<BurnSummaryEnvelope | null>(null);
   const [fsaError, setFsaError] = useState("");
+  // Non-fatal warning channel (e.g., IDB persistence failure: folder selected
+  // for this session but could not be remembered). Distinct from fsaError so
+  // the picker flow continues — Codex Phase 1 PARTIAL mitigation (Invariant #5).
+  const [fsaWarning, setFsaWarning] = useState("");
   const [fsaLoading, setFsaLoading] = useState(false);
   const [fsaHandle, setFsaHandle] = useState("");
   const [fsaSubmitting, setFsaSubmitting] = useState(false);
@@ -87,6 +91,12 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
 
   // Telemetry state (Axes 2–3)
   const durationTimerRef = useRef<(() => DurationBucket) | null>(null);
+  // Chrome dispatches home-folder block as AbortError (Cell #2 verified
+  // 2026-05-22: e.name="AbortError", code=20), indistinguishable from
+  // intentional cancel. Surface actionable guidance only after the second
+  // AbortError — single cancels are common UX exploration; repeated cancels
+  // signal real confusion. Invariant #4 preserved: e.name only.
+  const abortCountRef = useRef<number>(0);
   const [uploadTimeBucket, setUploadTimeBucket] = useState<DurationBucket | null>(null);
   const [showSurvey, setShowSurvey] = useState(false);
 
@@ -102,27 +112,73 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
   // ── FSA handlers ──────────────────────────────────────────────────────────
 
   async function pickFolder(kind: "claude" | "codex") {
+    // Step 1 — Picker call. Errors classified by error.name only (Invariant #4:
+    // locale-independent). Branches: AbortError silent / SecurityError system
+    // folder block / NotAllowedError permission denied / fallback.
+    let h: FileSystemDirectoryHandle;
     try {
-      // showDirectoryPicker is a browser API — not available in SSR/node
       const picker = (window as Window & typeof globalThis & {
         showDirectoryPicker(opts?: { mode?: string }): Promise<FileSystemDirectoryHandle>;
       }).showDirectoryPicker;
-      const h = await picker({ mode: "read" });
-      const expectedName = kind === "claude" ? "projects" : "sessions";
-      if (h.name !== expectedName) {
-        setFsaError(
-          `Selected folder must be the .claude/projects (or .codex/sessions) directory itself, not your home directory. You selected "${h.name}".`,
-        );
-        return;
-      }
-      setFsaError("");
-      await saveHandle(kind, h);
-      if (kind === "claude") setClaudeHandle(h);
-      else setCodexHandle(h);
+      h = await picker({ mode: "read" });
     } catch (e) {
-      // User cancelled the picker — not an error
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setFsaError("Could not open the folder picker. Check browser permissions.");
+      if (e instanceof DOMException) {
+        if (e.name === "AbortError") {
+          abortCountRef.current += 1;
+          if (abortCountRef.current >= 2) {
+            setFsaWarning(
+              "Trouble picking the folder? Chrome blocks system folders like your home directory — drill into ~/.claude/projects (or ~/.codex/sessions) specifically.",
+            );
+          }
+          return;
+        }
+        if (e.name === "SecurityError") {
+          setFsaError(
+            "Chrome blocked that folder because it contains system files. Drill down to your .claude/projects (or .codex/sessions) directory specifically — not your home folder.",
+          );
+          return;
+        }
+        if (e.name === "NotAllowedError") {
+          setFsaError(
+            "Read access wasn't granted. Try again and approve the picker when Chrome prompts.",
+          );
+          return;
+        }
+      }
+      setFsaError(
+        "Couldn't open the folder picker. Try a different browser or check site permissions.",
+      );
+      return;
+    }
+
+    // Step 2 — Name validation. Dynamic h.name + expectedName for actionable
+    // error message (Phase 6 cell #3 contract).
+    const expectedName = kind === "claude" ? "projects" : "sessions";
+    if (h.name !== expectedName) {
+      setFsaError(
+        `You picked "${h.name}". We need the directory literally named "${expectedName}" (inside ~/.claude/ or ~/.codex/). Try again.`,
+      );
+      return;
+    }
+
+    // Step 3 — Handle React state set IMMEDIATELY (before saveHandle).
+    // Invariant #5: picker success ≠ IDB persistence success. The folder is
+    // usable for this session regardless of IDB save outcome.
+    setFsaError("");
+    setFsaWarning("");
+    abortCountRef.current = 0;
+    if (kind === "claude") setClaudeHandle(h);
+    else setCodexHandle(h);
+
+    // Step 4 — IDB persistence is best-effort (non-fatal). Failure surfaces as
+    // fsaWarning (distinct channel); fsaError stays empty so Scan button is
+    // enabled. Re-selection required on next session if save failed.
+    try {
+      await saveHandle(kind, h);
+    } catch {
+      setFsaWarning(
+        "Folder selected for this session, but it could not be remembered. You'll need to pick it again next time.",
+      );
     }
   }
 
@@ -346,7 +402,26 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
         <div className="form-step">
           <div className="form-step-label">Step 1 · Select folders</div>
           <div className="form-step-desc">
-            Select only the exact directory shown below — not your home folder.
+            Pick the exact folder previewed below. Drill into hidden directories with the OS shortcut shown.
+          </div>
+          <div className="path-preview-card">
+            <div className="path-preview-row">
+              <span className="path-segment">~</span>
+              <span>/</span>
+              <span className="path-segment path-segment--hidden">.claude</span>
+              <span>/</span>
+              <span className="path-segment">projects</span>
+            </div>
+            <div className="path-preview-row">
+              <span className="path-segment">~</span>
+              <span>/</span>
+              <span className="path-segment path-segment--hidden">.codex</span>
+              <span>/</span>
+              <span className="path-segment">sessions</span>
+            </div>
+            <p className="path-preview-hint">
+              Hidden folders need: <kbd>⌘⇧.</kbd> (macOS) or <kbd>Ctrl+H</kbd> (Linux) in your file manager
+            </p>
           </div>
           <div className="form-fsa-pickers">
             <button
@@ -383,6 +458,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
         </div>
 
         {fsaError && <p className="form-error">{fsaError}</p>}
+        {fsaWarning && <p className="form-warning">{fsaWarning}</p>}
 
         <Button
           variant="primary"
