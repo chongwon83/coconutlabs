@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:parity": "vitest run __tests__/burn-parity.test.ts",
     "test:security": "vitest run __tests__/burn-security.test.ts __tests__/burn-server-whitelist.test.ts __tests__/burn-telemetry-privacy.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",

@@ -21,7 +21,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-const ENV_KEYS = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"] as const;
+const ENV_KEYS = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "BURN_STORE"] as const;
 const savedEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
@@ -70,6 +70,34 @@ describe("getStore — env branch selection", () => {
 
     const store = getStore();
     expect(store).toBeInstanceOf(RedisBurnStore);
+  });
+
+  it("returns a MemoryBurnStore when BURN_STORE=memory (e2e isolation)", async () => {
+    process.env.BURN_STORE = "memory";
+    // Setting Upstash URL alongside must NOT take precedence — BURN_STORE=memory
+    // is the explicit e2e override, checked first in the factory.
+    process.env.UPSTASH_REDIS_REST_URL = "https://fake-redis.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "fake-token-for-test";
+
+    const { getStore } = await import("@/lib/server/burnStore/index");
+    const { MemoryBurnStore } = await import("@/lib/server/burnStore/memoryStore");
+
+    const store = getStore();
+    expect(store).toBeInstanceOf(MemoryBurnStore);
+  });
+
+  it("BURN_STORE=anything-else does NOT route to MemoryBurnStore", async () => {
+    // The factory matches the literal string 'memory'. Any other value (typo,
+    // legacy flag) falls through to the existing Redis/File branches — this
+    // prevents a stray BURN_STORE=memry from silently using fileStore in prod.
+    process.env.BURN_STORE = "in-memory";
+    delete process.env.UPSTASH_REDIS_REST_URL;
+
+    const { getStore } = await import("@/lib/server/burnStore/index");
+    const { FileBurnStore } = await import("@/lib/server/burnStore/fileStore");
+
+    const store = getStore();
+    expect(store).toBeInstanceOf(FileBurnStore);
   });
 });
 
