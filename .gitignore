@@ -51,3 +51,7 @@ __pycache__/
 
 # workflow (개인 진행 상태 — 솔로 프로젝트)
 docs/workflow-state.md
+.env*.local
+
+# codex CLI session artifacts (transient)
+.context/
