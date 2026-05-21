@@ -307,28 +307,41 @@ export function validateTelemetryEvent(raw: unknown): ValidationResult {
 
 // Sends a telemetry event to the server. Fire-and-forget: errors are silently
 // swallowed so that a telemetry failure never disrupts the main flow.
+//
+// sendBeacon is intentionally NOT used here: sendBeacon cannot attach custom
+// Authorization headers, which are required for the HMAC collector token.
+// fetch with keepalive: true provides equivalent unload-survival semantics.
 export function sendTelemetryEvent(event: TelemetryEvent): void {
   // Validate locally before sending (defence in depth).
   const result = validateTelemetryEvent(event);
   if (!result.ok) return; // drop silently
 
-  try {
-    // Use sendBeacon when available (non-blocking, survives page unload).
-    const body = JSON.stringify(event);
-    if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-      navigator.sendBeacon("/api/telemetry/auto-detect", body);
-    } else {
-      fetch("/api/telemetry/auto-detect", {
+  void (async () => {
+    try {
+      const body = JSON.stringify(event);
+      // Fetch a single-use token bound to this telemetry POST.
+      const tokenRes = await fetch("/api/internal/issue-collector-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "telemetry" }),
+      });
+      if (!tokenRes.ok) return; // drop silently if token issuance fails
+      const tokenData = (await tokenRes.json()) as { token?: string };
+      if (!tokenData.token) return;
+
+      fetch("/api/telemetry/auto-detect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${tokenData.token}`,
+        },
         body,
-        // keepalive lets the request survive navigation (like sendBeacon).
         keepalive: true,
       }).catch(() => {});
+    } catch {
+      // Never throw from telemetry
     }
-  } catch {
-    // Never throw from telemetry
-  }
+  })();
 }
 
 // ── Duration timer ────────────────────────────────────────────────────────────

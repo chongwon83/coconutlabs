@@ -19,6 +19,7 @@ import {
   startDurationTimer,
   type DurationBucket,
 } from "@/lib/client/burn/telemetry";
+import { fetchCollectorToken } from "@/lib/client/burn/token";
 
 interface JoinBurnIndexFormProps {
   onSuccess?: (msg: string) => void;
@@ -187,9 +188,13 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
     setFsaSubmitting(true);
     try {
       const raw = JSON.stringify(fsaEnvelope);
+      const burnToken = await fetchCollectorToken("burnindex");
       const res = await fetch("/api/burnindex", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${burnToken}`,
+        },
         body: JSON.stringify({ handle: trimmed, raw }),
       });
       const data: { entries?: ImportedEntry[]; error?: string } = await res
@@ -286,9 +291,13 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
       // the manual-upload path on the same canonical-form contract as the
       // FSA path (lib/client/burn/import.ts also POSTs JSON.stringify).
       const canonicalRaw = JSON.stringify(envelope);
+      const burnToken = await fetchCollectorToken("burnindex");
       const res = await fetch("/api/burnindex", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${burnToken}`,
+        },
         body: JSON.stringify({ handle: trimmed, raw: canonicalRaw }),
       });
       const data: { entries?: ImportedEntry[]; error?: string } = await res

@@ -5,6 +5,7 @@
 // before touching the store.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { NextRequest } from "next/server";
 import type { ImportedEntry } from "@/lib/data";
 
 // ── Mock server-side dependencies ────────────────────────────────────────────
@@ -23,6 +24,9 @@ vi.mock("@/lib/server/trend", () => ({
 }));
 vi.mock("@/lib/server/burn/metrics", () => ({
   recordSubmission: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("@/lib/server/burn/token", () => ({
+  verifyAndConsumeToken: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 // Import after mocks are in place.
@@ -57,12 +61,16 @@ function makeEnvelope(period: string, since: string | null, until: string | null
   };
 }
 
-function makeRequest(handle: string, envelope: object) {
+function makeRequest(handle: string, envelope: object): NextRequest {
   return new Request("http://localhost/api/burnindex", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      // verifyAndConsumeToken is mocked to return {ok:true} — any Bearer value works
+      "Authorization": "Bearer test-token",
+    },
     body: JSON.stringify({ handle, raw: JSON.stringify(envelope) }),
-  });
+  }) as unknown as NextRequest;
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

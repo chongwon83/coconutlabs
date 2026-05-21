@@ -8,14 +8,17 @@
 //   validated by validateSummary before route.ts calls recordSubmission).
 // - Axis 2/3 stores only enum field values from validated telemetry events.
 //
-// Redis schema (all keys under burn:metrics: namespace):
-//   burn:metrics:axis1         SET  — distinct project_hash values
-//   burn:metrics:agg           HASH — numeric counters (see field names below)
+// Redis schema (all keys under burn:metrics:v2: namespace):
+//   burn:metrics:v2:axis1      SET  — distinct project_hash values (v2 clean slate)
+//   burn:metrics:v2:agg        HASH — numeric counters (see field names below)
+//
+// v1 keys (burn:metrics:axis1, burn:metrics:agg) are preserved in Redis for
+// rollback reference but are no longer read or written by this module.
 
 import { Redis } from "@upstash/redis";
 
-const AXIS1_KEY = "burn:metrics:axis1";
-const AGG_KEY = "burn:metrics:agg";
+const AXIS1_KEY = "burn:metrics:v2:axis1";
+const AGG_KEY = "burn:metrics:v2:agg";
 
 // AGG hash field names
 const AXIS2_STARTED = "axis2:started";
@@ -95,6 +98,9 @@ export interface MetricsSnapshot {
     started: number;
     completed: number;
     failed: number;
+    // started - completed - failed: sessions that began but never reported an
+    // outcome. Counted as implicit failures for gate evaluation purposes.
+    abandoned: number;
     buckets: Record<string, number>;
   };
   axis3: {
@@ -136,12 +142,19 @@ export async function getMetricsSnapshot(): Promise<MetricsSnapshot> {
     steps[s] = toNum(a[axis3Step(s)]);
   }
 
+  const started = toNum(a[AXIS2_STARTED]);
+  const completed = toNum(a[AXIS2_COMPLETED]);
+  const failed = toNum(a[AXIS2_FAILED]);
+  // Clamp to 0: counter skew or ordering artifacts could produce negatives.
+  const abandoned = Math.max(0, started - completed - failed);
+
   return {
     axis1DistinctCount: axis1Count,
     axis2: {
-      started: toNum(a[AXIS2_STARTED]),
-      completed: toNum(a[AXIS2_COMPLETED]),
-      failed: toNum(a[AXIS2_FAILED]),
+      started,
+      completed,
+      failed,
+      abandoned,
       buckets,
     },
     axis3: {
