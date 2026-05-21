@@ -124,6 +124,31 @@ aggregates only — never prompt, response, or source-code content.
 
 ---
 
+## Testing
+
+### Unit tests (vitest)
+
+```bash
+npm test
+```
+
+### E2E tests (Playwright — Chromium)
+
+> **Before running e2e:** stop any existing `npm run dev` instance on port 3000/3001.
+> Playwright starts its own dev server on **port 3002** with `BURN_STORE=memory`
+> for isolation. A live dev server on an adjacent port can shadow the baseURL and
+> cause the wrong app to load.
+
+```bash
+npx playwright test          # headless
+npx playwright test --ui     # interactive UI mode
+```
+
+E2E tests live in `e2e/`. They stub `showDirectoryPicker` and patch the
+handles IDB to bypass `structuredClone` constraints on fake FSA handles.
+
+---
+
 ## What this prototype does NOT include
 
 - Real authentication or account system

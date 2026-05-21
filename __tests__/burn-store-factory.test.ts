@@ -21,7 +21,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-const ENV_KEYS = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "BURN_STORE"] as const;
+const ENV_KEYS = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "BURN_STORE", "NODE_ENV"] as const;
 const savedEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
@@ -31,9 +31,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  const env = process.env as Record<string, string | undefined>;
   for (const k of ENV_KEYS) {
-    if (savedEnv[k] === undefined) delete process.env[k];
-    else process.env[k] = savedEnv[k];
+    if (savedEnv[k] === undefined) delete env[k];
+    else env[k] = savedEnv[k];
   }
 });
 
@@ -84,6 +85,15 @@ describe("getStore — env branch selection", () => {
 
     const store = getStore();
     expect(store).toBeInstanceOf(MemoryBurnStore);
+  });
+
+  it("throws when BURN_STORE=memory in NODE_ENV=production", async () => {
+    process.env.BURN_STORE = "memory";
+    // NODE_ENV is readonly in @types/node — cast required for test override.
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+
+    const { getStore } = await import("@/lib/server/burnStore/index");
+    expect(() => getStore()).toThrow(/forbidden in production/);
   });
 
   it("BURN_STORE=anything-else does NOT route to MemoryBurnStore", async () => {
