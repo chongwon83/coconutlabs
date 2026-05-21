@@ -55,3 +55,8 @@ docs/workflow-state.md
 
 # codex CLI session artifacts (transient)
 .context/
+
+# Playwright e2e output
+/test-results/
+/playwright-report/
+/.playwright-cache/

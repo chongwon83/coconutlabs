@@ -1,0 +1,4 @@
+Placeholder so git tracks this directory. Used by the FSA picker reject case:
+the e2e spec stubs showDirectoryPicker to return a handle named "random-folder",
+which is NOT in CLAUDE_ROOT_NAMES ({"projects"}) / CODEX_ROOT_NAMES ({"sessions"}),
+so JoinBurnIndexForm must show the "must be the .claude/projects ..." error.
