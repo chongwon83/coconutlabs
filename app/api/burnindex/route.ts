@@ -69,6 +69,15 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: result.error }, { status: 400 });
   }
 
+  // Only week-period envelopes belong on the leaderboard. Other periods are
+  // valid for local audit but must never mix into the shared store.
+  if (result.envelope.periodWindow.period !== "week") {
+    return Response.json(
+      { error: "Only 'week' period envelopes can be submitted to the leaderboard." },
+      { status: 400 },
+    );
+  }
+
   const entry = buildImportedEntry(result.envelope, handle.trim());
   try {
     const entries = await upsertEntry(entry);

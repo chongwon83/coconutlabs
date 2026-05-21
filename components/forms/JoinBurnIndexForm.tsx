@@ -61,9 +61,13 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
   //   2. showDirectoryPicker is available (Chrome 86+, Edge 86+).
   // Kill-switch: set NEXT_PUBLIC_AUTO_DETECT_DEFAULT=false (or unset) to turn OFF globally.
   const params = useSearchParams();
+  // Kill-switch precedence: env=false blocks ALL paths (including ?auto-detect=1).
+  // env unset → query=1 still works (beta testers). env=true → everyone sees FSA.
+  const _envFlag = process.env.NEXT_PUBLIC_AUTO_DETECT_DEFAULT;
   const autoDetect =
-    (params.get("auto-detect") === "1" ||
-      process.env.NEXT_PUBLIC_AUTO_DETECT_DEFAULT === "true") &&
+    (_envFlag === "false"
+      ? false
+      : _envFlag === "true" || params.get("auto-detect") === "1") &&
     typeof window !== "undefined" &&
     "showDirectoryPicker" in window;
 
