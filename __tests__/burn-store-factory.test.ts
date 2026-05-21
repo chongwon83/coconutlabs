@@ -31,9 +31,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  const env = process.env as Record<string, string | undefined>;
   for (const k of ENV_KEYS) {
-    if (savedEnv[k] === undefined) delete process.env[k];
-    else process.env[k] = savedEnv[k];
+    if (savedEnv[k] === undefined) delete env[k];
+    else env[k] = savedEnv[k];
   }
 });
 
@@ -88,7 +89,8 @@ describe("getStore — env branch selection", () => {
 
   it("throws when BURN_STORE=memory in NODE_ENV=production", async () => {
     process.env.BURN_STORE = "memory";
-    process.env.NODE_ENV = "production";
+    // NODE_ENV is readonly in @types/node — cast required for test override.
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
 
     const { getStore } = await import("@/lib/server/burnStore/index");
     expect(() => getStore()).toThrow(/forbidden in production/);
