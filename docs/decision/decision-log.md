@@ -362,6 +362,18 @@ S0에서 작성, S10에서 회고 2줄 추가.
 
 ---
 
+### 2026-05-22 [Next cycle — Hygiene + e2e (rollout-gate 헬스 체크 + gstack 업그레이드 + Playwright e2e)]
+
+- 문제: 직전 사이클(folder-picker-ux Phase 0~8 + Finding 1) 종료 직후 retro 액션 아이템 3종이 누적 — ① test ratio 11.2% (목표 ≥ 20% 미달, Playwright e2e 1 spec 추가 시 15~18% 상승) ② 7-axis production rollout-gate workflow가 실제로 트리거·통과하는지 미검증 (안전망이 작동하지 않으면 e2e 추가해도 의미 없음) ③ 매 세션 preamble의 `UPGRADE_AVAILABLE` 노이즈 (gstack 1.40 → 1.41.1). 우선순위 명확: Phase #2(안전망 확인) → #3(노이즈 제거) → #1(e2e 본 작업).
+- 버린 대안: ① Phase #1을 먼저 진행 — rollout-gate가 안 돌면 e2e가 CI에서 게이트 되지 못해 안전망 0. ② #1을 독립 사이클로 분리 — 75~90분 단일 세션 분량이라 묶는 게 컨텍스트 단편화 0. ③ gstack 업그레이드 무시 — 매 세션 5초 손실 + warning blindness 위험.
+- 핵심 트레이드오프: 단일 세션 75~90분 사이클로 3 Phase 묶음 vs 각 Phase 독립 commit. Phase #2/#3은 코드 변경 0(읽기·환경)이라 묶어도 무해. Phase #1은 헤비(5+ 파일 + 새 인프라 + CI 통합) — 위험 3축 2/3 충족(① 실패비용 ≥ 2h ② 영향범위 CI+e2e 인프라+5+ 파일)이라 /codex 교차 리뷰 의무 발동.
+- 선택 이유: plan(`docs/plans/next-cycle-hygiene-and-e2e.md`)이 이미 작성·commit(`c408b51`)됨 + 진입 명령 명시 + 완료 기준(Review Harness 5항목) 명문화. Phase 순서가 안전망 → 환경 → 본 작업의 자연 의존성을 반영. 본 사이클은 휴면 retro 액션 정리 + 다음 contract 변경의 회귀 비용을 0으로 만드는 인프라 투자 성격.
+- 강한 증거: 직전 사이클 SESSION_HANDOFF.md Section 3 "다음 사이클 후보" 4건 중 owner 채택 결정 — Hygiene + e2e가 1순위. plan §의존성 상태 검증 완료 (`@playwright/test ^1.60.0` ✅ devDep, `playwright.config.ts` ❌ 신규 필요, `e2e/` ❌ 신규 필요, CI 통합 ❌ 신규 필요). 위험 3축 plan-brief에 점검 안 됨 → S0 본 엔트리에서 명문화: Phase #2/#3 라이트(0/3 충족, Fast-Path 가능), Phase #1 헤비(2/3 충족, /codex 의무 + 검증 분리).
+
+[S10 회고 — 본 사이클 완료 후 추가]
+
+---
+
 ### 2026-05-22 [folder-picker-ux Finding 1 — `?auto-detect=1` 모달 자동 오픈 별 사이클 진입]
 
 - 문제: Phase 7 production owner self-test에서 발견 — `?auto-detect=1` URL 쿼리가 modal 자동 오픈을 trigger하지 않음. 사용자는 Hero/Nav/DropsSection/FinalCTA "Join Burn Index" 버튼 1회 클릭 필수. URL 공유 기반 진입 동선 차단 → 핵심 UX gap.
