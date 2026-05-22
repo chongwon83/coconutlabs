@@ -27,6 +27,8 @@ import { JoinBurnIndexForm } from "@/components/forms/JoinBurnIndexForm";
 import { ChallengeInviteForm } from "@/components/forms/ChallengeInviteForm";
 import type { ImportedEntry } from "@/lib/data";
 
+const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
+
 type ModalKind = "join" | "challenge" | null;
 
 // useSearchParams은 production build에서 Suspense boundary 의무 (Next.js 16.2.6
@@ -118,18 +120,24 @@ export default function LandingApp() {
       <main>
         <Hero
           onJoin={() => setModal("join")}
-          onChallenge={() => setModal("challenge")}
+          {...(SHOW_LEGACY ? { onChallenge: () => setModal("challenge") } : {})}
         />
-        <Ticker />
+        <Ticker size={SHOW_LEGACY ? "default" : "compact"} />
         <BurnIndexSection imported={imported} />
-        <ChallengeSection onInvite={() => setModal("challenge")} />
-        <BuildersSection />
-        <DropsSection onRequest={() => setModal("join")} />
-        <TrustSection />
-        <FinalCTA
-          onJoin={() => setModal("join")}
-          onChallenge={() => setModal("challenge")}
-        />
+        {SHOW_LEGACY && (
+          <ChallengeSection onInvite={() => setModal("challenge")} />
+        )}
+        {SHOW_LEGACY && <BuildersSection />}
+        {SHOW_LEGACY && (
+          <DropsSection onRequest={() => setModal("join")} />
+        )}
+        <TrustSection onJoin={() => setModal("join")} />
+        {SHOW_LEGACY && (
+          <FinalCTA
+            onJoin={() => setModal("join")}
+            onChallenge={() => setModal("challenge")}
+          />
+        )}
       </main>
       <Footer />
 

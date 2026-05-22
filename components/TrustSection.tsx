@@ -1,15 +1,19 @@
 "use client";
 
 import { V3_TRUST } from "@/lib/data";
-import { Icon } from "@/components/primitives";
+import { Button, Icon } from "@/components/primitives";
 
 type TrustIcon = "shield" | "lock" | "eye" | "code";
+
+interface TrustSectionProps {
+  onJoin?: () => void;
+}
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return <div className="section-eyebrow">{children}</div>;
 }
 
-export function TrustSection() {
+export function TrustSection({ onJoin }: TrustSectionProps) {
   return (
     <section className="section" id="safety">
       <div className="section-inner">
@@ -43,6 +47,21 @@ export function TrustSection() {
             Only aggregated efficiency signals leave your device.{" "}
             <a href="#" className="trust-link">Read the full collection spec →</a>
           </span>
+        </div>
+
+        <div className="trust-cta">
+          <p className="trust-cta-headline">
+            Start shipping smarter today.
+          </p>
+          <p className="trust-cta-sub">
+            Join 1,247 builders already tracking their AI coding efficiency.
+          </p>
+          <Button variant="primary" size="lg" onClick={onJoin}>
+            Join Burn Index
+          </Button>
+          <p className="trust-cta-note">
+            Free to join · No credit card · Invite-only beta
+          </p>
         </div>
       </div>
     </section>

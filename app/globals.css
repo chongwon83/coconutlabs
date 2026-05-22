@@ -460,6 +460,17 @@ button { font: inherit; cursor: pointer; }
   max-width: 580px;
   line-height: 1.55;
 }
+.burn-methodology-caption {
+  font-size: 12.5px;
+  color: var(--fg3);
+  margin: 8px 0 0;
+  max-width: 580px;
+  line-height: 1.55;
+}
+.burn-methodology-caption strong {
+  color: var(--fg2);
+  font-weight: 600;
+}
 .section-actions { display: flex; gap: 8px; align-items: center; }
 
 /* Eyebrow numbered chip */
@@ -1776,6 +1787,14 @@ textarea.form-input {
   white-space: nowrap; padding-left: 100%;
 }
 
+/* Compact ticker — Hero sub-row variant for burn-only mode.
+   Smaller height/font reduces the strip to a secondary signal lane
+   rather than a dominant marquee. */
+.ticker-compact { border-top: none; }
+.ticker-compact .ticker-track {
+  height: 28px; gap: 28px; font-size: 10.5px; color: var(--fg3);
+}
+
 /* Section inner/alt/note */
 .section-inner {
   max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter);
@@ -1966,6 +1985,38 @@ textarea.form-input {
 .trust-link { color: var(--young-coconut); text-decoration: none; }
 .trust-link:hover { text-decoration: underline; }
 .trust-item { display: flex; align-items: flex-start; gap: 14px; }
+
+/* Trust compact CTA — FinalCTA absorption (Gap 2=B, landing-mvp-4) */
+.trust-cta {
+  margin-top: 40px;
+  padding: 32px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--bg);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.trust-cta-headline {
+  font-size: clamp(22px, 2.5vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  margin: 0;
+}
+.trust-cta-sub {
+  font-size: 15px;
+  color: var(--fg2);
+  line-height: 1.55;
+  margin: 0;
+}
+.trust-cta-note {
+  font-size: 12px;
+  color: var(--fg3);
+  margin: 4px 0 0;
+}
 
 /* FinalCTA */
 .final-cta { background: #FFFFFF; }

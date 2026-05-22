@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button, Badge } from "@/components/primitives";
 
+const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
+
 type HeroTab = "burn" | "challenge" | "drops";
 
 interface HeroProps {
@@ -95,6 +97,7 @@ function HeroSecondaryCard() {
 
 export function Hero({ onJoin, onChallenge }: HeroProps) {
   const [tab, setTab] = useState<HeroTab>("burn");
+  const activeTab: HeroTab = SHOW_LEGACY ? tab : "burn";
 
   return (
     <section className="hero-v3" id="hero">
@@ -109,8 +112,9 @@ export function Hero({ onJoin, onChallenge }: HeroProps) {
             <span className="hero-accent">Big ships.</span>
           </h1>
           <p className="hero-sub">
-            Track your AI coding burn, compete in verified cost-per-fix challenges,
-            and learn the workflows behind top builders.
+            {SHOW_LEGACY
+              ? "Track your AI coding burn, compete in verified cost-per-fix challenges, and learn the workflows behind top builders."
+              : "Track your AI coding burn and rank on the verified public leaderboard for cost-per-fix efficiency."}
           </p>
           <div className="hero-chips">
             <span className="hero-chip">Claude Code</span>
@@ -122,26 +126,30 @@ export function Hero({ onJoin, onChallenge }: HeroProps) {
             <Button variant="primary" size="lg" onClick={onJoin}>
               Join Burn Index
             </Button>
-            <Button variant="secondary" size="lg" onClick={onChallenge}>
-              Get Challenge Invite
-            </Button>
+            {SHOW_LEGACY && (
+              <Button variant="secondary" size="lg" onClick={onChallenge}>
+                Get Challenge Invite
+              </Button>
+            )}
           </div>
           <HeroSecondaryCard />
         </div>
 
         <div className="hero-right">
-          <div className="hero-tabs">
-            {(["burn", "challenge", "drops"] as HeroTab[]).map((t) => (
-              <button
-                key={t}
-                className={`hero-tab${tab === t ? " hero-tab-active" : ""}`}
-                onClick={() => setTab(t)}
-              >
-                {t === "burn" ? "Burn Index" : t === "challenge" ? "Challenges" : "Drops"}
-              </button>
-            ))}
-          </div>
-          <ProductShot tab={tab} />
+          {SHOW_LEGACY && (
+            <div className="hero-tabs">
+              {(["burn", "challenge", "drops"] as HeroTab[]).map((t) => (
+                <button
+                  key={t}
+                  className={`hero-tab${tab === t ? " hero-tab-active" : ""}`}
+                  onClick={() => setTab(t)}
+                >
+                  {t === "burn" ? "Burn Index" : t === "challenge" ? "Challenges" : "Drops"}
+                </button>
+              ))}
+            </div>
+          )}
+          <ProductShot tab={activeTab} />
         </div>
       </div>
     </section>

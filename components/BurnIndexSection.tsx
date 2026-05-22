@@ -104,6 +104,12 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
           Ranked by VES — Verified Efficiency Score (verified fixes ÷ AI cost USD).
           Lower spend, more fixes = higher rank.
         </p>
+        <p className="burn-methodology-caption">
+          30-day rolling window · 3-tier trust hierarchy:
+          {" "}<strong>Verified</strong> (provider / device-synced) &gt;
+          {" "}<strong>Estimated</strong> &gt;
+          {" "}<strong>Self-reported</strong>.
+        </p>
 
         <div className="lb-filters">
           {(["all", "provider", "device", "estimated", "selfrep"] as Filter[]).map((f) => (
