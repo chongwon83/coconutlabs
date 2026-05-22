@@ -230,7 +230,20 @@ test.describe("FSA burn import — picker flow", () => {
         jsonl: FIXTURE_JSONL,
       });
 
-      // 2. Intercept burnindex POST before navigating.
+      // 2. Mock the collector-token endpoint. JoinBurnIndexForm.tsx calls
+      //    fetchCollectorToken() before POSTing the envelope. The real endpoint
+      //    needs Redis + COLLECTOR_HMAC_SECRET which playwright.config.ts
+      //    intentionally omits (security boundary). Without this stub the
+      //    fetch throws and the upload aborts before /api/burnindex is hit.
+      await page.route("**/api/internal/issue-collector-token", async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ token: "test-token-for-e2e" }),
+        });
+      });
+
+      // 3. Intercept burnindex POST before navigating.
       // Filter by method: the page GETs /api/burnindex on mount (leaderboard
       // fetch). Only intercept POSTs — let GETs pass through so the GET
       // doesn't crash the handler with a null postDataJSON body.
@@ -254,15 +267,21 @@ test.describe("FSA burn import — picker flow", () => {
         });
       });
 
-      // 3. Navigate with auto-detect flag (activates FSA UI branch).
+      // 4. Navigate with auto-detect flag (activates FSA UI branch).
       await page.goto("/?auto-detect=1");
 
-      // 4. Open the modal — JoinBurnIndexForm lives inside a modal overlay
-      //    that requires clicking "Join Burn Index" to render. Use .first()
-      //    because the same button label appears in both hero and CTA sections.
-      await page.getByRole("button", { name: "Join Burn Index" }).first().click();
+      // 5. Modal auto-opens via LandingApp.tsx:46-51 useEffect when the
+      //    auto-detect query param is set. Assert the overlay first (fails
+      //    fast and unambiguously if the auto-open contract regresses), then
+      //    the picker button (fails if the FSA branch fails to mount).
+      await expect(page.locator(".modal-overlay")).toBeVisible({
+        timeout: 2_000,
+      });
+      await expect(
+        page.getByRole("button", { name: "Select .claude/projects folder" }),
+      ).toBeVisible({ timeout: 5_000 });
 
-      // 5. Step 1: pick folder.
+      // 6. Step 1: pick folder.
       await page
         .getByRole("button", { name: "Select .claude/projects folder" })
         .click();
@@ -271,17 +290,23 @@ test.describe("FSA burn import — picker flow", () => {
         page.getByRole("button", { name: /✓ projects/ }),
       ).toBeVisible({ timeout: 5_000 });
 
-      // 6. Step 2: scan (clock ensures window = [2026-05-11, 2026-05-18)).
+      // 7. Step 2: scan (clock ensures window = [2026-05-11, 2026-05-18)).
       await page.getByRole("button", { name: "Scan & preview" }).click();
       // Preview appears after runImport() resolves (may take a few seconds).
       await expect(
         page.getByRole("button", { name: "Upload to leaderboard" }),
       ).toBeVisible({ timeout: 15_000 });
 
-      // 7. Step 3: enter handle + upload.
+      // 8. Step 3: enter handle + upload.
       await page.getByLabel(/GitHub \/ X handle/).fill("@testhandle");
 
-      const responseReady = page.waitForResponse("**/api/burnindex");
+      // Predicate-form waitForResponse: only count the POST. The page also
+      // GETs /api/burnindex on mount (leaderboard fetch) — the unpredicated
+      // glob would match that too and let postCount remain 0 silently.
+      const responseReady = page.waitForResponse(
+        (res) =>
+          res.url().includes("/api/burnindex") && res.request().method() === "POST",
+      );
       await page
         .getByRole("button", { name: "Upload to leaderboard" })
         .click();
@@ -338,17 +363,27 @@ test.describe("FSA burn import — picker flow", () => {
       });
 
       await page.goto("/?auto-detect=1");
-      // Open the modal — form lives inside a modal overlay.
-      await page.getByRole("button", { name: "Join Burn Index" }).first().click();
+      // Modal auto-opens via LandingApp.tsx:46-51 when ?auto-detect=1 is set.
+      // Assert overlay first (fails fast if auto-open contract regresses),
+      // then the picker button.
+      await expect(page.locator(".modal-overlay")).toBeVisible({
+        timeout: 2_000,
+      });
+      await expect(
+        page.getByRole("button", { name: "Select .claude/projects folder" }),
+      ).toBeVisible({ timeout: 5_000 });
       await page
         .getByRole("button", { name: "Select .claude/projects folder" })
         .click();
 
-      // Full error string from JoinBurnIndexForm.tsx pickFolder() — includes the
-      // selected folder name so the assertion fails if no error is shown at all.
+      // Canonical reject message from JoinBurnIndexForm.tsx:159 — regex must
+      // include BOTH the user-supplied folder name AND the expected target
+      // directory so a generic empty error or a generic "wrong folder" toast
+      // can't satisfy the assertion. Refactor-resilient (i18n / minor wording)
+      // but still catches missing-name-interpolation bugs.
       await expect(
         page.getByText(
-          'Selected folder must be the .claude/projects (or .codex/sessions) directory itself, not your home directory. You selected "random-folder".',
+          /You picked "random-folder"\. We need the directory literally named "projects" \(inside ~\/\.claude\/ or ~\/\.codex\/\)\. Try again\./,
         ),
       ).toBeVisible({ timeout: 5_000 });
 

@@ -64,6 +64,40 @@ test.setTimeout(120_000);
 // ── Test ─────────────────────────────────────────────────────────────────────
 
 test("onboarding upload flow completes in ≤ 30 s (5-run median)", async ({ page }) => {
+  // ── Network stubs (installed once, persist across all 5 iterations) ──────
+  //
+  // 1. /api/internal/issue-collector-token — JoinBurnIndexForm.tsx:350 calls
+  //    fetchCollectorToken("burnindex") inside handleConfirm. The real endpoint
+  //    needs Upstash Redis + COLLECTOR_HMAC_SECRET which playwright.config.ts
+  //    intentionally omits (security boundary — dev .env.local must not leak
+  //    into e2e). Without this stub the fetch throws → setFsaError → no toast.
+  await page.route("**/api/internal/issue-collector-token", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ token: "test-token-for-e2e" }),
+    });
+  });
+
+  // 2. POST /api/burnindex — even with a token stubbed, the real route invokes
+  //    verifyAndConsumeToken (lib/server/burn/token.ts:94) which expects an
+  //    HMAC-signed 4-part token + Redis nonce. parseToken("test-token-for-e2e")
+  //    returns null → 401 malformed → onSuccess never fires.  Fulfill the POST
+  //    locally so the client-side success path (showToast) executes.
+  //    GET requests (leaderboard fetch on mount) pass through (route.continue)
+  //    so we still exercise the real GET handler against BURN_STORE=memory.
+  await page.route("**/api/burnindex", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ entries: [] }),
+    });
+  });
+
   const times: number[] = [];
 
   for (let i = 0; i < RUNS; i++) {
