@@ -11,16 +11,13 @@ import {
   type SetStateAction,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Nav } from "@/components/Nav";
 import { StatusBar } from "@/components/StatusBar";
 import { Hero } from "@/components/Hero";
 import { Ticker } from "@/components/Ticker";
 import { BurnIndexSection } from "@/components/BurnIndexSection";
-import { ChallengeSection } from "@/components/ChallengeSection";
-import { BuildersSection } from "@/components/BuildersSection";
-import { DropsSection } from "@/components/DropsSection";
 import { TrustSection } from "@/components/TrustSection";
-import { FinalCTA } from "@/components/FinalCTA";
 import { Footer } from "@/components/Footer";
 import { Toast } from "@/components/Toast";
 import { JoinBurnIndexForm } from "@/components/forms/JoinBurnIndexForm";
@@ -28,6 +25,14 @@ import { ChallengeInviteForm } from "@/components/forms/ChallengeInviteForm";
 import type { ImportedEntry } from "@/lib/data";
 
 const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
+
+// Legacy sections are excluded from the bundle entirely when the flag is
+// false. The ternary collapses to `null` at build time because the
+// NEXT_PUBLIC_* env var is inlined, so the dynamic() import never reaches
+// the production chunk graph in the launch configuration.
+const LegacySections = SHOW_LEGACY
+  ? dynamic(() => import("@/components/LegacySections"))
+  : null;
 
 type ModalKind = "join" | "challenge" | null;
 
@@ -124,16 +129,17 @@ export default function LandingApp() {
         />
         <Ticker size={SHOW_LEGACY ? "default" : "compact"} />
         <BurnIndexSection imported={imported} />
-        {SHOW_LEGACY && (
-          <ChallengeSection onInvite={() => setModal("challenge")} />
-        )}
-        {SHOW_LEGACY && <BuildersSection />}
-        {SHOW_LEGACY && (
-          <DropsSection onRequest={() => setModal("join")} />
+        {LegacySections && (
+          <LegacySections
+            slot="mid"
+            onJoin={() => setModal("join")}
+            onChallenge={() => setModal("challenge")}
+          />
         )}
         <TrustSection onJoin={() => setModal("join")} />
-        {SHOW_LEGACY && (
-          <FinalCTA
+        {LegacySections && (
+          <LegacySections
+            slot="final"
             onJoin={() => setModal("join")}
             onChallenge={() => setModal("challenge")}
           />
