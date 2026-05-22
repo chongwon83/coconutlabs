@@ -14,13 +14,11 @@ accidentally emit a raw slug because the field does not exist.
 
 import json
 import re
+from importlib.resources import files
 from dataclasses import dataclass
 from pathlib import Path
 
 from .hashing import project_hash
-
-# model-pricing.json sits one directory up (usage-poc/), not inside the package.
-PRICING_PATH = Path(__file__).parent.parent / "model-pricing.json"
 
 # A model identifier is a short token like 'claude-opus-4-7'. Anything with
 # path separators, whitespace, or quotes is rejected so a corrupted/adversarial
@@ -107,11 +105,11 @@ class SessionParse:
 
 
 def load_pricing() -> dict:
-    """Load the model pricing table."""
+    """Load the model pricing table (bundled inside the package)."""
     try:
-        with open(PRICING_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
+        data = files("coconut_collector").joinpath("model-pricing.json").read_text("utf-8")
+        return json.loads(data)
+    except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
         raise RuntimeError(f"cannot load pricing table: {e}") from e
 
 
@@ -261,7 +259,22 @@ CLAUDE_LOG_GLOB = ("~/.claude/projects", "*/*.jsonl")
 CODEX_LOG_GLOB = ("~/.codex/sessions", "*/*/*/rollout-*.jsonl")
 
 
-def find_logs(tool: str) -> list[Path]:
-    """Glob all local session logs for a tool (standard install paths)."""
-    base, pattern = CLAUDE_LOG_GLOB if tool == "claude" else CODEX_LOG_GLOB
-    return sorted(Path(base).expanduser().glob(pattern))
+def find_logs(tool: str, scan_root: Path | None = None) -> list[Path]:
+    """Glob all local session logs for a tool.
+
+    When `scan_root` is None the standard install-relative paths are used
+    (``~/.claude/projects`` and ``~/.codex/sessions``). When provided, logs
+    are searched under ``scan_root/.claude/projects`` and
+    ``scan_root/.codex/sessions`` — useful when the user passes their home
+    directory explicitly (e.g. ``coconut-collector ~/``).
+    """
+    if scan_root is None:
+        base, pattern = CLAUDE_LOG_GLOB if tool == "claude" else CODEX_LOG_GLOB
+        return sorted(Path(base).expanduser().glob(pattern))
+    if tool == "claude":
+        base = scan_root / ".claude" / "projects"
+        pattern = "*/*.jsonl"
+    else:
+        base = scan_root / ".codex" / "sessions"
+        pattern = "*/*/*/rollout-*.jsonl"
+    return sorted(base.glob(pattern)) if base.is_dir() else []

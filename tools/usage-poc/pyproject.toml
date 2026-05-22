@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "coconut-collector"
+version = "0.1.0"
+description = "CLI collector: reads local Claude Code / Codex session logs (never uploads prompts/code — only token counts and cost estimates) and emits a CoconutLabs Burn Summary."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+coconut-collector = "coconut_collector.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["coconut_collector"]
+# include model-pricing.json (bundled inside the package directory)

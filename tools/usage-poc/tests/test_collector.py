@@ -140,7 +140,7 @@ def test_collect_groups_by_tool_model_projecthash(tmp_path, monkeypatch):
     # one claude session, DIFFERENT project -> separate row
     b1 = write_claude_log(tmp_path, "proj-b", "claude-opus-4-7", ntok=50)
 
-    def fake_find_logs(tool):
+    def fake_find_logs(tool, scan_root=None):
         return [a1, a2, b1] if tool == "claude" else []
 
     monkeypatch.setattr(collect_mod, "find_logs", fake_find_logs)
@@ -167,7 +167,7 @@ def test_envelope_passes_jsonschema(tmp_path, monkeypatch):
     cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7")
     cx = write_codex_log(tmp_path, "x", "/Users/x/proj-b", "gpt-5.5")
 
-    def fake_find_logs(tool):
+    def fake_find_logs(tool, scan_root=None):
         return [cl] if tool == "claude" else [cx]
 
     monkeypatch.setattr(collect_mod, "find_logs", fake_find_logs)
@@ -192,7 +192,7 @@ def test_no_content_fields_in_output(tmp_path, monkeypatch):
     cx = write_codex_log(tmp_path, "x", "/Users/x/proj-b", "gpt-5.5",
                          ts="2026-05-12T11:00:00Z")
 
-    def fake_find_logs(tool):
+    def fake_find_logs(tool, scan_root=None):
         return [cl] if tool == "claude" else [cx]
 
     monkeypatch.setattr(collect_mod, "find_logs", fake_find_logs)
@@ -217,7 +217,7 @@ def test_estimate_cost_shim_equivalence(tmp_path, monkeypatch):
     cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7", ntok=100)
     cx = write_codex_log(tmp_path, "x", "/Users/x/proj-b", "gpt-5.5")
 
-    def fake_find_logs(tool):
+    def fake_find_logs(tool, scan_root=None):
         return [cl] if tool == "claude" else [cx]
 
     monkeypatch.setattr(estimate_cost, "find_logs", fake_find_logs)
@@ -259,7 +259,7 @@ def test_week_period_excludes_out_of_window(tmp_path, monkeypatch):
     outside = write_claude_log(tmp_path / "c", "proj-a", "claude-opus-4-7",
                                ts="2026-05-19T09:00:00Z", ntok=400)
 
-    def fake_find_logs(tool):
+    def fake_find_logs(tool, scan_root=None):
         return [inside1, inside2, outside] if tool == "claude" else []
 
     monkeypatch.setattr(collect_mod, "find_logs", fake_find_logs)
@@ -281,7 +281,7 @@ def test_all_period_includes_everything(tmp_path, monkeypatch):
     s3 = write_claude_log(tmp_path / "c", "proj-a", "claude-opus-4-7",
                           ts="2026-05-10T09:00:00Z", ntok=400)
 
-    def fake_find_logs(tool):
+    def fake_find_logs(tool, scan_root=None):
         return [s1, s2, s3] if tool == "claude" else []
 
     monkeypatch.setattr(collect_mod, "find_logs", fake_find_logs)
@@ -302,7 +302,7 @@ def test_calendar_window_boundaries(tmp_path, monkeypatch):
                                   "claude-opus-4-7", ts=ts)
                  for i, ts in enumerate(timestamps)]
         monkeypatch.setattr(collect_mod, "find_logs",
-                            lambda tool: paths if tool == "claude" else [])
+                            lambda tool, scan_root=None: paths if tool == "claude" else [])
         groups = collect_mod.collect(load_pricing(), SALT,
                                      period=period, now=now)
         return sum(g["sessions"] for g in groups.values())
@@ -346,7 +346,7 @@ def test_session_without_timestamp(tmp_path, monkeypatch):
     p.write_text(line + "\n", encoding="utf-8")
 
     monkeypatch.setattr(collect_mod, "find_logs",
-                        lambda tool: [p] if tool == "claude" else [])
+                        lambda tool, scan_root=None: [p] if tool == "claude" else [])
     week = collect_mod.collect(load_pricing(), SALT, period="week",
                                now=datetime(2026, 5, 19, 12, tzinfo=UTC))
     allp = collect_mod.collect(load_pricing(), SALT, period="all")
@@ -363,7 +363,7 @@ def test_empty_period_raises(tmp_path, monkeypatch):
                            ts="2020-01-01T00:00:00Z")
 
     monkeypatch.setattr(collect_mod, "find_logs",
-                        lambda tool: [old] if tool == "claude" else [])
+                        lambda tool, scan_root=None: [old] if tool == "claude" else [])
     with pytest.raises(ValueError, match="no sessions in period 'day'"):
         build_envelope(load_pricing(), SALT,
                        generated_at="2026-05-19T12:00:00Z", period="day")
@@ -376,7 +376,7 @@ def test_envelope_schema_version_and_period_window(tmp_path, monkeypatch):
                           ts="2026-05-19T09:00:00Z")
 
     monkeypatch.setattr(collect_mod, "find_logs",
-                        lambda tool: [cl] if tool == "claude" else [])
+                        lambda tool, scan_root=None: [cl] if tool == "claude" else [])
     # generatedAt 2026-05-26 -> last completed week [2026-05-18, 2026-05-25)
     # contains the 2026-05-19 fixture.
     env = build_envelope(load_pricing(), SALT,
@@ -400,7 +400,7 @@ def test_generated_at_normalised(tmp_path, monkeypatch):
                           ts="2026-05-19T09:00:00Z")
 
     monkeypatch.setattr(collect_mod, "find_logs",
-                        lambda tool: [cl] if tool == "claude" else [])
+                        lambda tool, scan_root=None: [cl] if tool == "claude" else [])
     env = build_envelope(load_pricing(), SALT,
                          generated_at="2026-05-26T12:00:00.500+00:00",
                          period="week")
@@ -546,3 +546,40 @@ def test_raw_slug_not_in_asdict_values(tmp_path):
     )
     # the hash must be present
     assert sp.project_hash in all_values
+
+
+# --- test 19: CLI --help exits 0 -----------------------------------------
+
+def test_cli_entry_point_help_exits_zero():
+    """coconut_collector.__main__ must exit 0 for --help."""
+    import subprocess
+    import sys
+    result = subprocess.run(
+        [sys.executable, "-m", "coconut_collector", "--help"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0
+    assert "period" in result.stdout.lower()
+
+
+# --- test 20: friendly error message when no sessions found ---------------
+
+def test_friendly_error_no_sessions(tmp_path, monkeypatch):
+    """When no sessions exist stderr must contain [CoconutLabs] and '→ 다음 액션:'."""
+    import subprocess
+    import sys
+    import os
+    # Use a tmp HOME where no claude/codex logs exist
+    env = dict(os.environ, HOME=str(tmp_path), USERPROFILE=str(tmp_path))
+    result = subprocess.run(
+        [sys.executable, "-m", "coconut_collector", "--period", "week"],
+        capture_output=True, text=True, env=env,
+    )
+    assert result.returncode != 0
+    combined = result.stderr + result.stdout
+    assert "[CoconutLabs]" in combined, (
+        f"Error output must include [CoconutLabs] prefix. Got: {combined!r}"
+    )
+    assert "→ 다음 액션:" in combined, (
+        f"Error output must include '→ 다음 액션:' hint. Got: {combined!r}"
+    )

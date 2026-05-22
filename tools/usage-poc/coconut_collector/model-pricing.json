@@ -1,0 +1,43 @@
+{
+  "_pricing_as_of": "2026-05-18",
+  "_note": "USD per 1M tokens. Sourced from official provider pricing pages on the date above. Prices change — verify before relying on. Codex 'pro' models have no cached-input discount, so cached_input == input. gpt-4-generation models predate the gpt-5 10%-of-input cached rule and use their own official cached prices.",
+  "_match": "Model name is prefix-matched at hyphen boundaries, longest prefix wins (e.g. claude-opus-4-7-20260101 -> claude-opus-4-7). Minor versions are listed separately because pricing differs (Opus 4.7-4.5 = $5 input, Opus 4.1-4.0 = $15). Unmatched model falls back to provider _default with price_confidence=low.",
+  "_source": {
+    "claude": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "codex": "https://developers.openai.com/api/docs/pricing"
+  },
+  "claude": {
+    "claude-opus-4-7":    { "input": 5,    "output": 25, "cache_read": 0.5,  "cache_write_5m": 6.25,  "cache_write_1h": 10 },
+    "claude-opus-4-6":    { "input": 5,    "output": 25, "cache_read": 0.5,  "cache_write_5m": 6.25,  "cache_write_1h": 10 },
+    "claude-opus-4-5":    { "input": 5,    "output": 25, "cache_read": 0.5,  "cache_write_5m": 6.25,  "cache_write_1h": 10 },
+    "claude-opus-4-1":    { "input": 15,   "output": 75, "cache_read": 1.5,  "cache_write_5m": 18.75, "cache_write_1h": 30 },
+    "claude-opus-4":      { "input": 15,   "output": 75, "cache_read": 1.5,  "cache_write_5m": 18.75, "cache_write_1h": 30 },
+    "claude-sonnet-4-6":  { "input": 3,    "output": 15, "cache_read": 0.3,  "cache_write_5m": 3.75,  "cache_write_1h": 6 },
+    "claude-sonnet-4-5":  { "input": 3,    "output": 15, "cache_read": 0.3,  "cache_write_5m": 3.75,  "cache_write_1h": 6 },
+    "claude-sonnet-4":    { "input": 3,    "output": 15, "cache_read": 0.3,  "cache_write_5m": 3.75,  "cache_write_1h": 6 },
+    "claude-haiku-4-5":   { "input": 1,    "output": 5,  "cache_read": 0.1,  "cache_write_5m": 1.25,  "cache_write_1h": 2 },
+    "claude-haiku-3-5":   { "input": 0.8,  "output": 4,  "cache_read": 0.08, "cache_write_5m": 1,     "cache_write_1h": 1.6 },
+    "_default":           { "input": 3,    "output": 15, "cache_read": 0.3,  "cache_write_5m": 3.75,  "cache_write_1h": 6 }
+  },
+  "codex": {
+    "gpt-5.5-pro":   { "input": 30,   "cached_input": 30,    "output": 180 },
+    "gpt-5.5":       { "input": 5,    "cached_input": 0.5,   "output": 30 },
+    "gpt-5.4-pro":   { "input": 30,   "cached_input": 30,    "output": 180 },
+    "gpt-5.4-mini":  { "input": 0.75, "cached_input": 0.075, "output": 4.5 },
+    "gpt-5.4-nano":  { "input": 0.2,  "cached_input": 0.02,  "output": 1.25 },
+    "gpt-5.4":       { "input": 2.5,  "cached_input": 0.25,  "output": 15 },
+    "gpt-5.3-codex": { "input": 1.75, "cached_input": 0.175, "output": 14 },
+    "gpt-5.2-codex": { "input": 1.75, "cached_input": 0.175, "output": 14 },
+    "gpt-5-codex":   { "input": 1.25, "cached_input": 0.125, "output": 10 },
+    "gpt-5-mini":    { "input": 0.25, "cached_input": 0.025, "output": 2 },
+    "gpt-5-nano":    { "input": 0.05, "cached_input": 0.005, "output": 0.4 },
+    "gpt-5":         { "input": 1.25, "cached_input": 0.125, "output": 10 },
+    "gpt-4.1-mini":  { "input": 0.4,  "cached_input": 0.1,   "output": 1.6 },
+    "gpt-4.1-nano":  { "input": 0.1,  "cached_input": 0.025, "output": 0.4 },
+    "gpt-4.1":       { "input": 2,    "cached_input": 0.5,   "output": 8 },
+    "gpt-4o":        { "input": 2.5,  "cached_input": 1.25,  "output": 10 },
+    "o4-mini":       { "input": 1.1,  "cached_input": 0.275, "output": 4.4 },
+    "o3":            { "input": 2,    "cached_input": 0.5,   "output": 8 },
+    "_default":      { "input": 1.25, "cached_input": 0.125, "output": 10 }
+  }
+}

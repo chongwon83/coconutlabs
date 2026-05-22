@@ -11,6 +11,7 @@ are never read.
 import json
 import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from .hashing import load_or_create_salt
 from .parsers import (cost_breakdown, find_logs, load_pricing, match_model,
@@ -131,13 +132,20 @@ def _verification(price_confidence: str) -> dict:
 
 
 def collect(pricing: dict, salt: str, period: str = "all",
-            now: datetime | None = None) -> dict:
+            now: datetime | None = None,
+            scan_root: "Path | None" = None) -> dict:
     """Scan every local session log and aggregate into grouped rows.
 
     Each log file is one session. Files that fail to parse or carry zero
     tokens are skipped. When `period` is not 'all', sessions are filtered
     to the calendar window containing `now` (defaults to the current UTC
     instant); a session is attributed by its first-line start timestamp.
+
+    `scan_root` overrides the default log discovery paths. When supplied,
+    logs are searched under ``scan_root/.claude/projects`` and
+    ``scan_root/.codex/sessions`` instead of the standard home-relative
+    defaults. Useful when the user passes their home directory explicitly
+    (e.g. ``coconut-collector ~/``).
     """
     if now is None:
         now = datetime.now(timezone.utc)
@@ -145,7 +153,7 @@ def collect(pricing: dict, salt: str, period: str = "all",
     groups: dict[tuple, dict] = {}
     for tool in ("claude", "codex"):
         parse = parse_claude if tool == "claude" else parse_codex
-        for path in find_logs(tool):
+        for path in find_logs(tool, scan_root=scan_root):
             try:
                 sp = parse(path, salt)
             except (ValueError, OSError, json.JSONDecodeError):
@@ -171,12 +179,14 @@ def collect(pricing: dict, salt: str, period: str = "all",
 
 def build_envelope(pricing: dict, salt: str,
                    generated_at: str | None = None,
-                   period: str = "week") -> dict:
+                   period: str = "week",
+                   scan_root: "Path | None" = None) -> dict:
     """Assemble the Burn Summary envelope (schemaVersion 2).
 
     `period` selects the calendar window (day/week/month/year/all). The
     window end and `generatedAt` are anchored to the same instant. Raises
     ValueError when `period` is unknown or no sessions fall in the window.
+    `scan_root` is forwarded to `collect()` to override default log paths.
     """
     if period not in _PERIODS:
         raise ValueError(f"unknown period: {period!r}")
@@ -191,7 +201,7 @@ def build_envelope(pricing: dict, salt: str,
         # input still serialises as schema-valid second-precision UTC 'Z'.
         generated_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     fallback_day = generated_at[:10]
-    groups = collect(pricing, salt, period=period, now=now)
+    groups = collect(pricing, salt, period=period, now=now, scan_root=scan_root)
     rows = []
     total_tokens = 0
     total_cost = 0.0
