@@ -1,2 +1,4 @@
 # notes-used.txt — 사용된 DevVault TIL/Errors 기록 (S10에서 usage_count +1)
 # 형식: <basename> | <적용 여부: ①직접 ②참고>
+
+# [ON-flip 2026-05-21] Pre-S0 조회 결과: 0건 무관 (키워드: auto-detect, vercel env, rollout gate, FSA picker)

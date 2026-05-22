@@ -11,15 +11,16 @@ Add a branch protection rule for `main` (or your default branch) with:
 
 | Check name | Workflow | Purpose |
 |------------|----------|---------|
-| `gate / gate-pass` | `production-rollout-gate.yml` | Axes 1-3 live metrics gate |
 | `parity / parity` | `parity-test.yml` | Axis 4 fixture parity |
 | `security / security` | `security-test.yml` | Axes 5/6/7 privacy tests |
+
+> **Note (2026-05-21)**: `gate / gate-pass` was removed from required checks because `workflow_dispatch` never runs automatically on PR push — leaving it in required checks permanently blocked all PRs. `gate-pass` is now a **manual owner ritual** (not CI-enforced) executed immediately before merging the ON-flip PR.
 
 ### Settings
 
 - **Require status checks to pass before merging**: ✅ ON
 - **Require branches to be up to date before merging**: ✅ ON (ensures metrics are evaluated against latest main)
-- **Do not allow bypassing the above settings**: ✅ ON (prevents owner from bypassing their own gate)
+- **Do not allow bypassing the above settings**: ❌ OFF (admin bypass enabled — gate is a manual ritual, not CI-enforced)
 
 ## GitHub Actions secrets to configure
 

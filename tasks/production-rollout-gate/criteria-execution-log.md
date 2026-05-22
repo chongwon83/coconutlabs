@@ -43,4 +43,36 @@ Required: `tasks/production-rollout-gate/smoke-golden-regression.md` — owner m
 
 ## Summary
 
-Must-pass: 10/10 ✅ | Should-pass: 6/6 ✅ | Phase A: pending owner manual step
+Must-pass: 10/10 ✅ | Should-pass: 6/6 ✅ | Phase A: ✅ COMPLETE (10/10 cells)
+
+---
+
+## ON-flip Success Conditions (2026-05-21)
+
+**기준**: `on-flip-2026-05-21.md` §성공조건 체크리스트
+
+### Must-Pass (5항목)
+
+| # | 항목 | 결과 | 근거 |
+|---|------|------|------|
+| 1 | Build secret 노출 0건 | ✅ PASS | curl + grep 전 청크 0건 |
+| 2 | Chrome → "Auto-detect Burn Summary" | ✅ PASS | Phase F smoke test #1 직접 확인 |
+| 3 | Safari fallback → "Join Burn Index" | ✅ PASS | Phase F smoke test #2 (FSA-off 시뮬레이션) |
+| 4 | 무토큰 POST → 401 | ✅ PASS | Phase F smoke test #4 curl 확인 |
+| 5 | axis2.started T+1h ≥ 1 | ❌ FAIL | T+1h 확인: HGETALL burn:metrics:v2:agg = empty, SCARD burn:metrics:v2:axis1 = 0. 유기 트래픽 미발생 |
+
+**Must-Pass: 4/5 (❌ #5 T+1h 0 — 유기 트래픽 미발생)**
+
+### Should-Pass (6항목)
+
+| # | 항목 | 결과 | 근거 |
+|---|------|------|------|
+| 6 | Codex pre-flip nit-only | ✅ PASS | PARTIAL → HIGH 3건 mitigations 반영, Phase B 진입 허용 |
+| 7 | Workflow_dispatch ritual + FAIL 기록 | ✅ PASS | Run #13 FAIL (axis1=0<15), 우회 기록 완료 |
+| 8 | Vercel env Production only | ✅ PASS | Preview/Dev 미오염 확인 |
+| 9 | Redeploy 5분 이내 | ✅ PASS | 34초 (EUAHZpz1Z) |
+| 10 | axis2 failRate ≤ 20% (n≥10) | ❌ FAIL | T+1h 분모=0, 평가 불가. 트래픽 누적 필요 |
+| 11 | Codex post-flip nit-only | ✅ PASS | PASS — HIGH/MEDIUM 결함 없음 |
+| 12 | decision-log + on-flip + S10 3종 | ✅ PASS | Phase J 완료 |
+
+**Should-Pass: 5/6 통과 (❌ #10 T+1h 분모=0 평가 불가) — 83% ≥ 80% 기준 충족**

@@ -49,3 +49,27 @@ Cells α1-α4 (uppercase query, duplicate param, empty value, `01` variant) requ
 | Phase A kill-switch matrix | ✅ CLOSED — 10/10 cells verified 2026-05-21 |
 | Vercel production API unreachable from CI | Solo project, owner local workaround documented |
 | Token rotation policy absent | Out of scope for this cycle; manual procedure documented above |
+
+---
+
+## ON-flip 2026-05-21 — 미검증 항목
+
+### 성공조건 #5 (axis2.started T+1h) ⏳
+
+axis2.started = 0 (T+15min까지). 분모 < 10 → failRate 평가 보류. T+1h 체크 필요.
+
+**수락 조건**: axis2.started ≥ 1 OR axis1-recruitment-strategy.md 개시 의사결정.
+
+### axis2 failRate (T+1h) ⏳
+
+분모 ≥ 10 시에만 평가. 현재 N/A.
+
+**Abandonment check (Q3 mitigation)**: started=0 → abandonment ratio 평가 불가. started > (completed+failed) × 3 조건 해당 시 failRate 평가 보류, completed 절대값 추세로 대체.
+
+### 429 rate (Q4 mitigation) ⏳
+
+issue-collector-token 429 응답 모니터링. 현재 axis2.started=0 → token 요청 없음 → 429 없음. 실 트래픽 발생 후 확인 필요.
+
+### Planner spot check (ON-flip)
+
+Planner spot check: contract/criteria 섹션에 코드 스니펫·diff·라인 단위 지시 ✅ 없음 (on-flip plan은 env 변경 + 문서만, 코드 변경 0).

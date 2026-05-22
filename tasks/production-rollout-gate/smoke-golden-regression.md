@@ -39,3 +39,23 @@
 Alpha cells confirm strict `=== "1"` matching rejects all variants.
 
 **Phase A complete.**
+
+---
+
+## Phase F — Production Smoke Test (ON-flip 2026-05-21)
+
+**Date**: 2026-05-21 (Session 2, post-redeploy)
+**Deployment**: EUAHZpz1Z — NEXT_PUBLIC_AUTO_DETECT_DEFAULT=true, Production only
+**URL**: https://www.coconutlabs.xyz/
+**Method**: Chrome browser automation (mcp__claude-in-chrome) + curl
+
+| # | 환경 | 기대 | 실제 | Pass? |
+|---|------|------|------|-------|
+| 1 | Chrome (FSA=true), 쿼리 없음 | "Auto-detect Burn Summary" | "Auto-detect Burn Summary" | ✅ |
+| 2 | FSA-off 시뮬레이션 (`delete window.showDirectoryPicker`) | "Join Burn Index" | "Join Burn Index" | ✅ |
+| 3 | Chrome + `?auto-detect=0` (env=true 우선 검증) | "Auto-detect Burn Summary" | "Auto-detect Burn Summary" | ✅ |
+| 4 | 무토큰 POST `/api/burnindex` | HTTP 401 | HTTP 401 | ✅ |
+
+**4/4 PASS.** Production ON-flip UX 정상 작동 직접 확인. JS 콘솔 에러 0건.
+
+**비고**: 테스트 #2는 실제 Safari 대신 `delete window.showDirectoryPicker`로 FSA 미지원 시뮬레이션 — `"showDirectoryPicker" in window` 코드 경로를 정확히 검증.

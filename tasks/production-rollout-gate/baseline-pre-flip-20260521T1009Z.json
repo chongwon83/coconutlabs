@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-05-21T10:15:00Z",
+  "_note": "Reconstructed from Upstash Redis CLI direct query (ROLLOUT_GATE_SECRET redacted by Vercel CLI pull). Redis commands: SCARD burn:metrics:v2:axis1 = 0, HGETALL burn:metrics:v2:agg = empty. v2 namespace is fresh (PR #12 namespace bump).",
+  "axes": {
+    "axis1": {
+      "state": "FAIL",
+      "value": 0,
+      "threshold": 15
+    },
+    "axis2": {
+      "state": "WARN",
+      "started": 0,
+      "completed": 0,
+      "failed": 0,
+      "abandoned": 0
+    },
+    "axis3": {
+      "state": "WARN",
+      "total": 0
+    },
+    "axis4": {"state": "CI_ONLY", "note": "Pass/fail determined by GitHub Actions CI check status."},
+    "axis5": {"state": "CI_ONLY", "note": "Pass/fail determined by GitHub Actions CI check status."},
+    "axis6": {"state": "CI_ONLY", "note": "Pass/fail determined by GitHub Actions CI check status."},
+    "axis7": {"state": "CI_ONLY", "note": "Pass/fail determined by GitHub Actions CI check status."}
+  },
+  "overallGatePass": false
+}

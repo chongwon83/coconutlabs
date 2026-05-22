@@ -1,0 +1,23 @@
+{
+  "_note": "T+initial snapshot captured post-Phase F via Upstash Redis CLI. Represents first active monitoring check.",
+  "_capturedAt": "2026-05-21T (Session 2, post-Phase F)",
+  "axes": {
+    "axis1": { "value": 0, "threshold": 15, "state": "FAIL" },
+    "axis2": {
+      "started": 0,
+      "completed": 0,
+      "failed": 0,
+      "failRate": null,
+      "abandonmentRatio": null,
+      "verdict": "noise — denominator < 10, evaluation deferred"
+    },
+    "axis3": { "total": 0 }
+  },
+  "invariantCheck": {
+    "secretLeak": "PASS (grep 0건, confirmed Phase E)",
+    "failRateExceedsThreshold": "N/A (no data)",
+    "hmac401Flood": "N/A (no token requests yet)",
+    "rate429": "N/A (no traffic)"
+  },
+  "overallInvariantViolation": false
+}
