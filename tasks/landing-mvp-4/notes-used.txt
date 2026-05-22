@@ -1,0 +1,11 @@
+# Pre-S0 Vault notes used — landing-mvp-4 cycle (2026-05-22)
+# Format: 1 basename per line. S10에서 sed 1-liner로 usage_count +1 + last_validated 갱신
+# Source: workflow-10steps.md "S10 — C2 usage_count 일괄 갱신" 절차
+
+# ① 직접 적용 (cycle 행동에 영향)
+2026-05-21-idb-structuredclone-function-prop-dataclonerror-patch.md
+2026-05-14-codex-heavy-1pass-p0-fail-v2-fix-pattern.md
+
+# ② 참고만 (cycle 영향 미미하나 confirm)
+2026-04-13-web-font-local-vendoring.md
+2026-04-01-nextjs-image-remote-patterns.md
