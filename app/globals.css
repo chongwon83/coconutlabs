@@ -2037,13 +2037,14 @@ textarea.form-input {
 }
 .path-preview-hint kbd {
   font-family: var(--font-mono);
-  font-size: 13px;
-  padding: 2px 7px;
+  font-size: 15px;
+  padding: 2px 8px;
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: 3px;
   color: var(--fg);
   letter-spacing: 0.5px;
+  line-height: 1.4;
 }
 .path-preview-hint .kbd-label {
   font-family: var(--font-ui);
