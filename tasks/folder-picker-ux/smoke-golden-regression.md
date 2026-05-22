@@ -24,10 +24,33 @@
 
 ## Phase 7 Production 재실행 (cells #1, #4 — 2/2 필수)
 
+**Deploy 상태**: ✅ Vercel commit `6cda4c5` deployment 완료 (2026-05-22, gh api 확인 — `https://vercel.com/chongwon-shins-projects/coconutlabs/9zFwEtq2UE3436K9m6ZrnNQX7Zyw`).
+
+**Production secret leak 재검증 메모**: `curl https://www.coconutlabs.xyz/_next/static/chunks/*.js`는 Vercel Bot Challenge (`x-vercel-mitigated: challenge`, 403)로 차단됨. **Local build verification (`grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0)이 Phase 7 commit 직전에 PASS**한 상태로 동일 source가 Vercel build pipeline 통과 → derivatively verified.
+
+**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+
 | # | 결과 | 메모 |
 |---|------|------|
-| 1 (production redeploy 후) | ⏳ | |
-| 4 (production redeploy 후) | ⏳ | |
+| 1 (production redeploy 후) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입. Path Preview Card 2 row + hint 노출 확인 후 본 표 1줄 직접 기록 |
+| 4 (production redeploy 후) | ⏳ owner-direct | `~/.claude/projects` 선택 → `✓ projects` 버튼 + fsaError/fsaWarning 0 + Scan 버튼 enabled 확인 후 본 표 1줄 직접 기록 |
+
+---
+
+## Phase 7.5 Production 재실측 (Findings 2+3 patch, cell 1/1 필수)
+
+**Deploy 상태**: ✅ Vercel commit `b94d362` deployment 완료 (2026-05-22T01:46:39Z, GitHub combined status `success` — `https://vercel.com/chongwon-shins-projects/coconutlabs/3kKrsZNWTyZpr8TzozqVvWPmwPeR`).
+
+**2026-05-22 Claude-in-Chrome 보조 검증** (Option B 하이브리드, `phase7.5-auxiliary-verification.md` 형식):
+- production HTML + computed styles 실측: kbd 13px / `letter-spacing 0.5px` / `padding 2px 7px` / aria-label `Command Shift Period`·`Control H` / `(period)` 라벨 `aria-hidden=true` 11px Inter `--fg2` / `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) JetBrains Mono — **3/3 마크업 PASS**
+- WCAG AA: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code `7.81:1` — **4/4 contrast PASS** (Edit 2 v2 `--fg3→--fg2` 회복 확인)
+- production main chunks 5개 (총 394 KB) 전수 grep `COLLECTOR_HMAC_SECRET` = **0 hits** — Invariant #1 PASS
+
+**owner-direct manual record는 여전히 의무** — 본 표 cell은 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능, harness-loop "auto-append 금지" 게이트 유지).
+
+| # | 결과 | 메모 |
+|---|------|------|
+| 7.5 (kbd 시인성 + home folder + aria-label) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입 → Hero "Join Burn Index" 클릭 → 모달 오픈 → ① `⌘⇧.` kbd 13px 가독 + `.`이 마침표가 아닌 키 라벨로 인지 ② `(period)` 라벨 명시 노출 ③ "From your home folder (~), open .claude/projects or .codex/sessions" 안내 노출 ④ (선택) VoiceOver(Cmd+F5)로 hint Tab → "Command Shift Period" / "Control H" 발음 확인 (Codex Q6 follow-up). 본 표 1줄 직접 기록 |
 
 ---
 
