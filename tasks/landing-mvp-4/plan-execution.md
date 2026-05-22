@@ -160,3 +160,73 @@ infos:    1 (token-summary: 8 colors / 6 typography / 2 rounding / 5 spacing / 9
 - (c) 본 plan + delta 재검토 (추가 변경 요청)
 
 → owner: a/b/c 중 선택 시점
+
+---
+
+## GSTACK REVIEW REPORT — /codex 5묶음 verification (2026-05-22)
+
+**Scope**: commit `03ca5e8` (landing-mvp-4-anB) — 5 묶음 변경
+- ① BurnIndexSection.tsx + globals.css `.burn-methodology-caption`
+- ② Hero.tsx + LandingApp.tsx feature-flag gating
+- ③ Ticker.tsx `size` prop + globals.css `.ticker-compact`
+- ④ TrustSection.tsx `.trust-cta` block + globals.css
+- ⑤ LandingApp.tsx legacy 4-section gating
+
+**Codex CLI**: `model_reasoning_effort=medium`, stdin closed via `</dev/null`, exit 0, 27,148 tokens.
+
+### Verdicts per [P1] axis
+
+| Q | Axis | Verdict | Evidence |
+|---|------|---------|----------|
+| Q1 | 4-section visual count + tree-shaking | **FAIL** | `LandingApp.tsx:19-23` static imports `ChallengeSection`, `BuildersSection`, `DropsSection`, `FinalCTA` — bundle includes their JS even when `SHOW_LEGACY=false`. Tree-shaking not guaranteed from this source shape. |
+| Q2 | Legacy preservation (`SHOW_LEGACY=true`) | PASS | All 4 legacy sections + default ticker + Hero tabs + secondary CTA render. Conditional spread passes `onChallenge` correctly. |
+| Q3 | Undefined-safe rendering (flag=false) | PASS | `Hero` forces `activeTab="burn"` when legacy off — no invalid ProductShot path. `TrustSection.onJoin` optional; `Button` spreads `onClick={undefined}` safely. |
+| Q4 | WCAG AA 4.5:1 normal text | **FAIL** | `--fg3` `#8E8E8E` on `--bg` `#FFFFFF` ≈ **3.3:1** contrast. Both `.burn-methodology-caption` (12.5px) and `.ticker-compact .ticker-track` (10.5px) are normal small text → fail 4.5:1 threshold. |
+| Q5 | React 19 strict mode + TS typing | PASS | `{...(SHOW_LEGACY ? { onChallenge } : {})}` valid JSX/React 19. TS accepts since `HeroProps.onChallenge` is optional. No new strict-mode hazards. |
+
+### GATE: **FAIL** (Q1, Q4)
+
+### Fix instructions
+
+**Q1 fix** (choose one):
+- **Option A** (recommended by codex): Replace static legacy imports with `next/dynamic` inside legacy-only boundaries, OR split into a `LegacySections` component imported via `next/dynamic` gated by flag. → strongest bundle exclusion guarantee.
+- **Option B**: Update acceptance criterion to count compact ticker as Hero sub-row (4섹션 정의 완화). No code change; weakens deliverable promise.
+
+**Q4 fix** (cheapest):
+- Change `--fg3` references to `--fg2` (`#525252` ≈ 7.6:1 on white) for `.burn-methodology-caption` and `.ticker-compact .ticker-track` in `app/globals.css`. Alternative: darken `--fg3` token globally (broader blast radius).
+
+### Persistence
+- jsonl log: `~/.gstack/projects/<slug>/landing-mvp-4-anB-reviews.jsonl` (appended)
+- Raw output: `~/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/cf52e250-0d5c-47de-ac08-ca763428c1e9/tool-results/bygtoqrn3.txt`
+
+### Next gate
+GATE: FAIL → owner 승인 후 Q1+Q4 fix 적용 → 2차 codex 재검증 → Phase 5 `/plan-design-review` 진입.
+
+---
+
+## GSTACK REVIEW REPORT — Q1+Q4 RE-VERIFICATION (2026-05-23)
+
+**Scope**: commit `b66f672` (fix(landing): codex GATE remediation — true bundle exclusion + caption contrast)
+- Q1 fix: `next/dynamic` 분리 (owner 선택 A) — `components/LegacySections.tsx` 신규, `LandingApp.tsx` `SHOW_LEGACY ? dynamic(...) : null` 가드
+- Q4 fix: `.burn-methodology-caption` `var(--fg3)` → `var(--fg2)` 1줄 swap
+
+**Codex CLI**: `model_reasoning_effort=medium`, stdin 파이프 패턴 (`codex exec ... - < /tmp/codex-prompt-q1q4.txt`), exit 0, 14,430 tokens.
+
+### Verdicts
+
+| Q | Axis | Verdict | Evidence |
+|---|------|---------|----------|
+| Q1 | Bundle exclusion when `SHOW_LEGACY=false` | **PASS** | `LandingApp.tsx`: `const LegacySections = SHOW_LEGACY ? dynamic(() => import("@/components/LegacySections")) : null` — build-inlined `NEXT_PUBLIC_*` constant collapses ternary to literal `null`, `dynamic()` import path unreachable. |
+| Q4 | WCAG AA 4.5:1 on `.burn-methodology-caption` | **PASS** | `var(--fg2)` `#525252` on white ≈ **7.8:1** contrast, above 4.5:1 threshold. |
+
+### GATE: **PASS**
+
+### RISKS
+- Q1 depends on production build environment having `NEXT_PUBLIC_SHOW_LEGACY_SECTIONS` unset or exactly `false` (not `"true"`). Vercel env에 `false` 명시 + `.env.production` 재확인 의무.
+
+### Persistence
+- 1차 FAIL 리포트 위쪽 보존 (감사 추적용)
+- 2차 PASS 리포트 (본 섹션) append-only
+
+### Next gate
+GATE: PASS → Phase 5 `/plan-design-review` (15min) 진입 가능 — burn-methodology-caption visual spec + flag=true 중복 sanity check.
