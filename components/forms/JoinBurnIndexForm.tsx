@@ -402,7 +402,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
         <div className="form-step">
           <div className="form-step-label">Step 1 · Select folders</div>
           <div className="form-step-desc">
-            Pick the exact folder previewed below. Drill into hidden directories with the OS shortcut shown.
+            Pick the exact folder previewed below.
           </div>
           <div className="path-preview-card">
             <div className="path-preview-row">
@@ -420,7 +420,10 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
               <span className="path-segment">sessions</span>
             </div>
             <p className="path-preview-hint">
-              Hidden folders need: <kbd>⌘⇧.</kbd> (macOS) or <kbd>Ctrl+H</kbd> (Linux) in your file manager
+              From your home folder (<code>~</code>), open <code>.claude/projects</code> or <code>.codex/sessions</code>. Reveal hidden folders with{" "}
+              <kbd aria-label="Command Shift Period">⌘⇧.</kbd>
+              <span className="kbd-label" aria-hidden="true">(period)</span> on macOS or{" "}
+              <kbd aria-label="Control H">Ctrl+H</kbd> on Linux.
             </p>
           </div>
           <div className="form-fsa-pickers">

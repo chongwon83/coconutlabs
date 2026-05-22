@@ -2037,12 +2037,23 @@ textarea.form-input {
 }
 .path-preview-hint kbd {
   font-family: var(--font-mono);
-  font-size: 11px;
-  padding: 1px 5px;
+  font-size: 13px;
+  padding: 2px 7px;
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: 3px;
   color: var(--fg);
+  letter-spacing: 0.5px;
+}
+.path-preview-hint .kbd-label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--fg2);
+  margin-left: 2px;
+}
+.path-preview-hint code {
+  font-family: var(--font-mono);
+  color: inherit;
 }
 .form-warning {
   font-family: var(--font-ui);
