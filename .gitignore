@@ -60,3 +60,12 @@ docs/workflow-state.md
 /test-results/
 /playwright-report/
 /.playwright-cache/
+
+# credentials (PyPI recovery codes, API keys, etc — 절대 git 추가 금지)
+credentials/
+
+# usage-poc build artifacts (Python wheel/sdist)
+tools/usage-poc/dist/
+
+# harness runtime state (atomic state.json + 페이즈 로그, 휘발성)
+.harness/
