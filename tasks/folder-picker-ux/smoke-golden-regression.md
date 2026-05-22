@@ -50,7 +50,7 @@
 
 | # | 결과 | 메모 |
 |---|------|------|
-| 7.5 (kbd 시인성 + home folder + aria-label) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입 → Hero "Join Burn Index" 클릭 → 모달 오픈 → ① `⌘⇧.` kbd 13px 가독 + `.`이 마침표가 아닌 키 라벨로 인지 ② `(period)` 라벨 명시 노출 ③ "From your home folder (~), open .claude/projects or .codex/sessions" 안내 노출 ④ (선택) VoiceOver(Cmd+F5)로 hint Tab → "Command Shift Period" / "Control H" 발음 확인 (Codex Q6 follow-up). 본 표 1줄 직접 기록 |
+| 7.5 (kbd 시인성 + home folder + aria-label) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입 → Hero "Join Burn Index" 클릭 → 모달 오픈 → ① `⌘⇧.` kbd 13px 가독 + `.`이 마침표가 아닌 키 라벨로 인지 ② `(period)` 라벨 명시 노출 ③ "From your home folder (~), open .claude/projects or .codex/sessions" 안내 노출 ④ (선택) VoiceOver(Cmd+F5)로 hint Tab → "Command Shift Period" / "Control H" 발음 확인 (Codex Q6 follow-up). 본 표 1줄 직접 기록 >> 사이즈 괜찮음|
 
 ---
 
