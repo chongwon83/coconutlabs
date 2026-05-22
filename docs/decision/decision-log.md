@@ -359,3 +359,17 @@ S0에서 작성, S10에서 회고 2줄 추가.
 [S10 회고]
 - 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
 - 다음엔 무엇을 바꿀까: ① staging/preview 환경 owner self-test 사이클 신설(별 cycle 분리) — coconutlabs 인프라에 staging 부재라 본 사이클 흡수 불가. 별 사이클 brief에 ON-flip 게이트 추가·Vercel Preview deploy 활용·owner 직접 진입 절차 정의 후 v2 이후 모든 production 변경에 적용. ② Phase 6 manual cells 글로벌 템플릿(`~/.claude/rules/task-standards.md` "Owner Happy Path Cells" 후보 섹션)에 "microcopy 시인성"(kbd font-size·padding·line-height) + "WCAG AA contrast 실측" 의무 항목 추가 — Phase 6 audit이 기능 검증에 집중해 시각 결함 누락. 본 cycle에서 발생한 kbd 11→13→15px 2단계 bump가 패턴화 trigger. ③ DOMException dispatch 명세 불명확 시(MDN+WICG+Chromium 소스 3중 분석 필요) AGENTS.md "WebKit/Blink API 사전 측정" 신규 anchor 추가 — `window.showDirectoryPicker` wrapper로 `e.name` 실측 후 분기 설계 의무화. Cell #2 Codex CONCERN을 patch-after-measure 패턴으로 1라운드 단축 가능. 향후 DOMException-heavy 작업(FSA / Clipboard API / Storage API)에서 자동 적용.
+
+---
+
+### 2026-05-22 [folder-picker-ux Finding 1 — `?auto-detect=1` 모달 자동 오픈 별 사이클 진입]
+
+- 문제: Phase 7 production owner self-test에서 발견 — `?auto-detect=1` URL 쿼리가 modal 자동 오픈을 trigger하지 않음. 사용자는 Hero/Nav/DropsSection/FinalCTA "Join Burn Index" 버튼 1회 클릭 필수. URL 공유 기반 진입 동선 차단 → 핵심 UX gap.
+- 버린 대안: ① folder-picker-ux 본체에 흡수 — 변경 surface 다른 파일(LandingApp.tsx vs JoinBurnIndexForm.tsx) + Invariant #3 contract 별개("modal 열린 뒤" vs "modal 오픈 자체")라 묶으면 책임 경계 흐림 ② Hero onClick handler에 useEffect-style 자동 호출 — onClick handler 분기 복잡도 증가 + StrictMode double-invoke 우려.
+- 핵심 트레이드오프: LandingApp.tsx 단일 파일 + `useSearchParams` 추가 + `userClosedRef` latch 1개. App Router client component 패턴 그대로. 페이지 reload 시 latch reset은 의도된 동작(URL 새 세션 = 신규 trigger). sessionStorage 영구 dismiss는 별 사이클 검토 — 본 사이클 scope 밖.
+- 선택 이유: 단일 파일 + 명확한 책임 분리(LandingApp = modal 오픈 / JoinBurnIndexForm = modal 내부 콘텐츠) + Invariant #3과 신규 Invariant #6("close 후 재오픈 0건")이 contract 모순 없음. 위험 3축 2/3 충족이라 /codex Phase 1 적대적 검토로 사각지대 1차 확보.
+- 강한 증거: plan-brief.md §위험 3축 평가에서 ① 실패비용 ≥ 2h(rollback + re-deploy + smoke test) ② 영향범위(LandingApp = 진입 페이지 routing, blast radius 큼) ③ 관찰가능성 부분(latch 누락 silent loop 첫 회 검출 어려움) 모두 명문화. plan-brief.md §진입 시점에서 /codex 5묶음 질문 사전 정의 완료(Suspense boundary / StrictMode double-invoke / onClick path / truthy value 분기 / e2e 실측 방법).
+
+[S10 회고]
+- 무엇이 잘 됐나: /codex Phase 1 6묶음 질문(Q1-Q6)이 plan-brief.md §진입 시점에서 사전 정의되어 있어 owner가 Codex 응답을 채택/거부할 때 판단 기준 명확. Q6 비-버튼 close 경로 누락 Hard gate가 `showToast` 내부 `setModal(null)` 경로 식별 → `closeModal` useCallback 단일 close path 통일로 Invariant #6 latch 우회 차단(Cell #7 runtime 검증으로 confirmed). 위험 3축 2/3 충족이 명문화돼 검증 분리 의무가 자동 발동, Suspense Option A(AutoDetectListener 자식 분리)로 `/` Static prerender 유지.
+- 다음엔 무엇을 바꿀까: ① `useSearchParams` 같은 Next.js client-only API 사용 시 AGENTS.md `node_modules/next/dist/docs/` 사전 확인 의무를 plan v1 작성 단계(S3)에 명시 — 본 사이클은 Phase 3 구현 단계(Task C.6 Step 1)에 검증해 plan revision risk 있었음 (Suspense boundary 의무 사실을 Phase 3에서야 확인). ② Phase 6 cells 표 작성 시 "비-버튼 close 경로 인벤토리" 1줄 의무 항목 추가 — 본 사이클은 Q6 Codex 적대적 검토로 `showToast` 경로를 사후 발견. close path가 N개인 컴포넌트는 모두 단일 useCallback 통일을 plan-brief 단계 패턴화.

@@ -1,6 +1,16 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  Suspense,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
+import { useSearchParams } from "next/navigation";
 import { Nav } from "@/components/Nav";
 import { StatusBar } from "@/components/StatusBar";
 import { Hero } from "@/components/Hero";
@@ -17,10 +27,38 @@ import { JoinBurnIndexForm } from "@/components/forms/JoinBurnIndexForm";
 import { ChallengeInviteForm } from "@/components/forms/ChallengeInviteForm";
 import type { ImportedEntry } from "@/lib/data";
 
+type ModalKind = "join" | "challenge" | null;
+
+// useSearchParams은 production build에서 Suspense boundary 의무 (Next.js 16.2.6
+// docs L179). 자식 컴포넌트로 분리해 CSR bailout 범위를 listener만으로 제한.
+function AutoDetectListener({
+  modal,
+  setModal,
+  userClosedRef,
+}: {
+  modal: ModalKind;
+  setModal: Dispatch<SetStateAction<ModalKind>>;
+  userClosedRef: MutableRefObject<boolean>;
+}) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (
+      searchParams?.get("auto-detect") === "1" &&
+      modal === null &&
+      !userClosedRef.current
+    ) {
+      setModal("join");
+    }
+  }, [searchParams, modal, setModal, userClosedRef]);
+  return null;
+}
+
 export default function LandingApp() {
   const [toast, setToast] = useState({ visible: false, message: "" });
-  const [modal, setModal] = useState<"join" | "challenge" | null>(null);
+  const [modal, setModal] = useState<ModalKind>(null);
   const [imported, setImported] = useState<ImportedEntry[]>([]);
+  // 사용자가 한 번 닫으면 같은 세션의 auto-detect 재오픈을 차단 (Invariant #6).
+  const userClosedRef = useRef<boolean>(false);
 
   // The leaderboard lives on the server now. Fetch it once on mount — every
   // browser hitting this server sees the same imports (incognito included).
@@ -40,10 +78,19 @@ export default function LandingApp() {
     };
   }, []);
 
-  const showToast = useCallback((msg: string) => {
-    setToast({ visible: true, message: msg });
+  // 모든 modal close 경로가 거치는 단일 path — latch set + setModal(null) 결합.
+  const closeModal = useCallback(() => {
+    userClosedRef.current = true;
     setModal(null);
   }, []);
+
+  const showToast = useCallback(
+    (msg: string) => {
+      setToast({ visible: true, message: msg });
+      closeModal();
+    },
+    [closeModal],
+  );
 
   const closeToast = useCallback(() => {
     setToast((t) => ({ ...t, visible: false }));
@@ -57,6 +104,13 @@ export default function LandingApp() {
 
   return (
     <>
+      <Suspense fallback={null}>
+        <AutoDetectListener
+          modal={modal}
+          setModal={setModal}
+          userClosedRef={userClosedRef}
+        />
+      </Suspense>
       <StatusBar />
       <Nav
         onJoin={() => setModal("join")}
@@ -86,14 +140,14 @@ export default function LandingApp() {
       />
 
       {modal && (
-        <div className="modal-overlay" onClick={() => setModal(null)}>
+        <div className="modal-overlay" onClick={closeModal}>
           <div
             className="modal-content"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               className="modal-close"
-              onClick={() => setModal(null)}
+              onClick={closeModal}
               aria-label="Close"
             >
               ×
