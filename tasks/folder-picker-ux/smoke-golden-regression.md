@@ -32,8 +32,8 @@
 
 | # | 결과 | 메모 |
 |---|------|------|
-| 1 (production redeploy 후) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입. Path Preview Card 2 row + hint 노출 확인 후 본 표 1줄 직접 기록 |
-| 4 (production redeploy 후) | ⏳ owner-direct | `~/.claude/projects` 선택 → `✓ projects` 버튼 + fsaError/fsaWarning 0 + Scan 버튼 enabled 확인 후 본 표 1줄 직접 기록 |
+| 1 (production redeploy 후) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입. Path Preview Card 2 row + hint 노출 확인 후 본 표 1줄 직접 기록 >> 둘 다 잘 보임 |
+| 4 (production redeploy 후) | ⏳ owner-direct | `~/.claude/projects` 선택 → `✓ projects` 버튼 + fsaError/fsaWarning 0 + Scan 버튼 enabled 확인 후 본 표 1줄 직접 기록 >> 둘 다 잘 보임 |
 
 ---
 

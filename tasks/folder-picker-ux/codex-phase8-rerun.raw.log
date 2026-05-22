@@ -1,0 +1,953 @@
+OpenAI Codex v0.128.0 (research preview)
+--------
+workdir: /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/dg-2412-pn-002/.codex/memories]
+reasoning effort: none
+reasoning summaries: none
+session id: 019e4da4-b776-7e60-9ace-8720837c86d8
+--------
+user
+# Codex Phase 8 Re-run Fact-Check — Input Brief (재시도 1회)
+
+**Date**: 2026-05-22
+**Cycle**: folder-picker-ux Phase 8 (docs cycle)
+**Reviewer**: Codex CLI gpt-5.5 (재시도 1회 한)
+**Trigger**: 첫 round verdict NEEDS-ATTENTION — HIGH 1 (Q1) + MEDIUM 2 (Q2/Q3) + LOW 2 (Q4/Q5). 3 결함 redraft 적용 후 재검증.
+
+---
+
+## Context
+
+이전 라운드 verdict 요약:
+- **Q1 HIGH overclaim**: "12+ cells" (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1 = 합 11, 12+ 아님) + "4 commits secret leak 0 hits" (3756e83은 docs-only — code chunks 0건)
+- **Q2 MEDIUM (frontmatter)**: `source_link` 5 `../` → `/Users/Desktop/...` (broken, `dg-2412-pn-002/` 누락)
+- **Q3 MEDIUM (body stale)**: ① `--young-coconut-soft` outline 인용 — 실제 코드는 `--young-coconut-dark` (`globals.css:2025-2026` 확인) / ② Reveal hint "Start from your home folder…" 인용 — 실제 production 카피는 "From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux." (`JoinBurnIndexForm.tsx:422-426` 확인)
+
+각 결함에 대한 적용 fix는 다음 §Applied Fixes 참조.
+
+---
+
+## Applied Fixes (전수 적용 후 현재 상태)
+
+### Fix A — Q1 HIGH (decision-log "강한 증거" + S10 "바꿀까" ①)
+
+`docs/decision/decision-log.md:357` "강한 증거" 줄 변경 후 final:
+> ... + Owner Happy Path 11 planned cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 중 Phase 6 7/7 owner-direct localhost ✅ 손글씨 기록 / Phase 7 #1·#4 production owner-notes evidence 컬럼 기록(marker 미flip) / Phase 7.5·7.5.6 owner 발화 "사이즈 괜찮음" verbal 확인 + code deploys 3건 (`6cda4c5`/`b94d362`/`40cd00c`) 각 build secret leak 0 hits 재확인 (`3756e83`은 docs-only commit — code chunks 변경 0건이라 secret leak 점검 대상 아님).
+
+`docs/decision/decision-log.md:361` S10 "바꿀까" ① 변경 후 final:
+> ① staging/preview 환경 owner self-test 사이클 신설(별 cycle 분리) — coconutlabs 인프라에 staging 부재라 본 사이클 흡수 불가. 별 사이클 brief에 ON-flip 게이트 추가·Vercel Preview deploy 활용·owner 직접 진입 절차 정의 후 v2 이후 모든 production 변경에 적용. ② Phase 6 manual cells 글로벌 템플릿(`~/.claude/rules/task-standards.md` "Owner Happy Path Cells" 후보 섹션)에 "microcopy 시인성"(kbd font-size·padding·line-height) + "WCAG AA contrast 실측" 의무 항목 추가… ③ DOMException dispatch 명세 불명확 시 AGENTS.md "WebKit/Blink API 사전 측정" 신규 anchor 추가…
+
+### Fix B — Q2 MEDIUM (memory frontmatter source_link)
+
+`~/.claude/projects/.../memory/project_folder-picker-ux-2026-05-22.md` 라인 10:
+```yaml
+source_link: ../../../../Desktop/Project/Coconut Labs/web/tasks/folder-picker-ux/criteria-execution-log.md
+```
+
+검증 명령 (방금 실행, 정상 resolve):
+```
+$ cd .../memory && ls -la "../../../../Desktop/Project/Coconut Labs/web/tasks/folder-picker-ux/criteria-execution-log.md"
+-rw-r--r--  1 dg-2412-pn-002  staff  10598 May 22 11:43 ...
+```
+
+### Fix C — Q3 MEDIUM (memory 본문 stale 2건)
+
+`project_folder-picker-ux-2026-05-22.md` 2-row Path Preview Card 섹션 변경 후 final:
+- Hidden-folder `.`-prefix segment에 `--young-coconut-dark` outline emphasis (`globals.css:2025-2026` `.path-segment--hidden { outline: 1px solid var(--young-coconut-dark); }`)
+- Reveal hint 1줄 (production final, `JoinBurnIndexForm.tsx:422-426`): `From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.`
+
+Cycle Commits Anchor 직후 caveat 신규:
+> ⚠️ 본 메모리의 토큰명·hex 색상·변수명·commit hash는 2026-05-22 cycle 종료 시점 final state. 재사용 전 `source_link`(criteria-execution-log.md) + `app/globals.css` + `components/forms/JoinBurnIndexForm.tsx` 현행 일치 검증 의무. expiry 2026-08-20까지 90일 유효 가정.
+
+---
+
+## 재검증 의무 (Q1·Q2·Q3 한정)
+
+**Q1 재검증**: decision-log "강한 증거" 줄 — overclaim 0건? "11 planned cells" + "Phase 7/7.5/7.5.6 evidence 상태 명시(owner-notes / verbal)" + "code deploys 3건 (docs-only 3756e83 분리)" 표현이 smoke-golden-regression.md 실제 기록과 일치하는지. S10 "바꿀까" ①도 행동 변화 가능한 별 사이클 액션으로 구체화됐는지.
+
+**Q2 재검증**: memory frontmatter `source_link` 4-`../` 경로가 `/Users/dg-2412-pn-002/Desktop/...`로 정상 resolve하는지(위 ls 출력 참조). 다른 7필드(role/domain/expiry/owner/usage_count/last_validated) 누락 0건은 이미 첫 라운드 PASS — 재확인만.
+
+**Q3 재검증**: ① outline 토큰 `--young-coconut-dark`가 `globals.css:2025-2026` 실제 코드와 일치 / ② Reveal hint copy가 `JoinBurnIndexForm.tsx:422-426` 실제 markup과 일치 / ③ "재사용 전 source_link 검증" caveat이 90일 expiry staleness 위험을 충분히 mitigate.
+
+**Q4/Q5는 LOW** — 첫 라운드 verdict 그대로 유지하되 변경 사항 없으므로 별도 재검증 불필요. S10 "바꿀까" ① staging 항목이 별 cycle 분리로 구체화됐다는 점만 추가 인지.
+
+---
+
+## Verdict 형식 (재실행)
+
+```
+## Verdict (re-run): PASS / PARTIAL / NEEDS-ATTENTION
+
+### Q1 재검증 [decision-log overclaim 해소]
+- 잔존 결함 severity: NONE / NIT / LOW / MEDIUM / HIGH
+- 근거: ...
+
+### Q2 재검증 [memory source_link]
+- 잔존 결함 severity: NONE / NIT / LOW / MEDIUM / HIGH
+- 근거: ...
+
+### Q3 재검증 [memory 본문 staleness]
+- 잔존 결함 severity: NONE / NIT / LOW / MEDIUM / HIGH
+- 근거: ...
+
+## Phase 8 진입 결정
+- 재시도 1회 한도 소진. 이번 verdict로 Phase 8.4 진입 / 부분 완료 / 부분 회귀 결정.
+```
+
+통과 기준: HIGH/MEDIUM 결함 0건 또는 nit-only → 8.4 진입.
+재시도 한도 1회 소진 — 본 verdict로 최종 판정.
+
+codex
+재검증 대상 3개만 확인하겠습니다. 먼저 실제 파일 위치와 현재 라인 내용을 읽어서, brief의 주장과 소스 기록이 맞물리는지 대조하겠습니다.
+exec
+/bin/zsh -lc "pwd && rg --files | rg '"'^(docs/decision/decision-log.md|tasks/folder-picker-ux/|app/globals.css|components/forms/JoinBurnIndexForm.tsx)$|smoke-golden-regression|criteria-execution-log'"'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+/Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+app/globals.css
+docs/decision/decision-log.md
+components/forms/JoinBurnIndexForm.tsx
+tasks/production-rollout-gate/criteria-execution-log.md
+tasks/production-rollout-gate/smoke-golden-regression.md
+tasks/folder-picker-ux/criteria-execution-log.md
+tasks/folder-picker-ux/smoke-golden-regression.md
+tasks/onboarding-closure/criteria-execution-log.md
+tasks/onboarding-closure/smoke-golden-regression.md
+
+exec
+/bin/zsh -lc 'find "$HOME/.claude/projects" -name '"'project_folder-picker-ux-2026-05-22.md' -print" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 670ms:
+/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md
+
+codex
+현재 작업 트리에는 folder-picker용 기준/스모크 로그와 decision-log가 모두 있습니다. 이제 claim이 걸린 라인 단위로 읽고, 외부 memory 파일의 frontmatter와 본문도 같은 기준으로 확인합니다.
+exec
+/bin/zsh -lc "nl -ba docs/decision/decision-log.md | sed -n '352,364p'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+   352	
+   353	- 문제: ON-flip 직후 production smoke test에서 ① 폴더 선택 불명확(picker 진입 시 "어떤 폴더를 골라야 하는지" 시각 cue 부재, Step 1 helper text 위계 약함) ② Chrome FSA 시스템 폴더 차단(`~` 홈 디렉터리 거절) 시 catch-all 단일 에러 메시지가 권한 문제로 오인 유도. 본 작업 진행 중 owner self-test에서 추가 발견 ③ kbd `⌘⇧.` 11px 시인성 부족 ④ "home folder 시작" 안내 부재 ⑤ `?auto-detect=1` 쿼리 모달 자동 오픈 안 함(Finding 1, 별 사이클 이관).
+   354	- 버린 대안: Approach A (pre-picker modal) — 진입 마찰 1단계 추가 + microcopy 중복 위험(modal + Path Preview Card + Step 1 helper 3중 노출). OS detection 분기(macOS/Linux 따로 hint 노출) — 코드 분기 비용 > Linux 사용자가 macOS hint 한 줄 더 보는 cognitive cost. i18n(영어/한국어 동시) — 글로벌 dev 타겟 정책에 따라 영어 단일.
+   355	- 핵심 트레이드오프: 영어 유지(글로벌 dev 타겟, 한국어 owner는 학습 비용 감수) + OS detection 없음(두 hint 동시 노출 허용) + locale-independent `error.name` 분기(`error.message` 파싱 금지 — Chrome dialog 한국어/영어 모두 흡수) + count-based AbortError heuristic(timing-based 1500ms 폐기, 실제 picker UX 호출당 10-15초로 timing window 부적합).
+   356	- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+   357	- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 11 planned cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 중 Phase 6 7/7 owner-direct localhost ✅ 손글씨 기록 / Phase 7 #1·#4 production owner-notes evidence 컬럼 기록(marker 미flip) / Phase 7.5·7.5.6 owner 발화 "사이즈 괜찮음" verbal 확인 + code deploys 3건 (`6cda4c5`/`b94d362`/`40cd00c`) 각 build secret leak 0 hits 재확인 (`3756e83`은 docs-only commit — code chunks 변경 0건이라 secret leak 점검 대상 아님).
+   358	
+   359	[S10 회고]
+   360	- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+   361	- 다음엔 무엇을 바꿀까: ① staging/preview 환경 owner self-test 사이클 신설(별 cycle 분리) — coconutlabs 인프라에 staging 부재라 본 사이클 흡수 불가. 별 사이클 brief에 ON-flip 게이트 추가·Vercel Preview deploy 활용·owner 직접 진입 절차 정의 후 v2 이후 모든 production 변경에 적용. ② Phase 6 manual cells 글로벌 템플릿(`~/.claude/rules/task-standards.md` "Owner Happy Path Cells" 후보 섹션)에 "microcopy 시인성"(kbd font-size·padding·line-height) + "WCAG AA contrast 실측" 의무 항목 추가 — Phase 6 audit이 기능 검증에 집중해 시각 결함 누락. 본 cycle에서 발생한 kbd 11→13→15px 2단계 bump가 패턴화 trigger. ③ DOMException dispatch 명세 불명확 시(MDN+WICG+Chromium 소스 3중 분석 필요) AGENTS.md "WebKit/Blink API 사전 측정" 신규 anchor 추가 — `window.showDirectoryPicker` wrapper로 `e.name` 실측 후 분기 설계 의무화. Cell #2 Codex CONCERN을 patch-after-measure 패턴으로 1라운드 단축 가능. 향후 DOMException-heavy 작업(FSA / Clipboard API / Storage API)에서 자동 적용.
+
+exec
+/bin/zsh -lc "rg -n \"Owner Happy Path|Phase 6|Phase 7|Phase 7\\.5|Phase 7\\.5\\.6|6cda4c5|b94d362|40cd00c|3756e83|secret leak|owner-notes|marker|verbal|사이즈\" tasks/folder-picker-ux/smoke-golden-regression.md" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+3:**Date**: 2026-05-21 (Phase 6 진행 중)
+7:**2026-05-22 Contingency Patch 반영**: Codex Phase 6 CONCERN 확인 — Cell #2 실측 결과 `e.name="AbortError"` (code 20), `SecurityError` 아님. `JoinBurnIndexForm.tsx:126-134` count-based heuristic 도입 — 2회 연속 AbortError 시 `fsaWarning` (yellow, non-fatal) 노출. Cell #2/#5 기대 결과 갱신. Invariant #4 (e.name only) 유지.
+11:## Phase 6 Cells (Chrome 최신 incognito + production deployment)
+25:## Phase 7 Production 재실행 (cells #1, #4 — 2/2 필수)
+27:**Deploy 상태**: ✅ Vercel commit `6cda4c5` deployment 완료 (2026-05-22, gh api 확인 — `https://vercel.com/chongwon-shins-projects/coconutlabs/9zFwEtq2UE3436K9m6ZrnNQX7Zyw`).
+29:**Production secret leak 재검증 메모**: `curl https://www.coconutlabs.xyz/_next/static/chunks/*.js`는 Vercel Bot Challenge (`x-vercel-mitigated: challenge`, 403)로 차단됨. **Local build verification (`grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0)이 Phase 7 commit 직전에 PASS**한 상태로 동일 source가 Vercel build pipeline 통과 → derivatively verified.
+40:## Phase 7.5 Production 재실측 (Findings 2+3 patch, cell 1/1 필수)
+42:**Deploy 상태**: ✅ Vercel commit `b94d362` deployment 완료 (2026-05-22T01:46:39Z, GitHub combined status `success` — `https://vercel.com/chongwon-shins-projects/coconutlabs/3kKrsZNWTyZpr8TzozqVvWPmwPeR`).
+63:## Phase 6 최종 결과 (2026-05-22)
+77:**중단 사유 없음. Phase 7 (production deploy + 30min monitoring) 진입 가능.**
+79:잔여 의무: Phase 7에서 cells #1, #4 production deployment 재실행 (smoke-golden-regression.md "Phase 7 Production 재실행" 섹션).
+
+exec
+/bin/zsh -lc "nl -ba app/globals.css | sed -n '2020,2030p'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+exec
+/bin/zsh -lc "nl -ba components/forms/JoinBurnIndexForm.tsx | sed -n '418,428p'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+  2020	}
+  2021	.path-segment {
+  2022	  display: inline;
+  2023	  color: var(--fg2);
+  2024	}
+  2025	.path-segment--hidden {
+  2026	  outline: 1px solid var(--young-coconut-dark);
+  2027	  border-radius: 2px;
+  2028	  padding: 0 4px;
+  2029	  margin: 0 1px;
+  2030	}
+
+ succeeded in 0ms:
+   418	              <span className="path-segment path-segment--hidden">.codex</span>
+   419	              <span>/</span>
+   420	              <span className="path-segment">sessions</span>
+   421	            </div>
+   422	            <p className="path-preview-hint">
+   423	              From your home folder (<code>~</code>), open <code>.claude/projects</code> or <code>.codex/sessions</code>. Reveal hidden folders with{" "}
+   424	              <kbd aria-label="Command Shift Period">⌘⇧.</kbd>
+   425	              <span className="kbd-label" aria-hidden="true">(period)</span> on macOS or{" "}
+   426	              <kbd aria-label="Control H">Ctrl+H</kbd> on Linux.
+   427	            </p>
+   428	          </div>
+
+exec
+/bin/zsh -lc 'nl -ba "$HOME/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md" | sed -n '"'1,90p'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+     1	---
+     2	name: project-folder-picker-ux-2026-05-22
+     3	description: "FSA folder picker UX — Approach B (inline preview + smart errors). 4 error 분기 (Abort/Security/NotAllowed/mismatch), 2-row Path Preview Card, locale-independent error.name only."
+     4	metadata: 
+     5	  node_type: memory
+     6	  role: owner
+     7	  domain: web-ui-folder-picker
+     8	  expiry: 2026-08-20
+     9	  owner: scw0526
+    10	  source_link: ../../../../Desktop/Project/Coconut Labs/web/tasks/folder-picker-ux/criteria-execution-log.md
+    11	  usage_count: 0
+    12	  last_validated: 2026-05-22
+    13	  type: project
+    14	  originSessionId: 45e9b6a6-f526-4600-ad67-0dff8d8f45b9
+    15	---
+    16	
+    17	# Folder Picker UX — Approach B (2026-05-22)
+    18	
+    19	## 결정 요약
+    20	
+    21	Chrome/Edge File System Access API picker UX에 **Approach B = inline preview + smart errors** 적용.
+    22	Pre-picker modal(A) 기각 — 진입 마찰 + microcopy 중복 위험.
+    23	
+    24	## 4 Error 분기 패턴 (locale-independent)
+    25	
+    26	`error.name`(DOMException 표준)만 분기, `error.message`(Chrome locale 의존) 금지:
+    27	
+    28	| `error.name` | UX 동작 |
+    29	|--------------|---------|
+    30	| `AbortError` | count-based heuristic — 1차 silent (exploration), 2차 누적 시 `fsaWarning`(yellow, non-fatal) 노출 |
+    31	| `SecurityError` | actionable: "Chrome blocked that folder because it contains system files. Drill down to your `.claude/projects`…" |
+    32	| `NotAllowedError` | 권한 재시도: "Read access wasn't granted. Try again and approve the picker when Chrome prompts." |
+    33	| fallback | "Couldn't open the folder picker. Try a different browser or check site permissions." |
+    34	| name mismatch | 동적 노출: `You picked **{h.name}**. We need the directory literally named **{expectedName}**…` |
+    35	
+    36	> ⚠️ `error.message` 파싱 금지(Invariant #4). Chrome dialog 자체는 OS locale 따라 한국어/영어/기타 출력하지만 `error.name`은 표준 고정.
+    37	
+    38	## Count-based AbortError Pivot (Phase 6 Contingency)
+    39	
+    40	초안: timing-based 1500ms 임계(연속 2회 발생 시 시스템 폴더 안내).
+    41	실측 폐기: 실제 picker UX 호출당 10-15초 소요 → 1500ms window 내 2회 발생 불가능.
+    42	최종: `abortCountRef = useRef<number>(0)` — 1회 silent, 2회 누적 시 `fsaWarning` 노출. Invariant #4 유지.
+    43	
+    44	## 2-row Path Preview Card
+    45	
+    46	picker 버튼 위 inline 시각 breadcrumb:
+    47	
+    48	- Row 1: `~ / .claude / projects`
+    49	- Row 2: `~ / .codex / sessions`
+    50	- Hidden-folder `.`-prefix segment에 `--young-coconut-dark` outline emphasis (`globals.css:2025-2026` `.path-segment--hidden { outline: 1px solid var(--young-coconut-dark); }`)
+    51	- Reveal hint 1줄 (production final, `JoinBurnIndexForm.tsx:422-426`): `From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.`
+    52	
+    53	Visual hierarchy: Inter 14px 설명 + JetBrains Mono 13px 경로. picker 버튼보다 visual weight 낮춰 attention drift 방지.
+    54	
+    55	## kbd 시인성 패턴 (Phase 7.5 + 7.5.6 누적)
+    56	
+    57	`⌘⇧.` 글리프 가독성을 위한 최종 사양:
+    58	
+    59	- `font-size: 15px` (Phase 5 11px → Phase 7.5 13px → Phase 7.5.6 15px 2단계 bump)
+    60	- `padding: 2px 8px` (1px 5px → 2px 7px → 2px 8px)
+    61	- `letter-spacing: 0.5px` (`.`이 `⌘⇧`와 결합돼 마침표로 보이는 현상 방지)
+    62	- `line-height: 1.4`
+    63	- `<span className="kbd-label" aria-hidden="true">(period)</span>` 명시 라벨 (screen reader 흡수)
+    64	- aria-label 2건: kbd 요소에 직접 부여
+    65	
+    66	WCAG AA 재확인(Phase 7.5.6): 15px kbd `#0A0A0A` on `#FAFAFA` = 18.97:1 ✅, `.kbd-label` `#525252` on `#FFFFFF` = 7.81:1 ✅.
+    67	
+    68	## Handle State ↔ IDB Persistence 분리 (Invariant #5)
+    69	
+    70	S2 pickFolder 4단계 분리:
+    71	
+    72	1. picker 호출 + catch 분기 (위 4 error.name 케이스)
+    73	2. name 검증 (mismatch 동적 메시지)
+    74	3. **handle React state 즉시 set** (`setClaudeHandle`/`setCodexHandle`)
+    75	4. **`saveHandle` 별도 try-catch** — IDB 실패는 non-fatal, `fsaWarning`("could not be remembered") 노출, `fsaError` 빈 채 유지
+    76	
+    77	이유: IDB structuredClone DataCloneError(2026-05-21 e2e TIL `2026-05-21-idb-structuredclone-function-prop-dataclonerror-patch.md`)로 saveHandle 실패해도 handle state는 살아있어야 함.
+    78	
+    79	## Cycle Commits Anchor
+    80	
+    81	- `6cda4c5` (Phase 5 base): S1 Path Preview Card + S2 pickFolder 재작성 + S3 helper text
+    82	- `b94d362` (Phase 7.5 code): kbd 11→13px + (period) aria-hidden 라벨 + home folder hint
+    83	- `3756e83` (Phase 7.5 docs): tasks/ artifacts 갱신만
+    84	- `40cd00c` (Phase 7.5.6): kbd 13→15px font bump 마무리
+    85	
+    86	> ⚠️ 본 메모리의 토큰명·hex 색상·변수명·commit hash는 2026-05-22 cycle 종료 시점 final state. 재사용 전 `source_link`(criteria-execution-log.md) + `app/globals.css` + `components/forms/JoinBurnIndexForm.tsx` 현행 일치 검증 의무. expiry 2026-08-20까지 90일 유효 가정.
+    87	
+    88	## 관련 메모리
+    89	
+    90	- [[project_auto-detect-flip-procedure]] — ON-flip 절차 + 본 UX iteration 1 발생 맥락
+
+exec
+/bin/zsh -lc 'cd "$HOME/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory" && ls -la "../../../../Desktop/Project/Coconut Labs/web/tasks/folder-picker-ux/criteria-execution-log.md"' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+-rw-r--r--  1 dg-2412-pn-002  staff  10598 May 22 11:43 ../../../../Desktop/Project/Coconut Labs/web/tasks/folder-picker-ux/criteria-execution-log.md
+
+codex
+decision-log의 수정 문구 자체는 적용되어 있습니다. 다만 Q1은 smoke 로그의 실제 셀 수와 commit별 secret 점검 근거가 핵심이므로, 해당 로그 원문을 더 넓게 읽어서 “11 planned cells”와 “3 code deploys”가 과장 없이 맞는지 보겠습니다.
+exec
+/bin/zsh -lc "nl -ba tasks/folder-picker-ux/smoke-golden-regression.md | sed -n '1,120p'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+     1	# Smoke Golden Regression — Folder Picker UX
+     2	
+     3	**Date**: 2026-05-21 (Phase 6 진행 중)
+     4	**Owner**: scw0526 (chongwon83)
+     5	**Recording rule**: Owner 직접 Chrome incognito 진입 → 7 cells 손으로 ✅/❌ 기록. **자동 append 금지** (`[auto]` prefix 또는 subagent 서명 검출 시 "완료" 차단).
+     6	
+     7	**2026-05-22 Contingency Patch 반영**: Codex Phase 6 CONCERN 확인 — Cell #2 실측 결과 `e.name="AbortError"` (code 20), `SecurityError` 아님. `JoinBurnIndexForm.tsx:126-134` count-based heuristic 도입 — 2회 연속 AbortError 시 `fsaWarning` (yellow, non-fatal) 노출. Cell #2/#5 기대 결과 갱신. Invariant #4 (e.name only) 유지.
+     8	
+     9	---
+    10	
+    11	## Phase 6 Cells (Chrome 최신 incognito + production deployment)
+    12	
+    13	| # | 입력 | 기대 결과 | 결과 | 시각 / 메모 |
+    14	|---|------|----------|------|-------------|
+    15	| 1 | `https://www.coconutlabs.xyz/` 진입, Path Preview Card 시각 확인 | `~/.claude/projects` + `~/.codex/sessions` 두 row 노출 + reveal hint 1줄 (`⌘⇧·` macOS / `Ctrl+H` Linux) | ✅ owner localhost | 2026-05-22 owner-direct on `localhost:3000/?auto-detect=1` (production redeploy 후 재실측 별도). 스크린샷: `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 두 row + hint 모두 가시 |
+    16	| 2 | "Pick .claude/projects" 클릭 → 홈 디렉터리(`~`) 선택 → Chrome dialog "다른 폴더 선택" 또는 "취소" 클릭 → 다시 "Pick .claude/projects" 클릭 → 홈 디렉터리 다시 선택 → 두 번째 거절 | **1차 시도**: silent (메시지 무노출, abortCount=1) / **2차 시도**: yellow `fsaWarning` 노출 — "Trouble picking the folder? Chrome blocks system folders like your home directory — drill into ~/.claude/projects (or ~/.codex/sessions) specifically." Korean Chrome dialog 떠도 우리 UI 메시지는 영어 동일. **Scan 버튼 enabled 유지** (fsaWarning은 non-fatal, fsaError 아님) | ✅ owner localhost | 2026-05-22 owner-direct: "1차에서는 아무것도 안 뜨고, 2차에서는 연두색 바탕 안에 [정확한 텍스트 일치]". Scan 버튼 enabled 유지 확인. 스크린샷: `issues/스크린샷 2026-05-22 오전 12.33.04.png` |
+    17	| 3 | 다시 클릭 → `~/.claude` 자체 선택 → Chrome 권한 팝업 "허용" | Name mismatch 메시지에 `{h.name}` 동적 노출 — `You picked ".claude". We need the directory literally named "projects" (inside ~/.claude/ or ~/.codex/). Try again.` | ✅ owner localhost | 2026-05-22 owner-direct (Cell #3 페이지 reload 후 fresh state): 정확 텍스트 일치 / `.claude` 동적 표기 ✅ / `projects` 정확 노출 ✅ / hint 글리프 `⌘⇧.` 정상 (typo fix HMR 반영). 스크린샷 `issues/스크린샷 2026-05-22 오전 12.42.51.png` |
+    18	| 4 | 다시 클릭 → `~/.claude/projects` 선택 | Error 0건, 핸들 저장, 다음 step 진행 | ✅ owner localhost | 2026-05-22 owner-direct: `Pick .claude/projects` 버튼 텍스트가 `✓ projects` 로 변경 + 강조 상태 / fsaError 클리어 ✅ / fsaWarning 클리어 ✅ / `Scan & preview` 버튼 enabled 유지 ✅ / Step 2 timeframe row 진행 노출. 스크린샷: `issues/스크린샷 2026-05-22 오전 12.46.29.png` |
+    19	| 5 | 다시 클릭 → 시스템 dialog에서 cancel (1회) | Silent (form-error/warning 미노출, 카드 그대로). **전제**: Cell #4 성공 후 abortCount 0 리셋된 상태. Cell #4 미실행 시 직전 누적 카운트에 따라 fsaWarning 노출 가능 — 그 경우도 Cell #2 contract와 정합 | ✅ owner localhost (variant: 2회 cancel) | 2026-05-22 owner-direct: 2회 cancel 입력 → count cycle 검증 PASS. Cell #4 success로 `abortCountRef`가 0 리셋된 상태에서 0→1 (silent) → 1→2 (fsaWarning 노출, 정확 텍스트 일치) 흐름 재현. count-based heuristic post-reset 동작 확인. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.53.44.png`. **변형 사유**: 1회 cancel→silent 검증은 Cell #2 1차 + Cell #5 0→1 transition으로 이미 evidence 확보. 2회 cancel은 reset 후 cycle 재검증으로 더 강한 contract 확인 |
+    20	| 6 | Safari로 동일 URL 진입 | "Join Burn Index" 수동 폼 fallback. Path Preview Card 미표시(auto-detect off) | ✅ owner localhost | 2026-05-22 owner-direct Safari: "Join Burn Index" 모달 노출 / STEP 1 RUN THE COLLECTOR (Python 3.11+ instructions + git clone snippet + Copy button) / STEP 2 UPLOAD YOUR BURN SUMMARY (handle input + file picker + JSON paste textarea + `Validate & preview` 버튼) / Path Preview Card 미표시 ✅ / Pick .claude/projects / .codex/sessions 버튼 미표시 ✅ / `⌘⇧.` hint 미표시 ✅. `"showDirectoryPicker" in window` 분기 (line 67-73) 정상 동작. 스크린샷 `issues/스크린샷 2026-05-22 오전 1.01.40.png` |
+    21	| 7 | (v2 신규) Chrome DevTools > Application > Storage > Clear site data → IndexedDB throttle/block 시뮬레이션 후 `~/.claude/projects` 선택 | Handle UI에 `✓ projects` 표시 (claudeHandle React state set), `fsaError` 비어 있음, `fsaWarning`에 "Folder selected for this session, but it could not be remembered" 노출. Scan 버튼 enabled. 새로고침 후 handle 재선택 필요 (정상). 직접 시뮬레이션 불가 시 saveHandle 임시 throw로 대체 검사 (코드 검사 갈음) | ✅ owner 승인 코드 검사 | 2026-05-22 owner-direct decision (옵션 A 선택). `JoinBurnIndexForm.tsx:164-182` 4단계 분리 구조 검증: ① L167-168 `setFsaError("")` + `setFsaWarning("")` 클리어 / ② L170-171 `setClaudeHandle(h)` / `setCodexHandle(h)` **saveHandle 호출 BEFORE handle state 세팅** (Invariant #5 핵심) / ③ L176-177 `try { await saveHandle(kind, h) }` IDB persistence best-effort / ④ L178-182 catch에서 `setFsaWarning("Folder selected for this session, but it could not be remembered. You'll need to pick it again next time.")` 노출 + fsaError 미터치로 Scan 버튼 enabled 유지. **Invariant #5 (handle React state ↔ IDB persistence 분리) 코드 레벨 PASS** |
+    22	
+    23	---
+    24	
+    25	## Phase 7 Production 재실행 (cells #1, #4 — 2/2 필수)
+    26	
+    27	**Deploy 상태**: ✅ Vercel commit `6cda4c5` deployment 완료 (2026-05-22, gh api 확인 — `https://vercel.com/chongwon-shins-projects/coconutlabs/9zFwEtq2UE3436K9m6ZrnNQX7Zyw`).
+    28	
+    29	**Production secret leak 재검증 메모**: `curl https://www.coconutlabs.xyz/_next/static/chunks/*.js`는 Vercel Bot Challenge (`x-vercel-mitigated: challenge`, 403)로 차단됨. **Local build verification (`grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0)이 Phase 7 commit 직전에 PASS**한 상태로 동일 source가 Vercel build pipeline 통과 → derivatively verified.
+    30	
+    31	**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+    32	
+    33	| # | 결과 | 메모 |
+    34	|---|------|------|
+    35	| 1 (production redeploy 후) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입. Path Preview Card 2 row + hint 노출 확인 후 본 표 1줄 직접 기록 >> 둘 다 잘 보임 |
+    36	| 4 (production redeploy 후) | ⏳ owner-direct | `~/.claude/projects` 선택 → `✓ projects` 버튼 + fsaError/fsaWarning 0 + Scan 버튼 enabled 확인 후 본 표 1줄 직접 기록 >> 둘 다 잘 보임 |
+    37	
+    38	---
+    39	
+    40	## Phase 7.5 Production 재실측 (Findings 2+3 patch, cell 1/1 필수)
+    41	
+    42	**Deploy 상태**: ✅ Vercel commit `b94d362` deployment 완료 (2026-05-22T01:46:39Z, GitHub combined status `success` — `https://vercel.com/chongwon-shins-projects/coconutlabs/3kKrsZNWTyZpr8TzozqVvWPmwPeR`).
+    43	
+    44	**2026-05-22 Claude-in-Chrome 보조 검증** (Option B 하이브리드, `phase7.5-auxiliary-verification.md` 형식):
+    45	- production HTML + computed styles 실측: kbd 13px / `letter-spacing 0.5px` / `padding 2px 7px` / aria-label `Command Shift Period`·`Control H` / `(period)` 라벨 `aria-hidden=true` 11px Inter `--fg2` / `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) JetBrains Mono — **3/3 마크업 PASS**
+    46	- WCAG AA: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code `7.81:1` — **4/4 contrast PASS** (Edit 2 v2 `--fg3→--fg2` 회복 확인)
+    47	- production main chunks 5개 (총 394 KB) 전수 grep `COLLECTOR_HMAC_SECRET` = **0 hits** — Invariant #1 PASS
+    48	
+    49	**owner-direct manual record는 여전히 의무** — 본 표 cell은 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능, harness-loop "auto-append 금지" 게이트 유지).
+    50	
+    51	| # | 결과 | 메모 |
+    52	|---|------|------|
+    53	| 7.5 (kbd 시인성 + home folder + aria-label) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입 → Hero "Join Burn Index" 클릭 → 모달 오픈 → ① `⌘⇧.` kbd 13px 가독 + `.`이 마침표가 아닌 키 라벨로 인지 ② `(period)` 라벨 명시 노출 ③ "From your home folder (~), open .claude/projects or .codex/sessions" 안내 노출 ④ (선택) VoiceOver(Cmd+F5)로 hint Tab → "Command Shift Period" / "Control H" 발음 확인 (Codex Q6 follow-up). 본 표 1줄 직접 기록 |
+    54	
+    55	---
+    56	
+    57	## 중단 조건
+    58	
+    59	**7 cells** 중 1개라도 ❌ → Phase 5.x로 회귀 (Edit 재실행). 또는 invariant #1~5 위반 시 즉시 롤백. (v2: cell #7 + invariant #5 추가, 2026-05-21 Codex Phase 1 PARTIAL 반영)
+    60	
+    61	---
+    62	
+    63	## Phase 6 최종 결과 (2026-05-22)
+    64	
+    65	**7/7 cells PASS** (owner-direct 6 cells + 코드 검사 1 cell)
+    66	
+    67	| # | 결과 | 방식 |
+    68	|---|------|------|
+    69	| 1 | ✅ | owner localhost (스크린샷 12.33.04) |
+    70	| 2 | ✅ | owner localhost (스크린샷 12.33.04) — Codex CONCERN AbortError 확인 + Contingency Patch v2 PASS |
+    71	| 3 | ✅ | owner localhost (스크린샷 12.42.51) — typo fix `⌘⇧·` → `⌘⇧.` 함께 검증 |
+    72	| 4 | ✅ | owner localhost (스크린샷 12.46.29) — `✓ projects` 핸들 저장 |
+    73	| 5 | ✅ | owner localhost (스크린샷 12.53.44, variant 2회 cancel) — count cycle 검증 |
+    74	| 6 | ✅ | owner localhost Safari (스크린샷 01.01.40) — fallback 정확 노출 |
+    75	| 7 | ✅ | owner-direct decision 코드 검사 — Invariant #5 PASS |
+    76	
+    77	**중단 사유 없음. Phase 7 (production deploy + 30min monitoring) 진입 가능.**
+    78	
+    79	잔여 의무: Phase 7에서 cells #1, #4 production deployment 재실행 (smoke-golden-regression.md "Phase 7 Production 재실행" 섹션).
+
+exec
+/bin/zsh -lc 'rg -n "secret|leak|COLLECTOR_HMAC_SECRET|grep -c|6cda4c5|b94d362|40cd00c|3756e83|code chunks|docs-only|변경|chunk" tasks/folder-picker-ux/criteria-execution-log.md tasks/folder-picker-ux/smoke-golden-regression.md docs/decision/decision-log.md' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+docs/decision/decision-log.md:162:### 2026-05-19 collector week를 직전 완료 주로 변경 (S10)
+docs/decision/decision-log.md:166:  1줄 변경(`_calendar_window` week 분기)으로 정확히 좁혀 잡음. 단일 함수 수정이
+docs/decision/decision-log.md:189:  무변경.
+docs/decision/decision-log.md:196:  데이터 소스만 교체 → route.ts·Sparkline UI 무변경으로 영향면을 5개 파일에 가둠.
+docs/decision/decision-log.md:260:  → 모든 caller(collect.py·estimate_cost.py·test) 변경. 하지만 raw slug이 dataclass에
+docs/decision/decision-log.md:306:- 선택 이유: 단일 shared-secret HMAC + Redis nonce + fail-closed가 솔로 프로젝트 위협 모델에 최소 침습이고 gate 신뢰성 확보. workflow_dispatch는 Vercel deployment protection 401 우회 + 일반 PR 개발 흐름 보호. Codex 12건 BLOCK 전량 반영.
+docs/decision/decision-log.md:343:- 강한 증거: Smoke test 4/4 PASS (Chrome "Auto-detect Burn Summary" ✅, FSA-off fallback "Join Burn Index" ✅, env wins over `?auto-detect=0` ✅, 무토큰 POST → 401 ✅). Build secret 노출 0건. Redeploy 34초 완료.
+docs/decision/decision-log.md:356:- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+docs/decision/decision-log.md:357:- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 11 planned cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 중 Phase 6 7/7 owner-direct localhost ✅ 손글씨 기록 / Phase 7 #1·#4 production owner-notes evidence 컬럼 기록(marker 미flip) / Phase 7.5·7.5.6 owner 발화 "사이즈 괜찮음" verbal 확인 + code deploys 3건 (`6cda4c5`/`b94d362`/`40cd00c`) 각 build secret leak 0 hits 재확인 (`3756e83`은 docs-only commit — code chunks 변경 0건이라 secret leak 점검 대상 아님).
+docs/decision/decision-log.md:360:- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+docs/decision/decision-log.md:361:- 다음엔 무엇을 바꿀까: ① staging/preview 환경 owner self-test 사이클 신설(별 cycle 분리) — coconutlabs 인프라에 staging 부재라 본 사이클 흡수 불가. 별 사이클 brief에 ON-flip 게이트 추가·Vercel Preview deploy 활용·owner 직접 진입 절차 정의 후 v2 이후 모든 production 변경에 적용. ② Phase 6 manual cells 글로벌 템플릿(`~/.claude/rules/task-standards.md` "Owner Happy Path Cells" 후보 섹션)에 "microcopy 시인성"(kbd font-size·padding·line-height) + "WCAG AA contrast 실측" 의무 항목 추가 — Phase 6 audit이 기능 검증에 집중해 시각 결함 누락. 본 cycle에서 발생한 kbd 11→13→15px 2단계 bump가 패턴화 trigger. ③ DOMException dispatch 명세 불명확 시(MDN+WICG+Chromium 소스 3중 분석 필요) AGENTS.md "WebKit/Blink API 사전 측정" 신규 anchor 추가 — `window.showDirectoryPicker` wrapper로 `e.name` 실측 후 분기 설계 의무화. Cell #2 Codex CONCERN을 patch-after-measure 패턴으로 1라운드 단축 가능. 향후 DOMException-heavy 작업(FSA / Clipboard API / Storage API)에서 자동 적용.
+tasks/folder-picker-ux/smoke-golden-regression.md:18:| 4 | 다시 클릭 → `~/.claude/projects` 선택 | Error 0건, 핸들 저장, 다음 step 진행 | ✅ owner localhost | 2026-05-22 owner-direct: `Pick .claude/projects` 버튼 텍스트가 `✓ projects` 로 변경 + 강조 상태 / fsaError 클리어 ✅ / fsaWarning 클리어 ✅ / `Scan & preview` 버튼 enabled 유지 ✅ / Step 2 timeframe row 진행 노출. 스크린샷: `issues/스크린샷 2026-05-22 오전 12.46.29.png` |
+tasks/folder-picker-ux/smoke-golden-regression.md:27:**Deploy 상태**: ✅ Vercel commit `6cda4c5` deployment 완료 (2026-05-22, gh api 확인 — `https://vercel.com/chongwon-shins-projects/coconutlabs/9zFwEtq2UE3436K9m6ZrnNQX7Zyw`).
+tasks/folder-picker-ux/smoke-golden-regression.md:29:**Production secret leak 재검증 메모**: `curl https://www.coconutlabs.xyz/_next/static/chunks/*.js`는 Vercel Bot Challenge (`x-vercel-mitigated: challenge`, 403)로 차단됨. **Local build verification (`grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0)이 Phase 7 commit 직전에 PASS**한 상태로 동일 source가 Vercel build pipeline 통과 → derivatively verified.
+tasks/folder-picker-ux/smoke-golden-regression.md:31:**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+tasks/folder-picker-ux/smoke-golden-regression.md:42:**Deploy 상태**: ✅ Vercel commit `b94d362` deployment 완료 (2026-05-22T01:46:39Z, GitHub combined status `success` — `https://vercel.com/chongwon-shins-projects/coconutlabs/3kKrsZNWTyZpr8TzozqVvWPmwPeR`).
+tasks/folder-picker-ux/smoke-golden-regression.md:47:- production main chunks 5개 (총 394 KB) 전수 grep `COLLECTOR_HMAC_SECRET` = **0 hits** — Invariant #1 PASS
+tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/criteria-execution-log.md:11:| 1 | Build secret 노출 0건 | ✅ (local build PASS + Vercel deploy success + production main chunks 8개 전수 0 hits) | Phase 5.3 + Phase 7 commit 직전 `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. Vercel deploy `6cda4c5` success (gh api). **Production curl 검증은 Vercel Bot Challenge로 차단** (`x-vercel-mitigated: challenge`, 403) → **Claude-in-Chrome 보조 검증 (2026-05-22)**: same-origin browser `fetch()`로 production main chunks 8개 (총 707,406 B) 전수 grep → **COLLECTOR_HMAC_SECRET 0 hits**. 상세 `phase7-auxiliary-verification.md`. Invariant #1 production 직접 검증 PASS |
+tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/criteria-execution-log.md:14:| 4 | SecurityError actionable → AbortError count-based fsaWarning | ✅ (Cell #2 재실측 PASS, owner localhost) ⏳ (production cell #2 재실측) | **2026-05-22 Cell #2 1차 실측**: `[picker-rejection] {name: "AbortError", code: 20, message: "Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request."}` — Codex CONCERN 확인 CORRECT. Chrome은 홈 디렉터리 거절을 AbortError로 dispatch (SecurityError 아님). 단순 silent return이 SecurityError 분기를 preempt → 메시지 무노출. **Contingency Patch v2 (count-based) 적용** `JoinBurnIndexForm.tsx:99 + 126-134`: `abortCountRef = useRef<number>(0)` → 1회 silent / 2회 누적 시 `fsaWarning` (yellow, non-fatal). timing-based 1500ms 폐기 (picker 호출당 10-15초 → 1500ms 내 2회 불가능 → count-based pivot). Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234/234 / build / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. **Cell #2 재실측 PASS (2026-05-22 owner-direct localhost)**: 1차 silent ✅ / 2차 연두색 fsaWarning 텍스트 정확 일치 ✅ / Scan 버튼 enabled 유지 ✅. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 잔여 = Phase 7 production redeploy 후 cell #2 재실측 |
+tasks/folder-picker-ux/criteria-execution-log.md:16:| 6 | a11y WCAG AA 4.5:1 + Tab order | ✅ (contrast + tab order + Phase 7.5 v2 회복 + Phase 7.5.6 font bump 재검증) ⏳ (Lighthouse + owner SR smoke 잔여) | Phase 3 self-audit + **localhost computed 재확인** (`preflight-localhost-verification.md`): `--fg2 rgb(82,82,82)` on `--bg rgb(255,255,255)` = **7.52:1** (helper/row/hint 모두 동일) / kbd `--fg rgb(10,10,10)` on `--surface-muted rgb(250,250,250)` = **20.4:1** / `--young-coconut-dark` outline-only(text 미사용). Tab 순서 10 tabbables: close 첫 → 2 pickers → 5 timeframe → 폼 필드 = 자연 순서. **Phase 7.5 v2 contrast 회복** (`phase7.5-auxiliary-verification.md`): Edit 2 v2 `.kbd-label` 색상을 `--fg3 #8E8E8E` (3.28:1 AA fail) → `--fg2 #525252` (codex v2 권장 반영)으로 변경 → **production 재계산 PASS**: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code (inherit `--fg2`) `7.81:1`. **a11y 추가 강화** (Edit 3 v2 신규 클래스 `.path-preview-hint code` JetBrains Mono / Edit 4 inline `<kbd aria-label>` 2건 + `<span aria-hidden>` 1건): SR이 `⌘⇧.`을 "Command Shift Period"로, `Ctrl+H`를 "Control H"로 또박또박 발음 + `(period)` 시각 라벨은 SR 중복 announce 차단. **Phase 7.5.6 patch 후 contrast 재확인** (font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규): 15px kbd `#0A0A0A` on `#FAFAFA` = **18.97:1** ✅ (font-size 증가에도 색상 무변 → ratio 동일), `.kbd-label` `#525252` on `#FFFFFF` = **7.81:1** ✅. Lighthouse + owner VoiceOver smoke 잔여 (Codex Q6 follow-up — task #14) |
+tasks/folder-picker-ux/criteria-execution-log.md:26:| 9 | tsc + vitest + eslint | ⚠️ PARTIAL→PASS (80% 룰) | `tsc --noEmit` ✅ exit 0 / `vitest run` ✅ 234/234 / `eslint --max-warnings=0` ❌ 15 warnings (모두 pre-existing, 본 변경 도입 0건). 3축 중 2.5 통과로 80% 룰 적용 → PASS |
+
+exec
+/bin/zsh -lc "rg -n \"Owner Happy Path|owner|Phase 6|Phase 7|Phase 7\\.5|Phase 7\\.5\\.6|사이즈|notes|verbal|marker|production\" tasks/folder-picker-ux/criteria-execution-log.md tasks/folder-picker-ux/smoke-golden-regression.md" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+tasks/folder-picker-ux/smoke-golden-regression.md:3:**Date**: 2026-05-21 (Phase 6 진행 중)
+tasks/folder-picker-ux/smoke-golden-regression.md:7:**2026-05-22 Contingency Patch 반영**: Codex Phase 6 CONCERN 확인 — Cell #2 실측 결과 `e.name="AbortError"` (code 20), `SecurityError` 아님. `JoinBurnIndexForm.tsx:126-134` count-based heuristic 도입 — 2회 연속 AbortError 시 `fsaWarning` (yellow, non-fatal) 노출. Cell #2/#5 기대 결과 갱신. Invariant #4 (e.name only) 유지.
+tasks/folder-picker-ux/smoke-golden-regression.md:11:## Phase 6 Cells (Chrome 최신 incognito + production deployment)
+tasks/folder-picker-ux/smoke-golden-regression.md:15:| 1 | `https://www.coconutlabs.xyz/` 진입, Path Preview Card 시각 확인 | `~/.claude/projects` + `~/.codex/sessions` 두 row 노출 + reveal hint 1줄 (`⌘⇧·` macOS / `Ctrl+H` Linux) | ✅ owner localhost | 2026-05-22 owner-direct on `localhost:3000/?auto-detect=1` (production redeploy 후 재실측 별도). 스크린샷: `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 두 row + hint 모두 가시 |
+tasks/folder-picker-ux/smoke-golden-regression.md:16:| 2 | "Pick .claude/projects" 클릭 → 홈 디렉터리(`~`) 선택 → Chrome dialog "다른 폴더 선택" 또는 "취소" 클릭 → 다시 "Pick .claude/projects" 클릭 → 홈 디렉터리 다시 선택 → 두 번째 거절 | **1차 시도**: silent (메시지 무노출, abortCount=1) / **2차 시도**: yellow `fsaWarning` 노출 — "Trouble picking the folder? Chrome blocks system folders like your home directory — drill into ~/.claude/projects (or ~/.codex/sessions) specifically." Korean Chrome dialog 떠도 우리 UI 메시지는 영어 동일. **Scan 버튼 enabled 유지** (fsaWarning은 non-fatal, fsaError 아님) | ✅ owner localhost | 2026-05-22 owner-direct: "1차에서는 아무것도 안 뜨고, 2차에서는 연두색 바탕 안에 [정확한 텍스트 일치]". Scan 버튼 enabled 유지 확인. 스크린샷: `issues/스크린샷 2026-05-22 오전 12.33.04.png` |
+tasks/folder-picker-ux/smoke-golden-regression.md:17:| 3 | 다시 클릭 → `~/.claude` 자체 선택 → Chrome 권한 팝업 "허용" | Name mismatch 메시지에 `{h.name}` 동적 노출 — `You picked ".claude". We need the directory literally named "projects" (inside ~/.claude/ or ~/.codex/). Try again.` | ✅ owner localhost | 2026-05-22 owner-direct (Cell #3 페이지 reload 후 fresh state): 정확 텍스트 일치 / `.claude` 동적 표기 ✅ / `projects` 정확 노출 ✅ / hint 글리프 `⌘⇧.` 정상 (typo fix HMR 반영). 스크린샷 `issues/스크린샷 2026-05-22 오전 12.42.51.png` |
+tasks/folder-picker-ux/smoke-golden-regression.md:18:| 4 | 다시 클릭 → `~/.claude/projects` 선택 | Error 0건, 핸들 저장, 다음 step 진행 | ✅ owner localhost | 2026-05-22 owner-direct: `Pick .claude/projects` 버튼 텍스트가 `✓ projects` 로 변경 + 강조 상태 / fsaError 클리어 ✅ / fsaWarning 클리어 ✅ / `Scan & preview` 버튼 enabled 유지 ✅ / Step 2 timeframe row 진행 노출. 스크린샷: `issues/스크린샷 2026-05-22 오전 12.46.29.png` |
+tasks/folder-picker-ux/smoke-golden-regression.md:19:| 5 | 다시 클릭 → 시스템 dialog에서 cancel (1회) | Silent (form-error/warning 미노출, 카드 그대로). **전제**: Cell #4 성공 후 abortCount 0 리셋된 상태. Cell #4 미실행 시 직전 누적 카운트에 따라 fsaWarning 노출 가능 — 그 경우도 Cell #2 contract와 정합 | ✅ owner localhost (variant: 2회 cancel) | 2026-05-22 owner-direct: 2회 cancel 입력 → count cycle 검증 PASS. Cell #4 success로 `abortCountRef`가 0 리셋된 상태에서 0→1 (silent) → 1→2 (fsaWarning 노출, 정확 텍스트 일치) 흐름 재현. count-based heuristic post-reset 동작 확인. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.53.44.png`. **변형 사유**: 1회 cancel→silent 검증은 Cell #2 1차 + Cell #5 0→1 transition으로 이미 evidence 확보. 2회 cancel은 reset 후 cycle 재검증으로 더 강한 contract 확인 |
+tasks/folder-picker-ux/smoke-golden-regression.md:20:| 6 | Safari로 동일 URL 진입 | "Join Burn Index" 수동 폼 fallback. Path Preview Card 미표시(auto-detect off) | ✅ owner localhost | 2026-05-22 owner-direct Safari: "Join Burn Index" 모달 노출 / STEP 1 RUN THE COLLECTOR (Python 3.11+ instructions + git clone snippet + Copy button) / STEP 2 UPLOAD YOUR BURN SUMMARY (handle input + file picker + JSON paste textarea + `Validate & preview` 버튼) / Path Preview Card 미표시 ✅ / Pick .claude/projects / .codex/sessions 버튼 미표시 ✅ / `⌘⇧.` hint 미표시 ✅. `"showDirectoryPicker" in window` 분기 (line 67-73) 정상 동작. 스크린샷 `issues/스크린샷 2026-05-22 오전 1.01.40.png` |
+tasks/folder-picker-ux/smoke-golden-regression.md:21:| 7 | (v2 신규) Chrome DevTools > Application > Storage > Clear site data → IndexedDB throttle/block 시뮬레이션 후 `~/.claude/projects` 선택 | Handle UI에 `✓ projects` 표시 (claudeHandle React state set), `fsaError` 비어 있음, `fsaWarning`에 "Folder selected for this session, but it could not be remembered" 노출. Scan 버튼 enabled. 새로고침 후 handle 재선택 필요 (정상). 직접 시뮬레이션 불가 시 saveHandle 임시 throw로 대체 검사 (코드 검사 갈음) | ✅ owner 승인 코드 검사 | 2026-05-22 owner-direct decision (옵션 A 선택). `JoinBurnIndexForm.tsx:164-182` 4단계 분리 구조 검증: ① L167-168 `setFsaError("")` + `setFsaWarning("")` 클리어 / ② L170-171 `setClaudeHandle(h)` / `setCodexHandle(h)` **saveHandle 호출 BEFORE handle state 세팅** (Invariant #5 핵심) / ③ L176-177 `try { await saveHandle(kind, h) }` IDB persistence best-effort / ④ L178-182 catch에서 `setFsaWarning("Folder selected for this session, but it could not be remembered. You'll need to pick it again next time.")` 노출 + fsaError 미터치로 Scan 버튼 enabled 유지. **Invariant #5 (handle React state ↔ IDB persistence 분리) 코드 레벨 PASS** |
+tasks/folder-picker-ux/smoke-golden-regression.md:25:## Phase 7 Production 재실행 (cells #1, #4 — 2/2 필수)
+tasks/folder-picker-ux/smoke-golden-regression.md:29:**Production secret leak 재검증 메모**: `curl https://www.coconutlabs.xyz/_next/static/chunks/*.js`는 Vercel Bot Challenge (`x-vercel-mitigated: challenge`, 403)로 차단됨. **Local build verification (`grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0)이 Phase 7 commit 직전에 PASS**한 상태로 동일 source가 Vercel build pipeline 통과 → derivatively verified.
+tasks/folder-picker-ux/smoke-golden-regression.md:31:**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+tasks/folder-picker-ux/smoke-golden-regression.md:35:| 1 (production redeploy 후) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입. Path Preview Card 2 row + hint 노출 확인 후 본 표 1줄 직접 기록 >> 둘 다 잘 보임 |
+tasks/folder-picker-ux/smoke-golden-regression.md:36:| 4 (production redeploy 후) | ⏳ owner-direct | `~/.claude/projects` 선택 → `✓ projects` 버튼 + fsaError/fsaWarning 0 + Scan 버튼 enabled 확인 후 본 표 1줄 직접 기록 >> 둘 다 잘 보임 |
+tasks/folder-picker-ux/smoke-golden-regression.md:40:## Phase 7.5 Production 재실측 (Findings 2+3 patch, cell 1/1 필수)
+tasks/folder-picker-ux/smoke-golden-regression.md:45:- production HTML + computed styles 실측: kbd 13px / `letter-spacing 0.5px` / `padding 2px 7px` / aria-label `Command Shift Period`·`Control H` / `(period)` 라벨 `aria-hidden=true` 11px Inter `--fg2` / `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) JetBrains Mono — **3/3 마크업 PASS**
+tasks/folder-picker-ux/smoke-golden-regression.md:47:- production main chunks 5개 (총 394 KB) 전수 grep `COLLECTOR_HMAC_SECRET` = **0 hits** — Invariant #1 PASS
+tasks/folder-picker-ux/smoke-golden-regression.md:49:**owner-direct manual record는 여전히 의무** — 본 표 cell은 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능, harness-loop "auto-append 금지" 게이트 유지).
+tasks/folder-picker-ux/smoke-golden-regression.md:53:| 7.5 (kbd 시인성 + home folder + aria-label) | ⏳ owner-direct | Chrome 최신 + incognito + `https://www.coconutlabs.xyz/?auto-detect=1` 진입 → Hero "Join Burn Index" 클릭 → 모달 오픈 → ① `⌘⇧.` kbd 13px 가독 + `.`이 마침표가 아닌 키 라벨로 인지 ② `(period)` 라벨 명시 노출 ③ "From your home folder (~), open .claude/projects or .codex/sessions" 안내 노출 ④ (선택) VoiceOver(Cmd+F5)로 hint Tab → "Command Shift Period" / "Control H" 발음 확인 (Codex Q6 follow-up). 본 표 1줄 직접 기록 |
+tasks/folder-picker-ux/smoke-golden-regression.md:63:## Phase 6 최종 결과 (2026-05-22)
+tasks/folder-picker-ux/smoke-golden-regression.md:65:**7/7 cells PASS** (owner-direct 6 cells + 코드 검사 1 cell)
+tasks/folder-picker-ux/smoke-golden-regression.md:69:| 1 | ✅ | owner localhost (스크린샷 12.33.04) |
+tasks/folder-picker-ux/smoke-golden-regression.md:70:| 2 | ✅ | owner localhost (스크린샷 12.33.04) — Codex CONCERN AbortError 확인 + Contingency Patch v2 PASS |
+tasks/folder-picker-ux/smoke-golden-regression.md:71:| 3 | ✅ | owner localhost (스크린샷 12.42.51) — typo fix `⌘⇧·` → `⌘⇧.` 함께 검증 |
+tasks/folder-picker-ux/smoke-golden-regression.md:72:| 4 | ✅ | owner localhost (스크린샷 12.46.29) — `✓ projects` 핸들 저장 |
+tasks/folder-picker-ux/smoke-golden-regression.md:73:| 5 | ✅ | owner localhost (스크린샷 12.53.44, variant 2회 cancel) — count cycle 검증 |
+tasks/folder-picker-ux/smoke-golden-regression.md:74:| 6 | ✅ | owner localhost Safari (스크린샷 01.01.40) — fallback 정확 노출 |
+tasks/folder-picker-ux/smoke-golden-regression.md:75:| 7 | ✅ | owner-direct decision 코드 검사 — Invariant #5 PASS |
+tasks/folder-picker-ux/smoke-golden-regression.md:77:**중단 사유 없음. Phase 7 (production deploy + 30min monitoring) 진입 가능.**
+tasks/folder-picker-ux/smoke-golden-regression.md:79:잔여 의무: Phase 7에서 cells #1, #4 production deployment 재실행 (smoke-golden-regression.md "Phase 7 Production 재실행" 섹션).
+tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/criteria-execution-log.md:11:| 1 | Build secret 노출 0건 | ✅ (local build PASS + Vercel deploy success + production main chunks 8개 전수 0 hits) | Phase 5.3 + Phase 7 commit 직전 `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. Vercel deploy `6cda4c5` success (gh api). **Production curl 검증은 Vercel Bot Challenge로 차단** (`x-vercel-mitigated: challenge`, 403) → **Claude-in-Chrome 보조 검증 (2026-05-22)**: same-origin browser `fetch()`로 production main chunks 8개 (총 707,406 B) 전수 grep → **COLLECTOR_HMAC_SECRET 0 hits**. 상세 `phase7-auxiliary-verification.md`. Invariant #1 production 직접 검증 PASS |
+tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/criteria-execution-log.md:13:| 3 | AbortError silent | ✅ (code + Cell #5 owner localhost PASS) | `JoinBurnIndexForm.tsx:126-134` count-based — 1차 cancel silent (count 0→1), 2차 cancel fsaWarning 노출 (count 1→2). locale-independent (Invariant #4). **Cell #5 owner-direct (2026-05-22 localhost)**: 2회 cancel variant — Cell #4 success 직후 `abortCountRef`=0 리셋된 상태에서 0→1 silent + 1→2 fsaWarning 정확 텍스트 일치. count-based heuristic post-reset cycle 검증 PASS. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.53.44.png` |
+tasks/folder-picker-ux/criteria-execution-log.md:14:| 4 | SecurityError actionable → AbortError count-based fsaWarning | ✅ (Cell #2 재실측 PASS, owner localhost) ⏳ (production cell #2 재실측) | **2026-05-22 Cell #2 1차 실측**: `[picker-rejection] {name: "AbortError", code: 20, message: "Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request."}` — Codex CONCERN 확인 CORRECT. Chrome은 홈 디렉터리 거절을 AbortError로 dispatch (SecurityError 아님). 단순 silent return이 SecurityError 분기를 preempt → 메시지 무노출. **Contingency Patch v2 (count-based) 적용** `JoinBurnIndexForm.tsx:99 + 126-134`: `abortCountRef = useRef<number>(0)` → 1회 silent / 2회 누적 시 `fsaWarning` (yellow, non-fatal). timing-based 1500ms 폐기 (picker 호출당 10-15초 → 1500ms 내 2회 불가능 → count-based pivot). Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234/234 / build / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. **Cell #2 재실측 PASS (2026-05-22 owner-direct localhost)**: 1차 silent ✅ / 2차 연두색 fsaWarning 텍스트 정확 일치 ✅ / Scan 버튼 enabled 유지 ✅. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 잔여 = Phase 7 production redeploy 후 cell #2 재실측 |
+tasks/folder-picker-ux/criteria-execution-log.md:15:| 5 | Name mismatch 동적 표기 | ✅ (code + Cell #3 owner localhost PASS) | `JoinBurnIndexForm.tsx:157-161` `You picked "${h.name}". We need the directory literally named "${expectedName}"…`. **Cell #3 owner-direct (2026-05-22 localhost)**: `~/.claude` 직접 선택 → 빨간 fsaError 노출, `.claude` 동적 + `projects` expected 정확 일치. typo fix `⌘⇧·` → `⌘⇧.` (line 423) 함께 검증. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.42.51.png` |
+tasks/folder-picker-ux/criteria-execution-log.md:16:| 6 | a11y WCAG AA 4.5:1 + Tab order | ✅ (contrast + tab order + Phase 7.5 v2 회복 + Phase 7.5.6 font bump 재검증) ⏳ (Lighthouse + owner SR smoke 잔여) | Phase 3 self-audit + **localhost computed 재확인** (`preflight-localhost-verification.md`): `--fg2 rgb(82,82,82)` on `--bg rgb(255,255,255)` = **7.52:1** (helper/row/hint 모두 동일) / kbd `--fg rgb(10,10,10)` on `--surface-muted rgb(250,250,250)` = **20.4:1** / `--young-coconut-dark` outline-only(text 미사용). Tab 순서 10 tabbables: close 첫 → 2 pickers → 5 timeframe → 폼 필드 = 자연 순서. **Phase 7.5 v2 contrast 회복** (`phase7.5-auxiliary-verification.md`): Edit 2 v2 `.kbd-label` 색상을 `--fg3 #8E8E8E` (3.28:1 AA fail) → `--fg2 #525252` (codex v2 권장 반영)으로 변경 → **production 재계산 PASS**: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code (inherit `--fg2`) `7.81:1`. **a11y 추가 강화** (Edit 3 v2 신규 클래스 `.path-preview-hint code` JetBrains Mono / Edit 4 inline `<kbd aria-label>` 2건 + `<span aria-hidden>` 1건): SR이 `⌘⇧.`을 "Command Shift Period"로, `Ctrl+H`를 "Control H"로 또박또박 발음 + `(period)` 시각 라벨은 SR 중복 announce 차단. **Phase 7.5.6 patch 후 contrast 재확인** (font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규): 15px kbd `#0A0A0A` on `#FAFAFA` = **18.97:1** ✅ (font-size 증가에도 색상 무변 → ratio 동일), `.kbd-label` `#525252` on `#FFFFFF` = **7.81:1** ✅. Lighthouse + owner VoiceOver smoke 잔여 (Codex Q6 follow-up — task #14) |
+tasks/folder-picker-ux/criteria-execution-log.md:18:**Must-Pass 현 시점**: 5/6 code-side ✅ + #4 ⚠️ PARTIAL (Codex CONCERN on Cell #2 dispatch) + #2/#6 localhost auto-verification 강화 + #3/#5 dynamic simulation 강화 (`preflight-phase6-simulated.md` 7/7 cells PASS for synthetic inputs). **Codex Phase 6 verdict: needs-attention** — single critical concern: real Chrome may dispatch home-folder rejection as `AbortError` (not `SecurityError`), in which case `JoinBurnIndexForm.tsx:120` silent return preempts the actionable SecurityError branch. owner 실측 잔여 = **🔴 P1 Cell #2 real `~` pick + capture `e.name`** + 🟡 P2 Cell #7 real DevTools IDB clear + 🟢 P3 production cell #1 + remaining 5 cells real picker + Safari + Lighthouse/screen reader.
+tasks/folder-picker-ux/criteria-execution-log.md:28:| 11 | Owner Happy Path 6 cells | ⏳ partial — 7/7 auto-simulated + Codex 검토 완료 (**needs-attention**) | **`preflight-phase6-simulated.md` 7/7 cells PASS (auto)**: Cell #1 inherited + Cell #2-#5 monkey-patched `showDirectoryPicker` 4분기 + Cell #6 no-query 네비게이션 manual form + Cell #7 `indexedDB.open` 패치 fsaWarning + Invariant #5. **Codex Phase 6 (`codex-phase6.md` 13261 bytes) 완료 — verdict: needs-attention**. Cell-by-cell: #1/#3/#4/#5/#6/#7 ✅ PASS / **#2 ⚠️ CONCERN MEDIUM** (AbortError vs SecurityError dispatch — MDN+WICG+Chromium source citations). Q1 LOW (Step 4 timing ✅) / Q2 MEDIUM (DOMException cross-Chromium 일부 unverified) / Q3 MEDIUM (parent-path validation gap, 별 사이클) / Q4 LOW (NEXT_PUBLIC build-time, redeploy 절차 정합) / Q5 INFO (English UI 영구) / Q6 MEDIUM (kbd SR 미검증). owner real-incognito + production은 여전히 의무 (smoke-golden-regression.md owner-직접-기록 invariant). **🔴 P1 = Cell #2 real `~` pick + `e.name` 로깅 (Phase 6 단일 차단 후보)**. |
+tasks/folder-picker-ux/criteria-execution-log.md:29:| 12 | B3 5종 + decision-log + S10 | ⏳ partial | #1 criteria ✅ / #2 본 파일 ✅ / #3 diff ✅ / #4 unverified ✅ / #5 smoke-golden Phase 6 owner / **`preflight-localhost-verification.md` + `preflight-phase6-simulated.md` 보조 산출물 추가** / decision-log + S10 Phase 8 |
+tasks/folder-picker-ux/criteria-execution-log.md:31:**Should-Pass 현 시점**: 3 PASS + 1 N/A (제외) + #11 partial (auto 7/7 ✅, owner real-incognito 잔여) + #12 partial → 5개 평가 대상 중 3 PASS + 2 partial. Phase 6/7/8 완료 후 80% 룰 (5/6+) 재평가. Codex Phase 6 verdict 도착 시 본 파일 + `preflight-phase6-simulated.md` 추가 갱신.
+tasks/folder-picker-ux/criteria-execution-log.md:48:- Phase 6 6 cells 완료 → #2~#6, #11 owner 실측 결과 반영
+tasks/folder-picker-ux/criteria-execution-log.md:49:- Phase 7 production deploy → #1 production 재검증
+
+codex
+Q1에서 한 가지 미세한 불일치가 보입니다. Phase 7의 두 production row는 결과 marker가 `⏳`인 채 notes에 owner 문구가 들어간 상태와 decision-log 설명이 맞지만, Phase 7.5/7.5.6의 verbal evidence는 smoke 로그 본문보다 criteria-execution-log 쪽에 더 직접적으로 남아 있습니다.
+exec
+/bin/zsh -lc "rg -n \"Phase 7\\.5\\.6|7\\.5\\.6|사이즈 괜찮음|owner production direct|Owner Happy Path Gate|40cd00c\" tasks/folder-picker-ux docs/decision" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+tasks/folder-picker-ux/codex-phase8-input.md:11:Phase 7.5.6 closure (commit `40cd00c`, owner production self-test "사이즈 괜찮음") 후 Phase 8 docs cycle 진입. 8.1A (3 기존 산출물 갱신) + 8.1B (3 신규 산출물 작성) + 8.2 (Finding 1 별 사이클 brief) 완료. 본 Phase 8.3은 **commit 전 fact-check** — 신규 산출물의 사실 정확성·overclaim 위험·frontmatter 준수·회고 패턴·invariant 정의를 적대적 검토.
+tasks/folder-picker-ux/codex-phase8-input.md:19:5. **Cycle 4 commits git log** — 확인 명령: `git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'`
+tasks/folder-picker-ux/codex-phase8-input.md:30:- "Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 직접 기록"
+tasks/folder-picker-ux/codex-phase8-input.md:31:- "4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits"
+tasks/folder-picker-ux/codex-phase8-input.md:35:- `tasks/folder-picker-ux/smoke-golden-regression.md` 실제 owner-direct 손글씨 cells 카운트가 정확히 12+ 인지 (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1 합산 = 11)
+tasks/folder-picker-ux/codex-phase8-input.md:57:- 4 commit hash 인용 (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`)
+tasks/folder-picker-ux/codex-phase8-input.md:76:- **잘 됐나**: "ON-flip → owner self-test → 3 Finding 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출"
+tasks/folder-picker-ux/unverified.md:3:**Date**: 2026-05-22 (Phase 7.5.6 closure)
+tasks/folder-picker-ux/unverified.md:34:## Phase 7.5.6 Closure (2026-05-22)
+tasks/folder-picker-ux/unverified.md:39:- **Deploy**: Vercel commit `40cd00c` auto-deploy 완료.
+tasks/folder-picker-ux/unverified.md:40:- **Owner Happy Path Gate**: Phase 7.5.6 (40cd00c) 2026-05-22 owner-direct production check ✅ + mcp computed style verify ✅ (font-size 15px / padding 2px 8px / line-height 21px) + owner 발화 "사이즈 괜찮음". `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 완료. 잔여 미검증 unchanged (Brave/Vivaldi, telemetry counter, parent-path validation Q3).
+tasks/folder-picker-ux/diff.md:3:**Date**: 2026-05-22 (Phase 7.5.6 closure)
+tasks/folder-picker-ux/diff.md:4:**Status**: Phase 7.5.6 완료 (Phase 5 base + Phase 7.5 hint/aria 강화 + Phase 7.5.6 kbd font 15px bump). 다음 단계 Phase 8 docs cycle.
+tasks/folder-picker-ux/diff.md:28:## Phase 7.5 + 7.5.6 Subsequent Iterations
+tasks/folder-picker-ux/diff.md:34:| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+tasks/folder-picker-ux/diff.md:36:**Phase 7.5 + 7.5.6 합산**: code 2 files (`JoinBurnIndexForm.tsx` + `app/globals.css`). Phase 5 base 위에 점진적 누적.
+tasks/folder-picker-ux/diff.md:45:**Owner Happy Path Gate (Phase 7.5.6)**: owner 2026-05-22 production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 ✅. mcp__claude-in-chrome computed style verify (font-size 15px / padding 2px 8px / line-height 21px) 부합.
+docs/decision/decision-log.md:356:- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+docs/decision/decision-log.md:357:- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 11 planned cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 중 Phase 6 7/7 owner-direct localhost ✅ 손글씨 기록 / Phase 7 #1·#4 production owner-notes evidence 컬럼 기록(marker 미flip) / Phase 7.5·7.5.6 owner 발화 "사이즈 괜찮음" verbal 확인 + code deploys 3건 (`6cda4c5`/`b94d362`/`40cd00c`) 각 build secret leak 0 hits 재확인 (`3756e83`은 docs-only commit — code chunks 변경 0건이라 secret leak 점검 대상 아님).
+docs/decision/decision-log.md:360:- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/criteria-execution-log.md:16:| 6 | a11y WCAG AA 4.5:1 + Tab order | ✅ (contrast + tab order + Phase 7.5 v2 회복 + Phase 7.5.6 font bump 재검증) ⏳ (Lighthouse + owner SR smoke 잔여) | Phase 3 self-audit + **localhost computed 재확인** (`preflight-localhost-verification.md`): `--fg2 rgb(82,82,82)` on `--bg rgb(255,255,255)` = **7.52:1** (helper/row/hint 모두 동일) / kbd `--fg rgb(10,10,10)` on `--surface-muted rgb(250,250,250)` = **20.4:1** / `--young-coconut-dark` outline-only(text 미사용). Tab 순서 10 tabbables: close 첫 → 2 pickers → 5 timeframe → 폼 필드 = 자연 순서. **Phase 7.5 v2 contrast 회복** (`phase7.5-auxiliary-verification.md`): Edit 2 v2 `.kbd-label` 색상을 `--fg3 #8E8E8E` (3.28:1 AA fail) → `--fg2 #525252` (codex v2 권장 반영)으로 변경 → **production 재계산 PASS**: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code (inherit `--fg2`) `7.81:1`. **a11y 추가 강화** (Edit 3 v2 신규 클래스 `.path-preview-hint code` JetBrains Mono / Edit 4 inline `<kbd aria-label>` 2건 + `<span aria-hidden>` 1건): SR이 `⌘⇧.`을 "Command Shift Period"로, `Ctrl+H`를 "Control H"로 또박또박 발음 + `(period)` 시각 라벨은 SR 중복 announce 차단. **Phase 7.5.6 patch 후 contrast 재확인** (font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규): 15px kbd `#0A0A0A` on `#FAFAFA` = **18.97:1** ✅ (font-size 증가에도 색상 무변 → ratio 동일), `.kbd-label` `#525252` on `#FFFFFF` = **7.81:1** ✅. Lighthouse + owner VoiceOver smoke 잔여 (Codex Q6 follow-up — task #14) |
+tasks/folder-picker-ux/codex-phase8-rerun-input.md:13:- **Q1 HIGH overclaim**: "12+ cells" (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1 = 합 11, 12+ 아님) + "4 commits secret leak 0 hits" (3756e83은 docs-only — code chunks 0건)
+tasks/folder-picker-ux/codex-phase8-rerun-input.md:26:> ... + Owner Happy Path 11 planned cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 중 Phase 6 7/7 owner-direct localhost ✅ 손글씨 기록 / Phase 7 #1·#4 production owner-notes evidence 컬럼 기록(marker 미flip) / Phase 7.5·7.5.6 owner 발화 "사이즈 괜찮음" verbal 확인 + code deploys 3건 (`6cda4c5`/`b94d362`/`40cd00c`) 각 build secret leak 0 hits 재확인 (`3756e83`은 docs-only commit — code chunks 변경 0건이라 secret leak 점검 대상 아님).
+tasks/folder-picker-ux/codex-phase8-rerun-input.md:57:**Q1 재검증**: decision-log "강한 증거" 줄 — overclaim 0건? "11 planned cells" + "Phase 7/7.5/7.5.6 evidence 상태 명시(owner-notes / verbal)" + "code deploys 3건 (docs-only 3756e83 분리)" 표현이 smoke-golden-regression.md 실제 기록과 일치하는지. S10 "바꿀까" ①도 행동 변화 가능한 별 사이클 액션으로 구체화됐는지.
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:25:- **Q1 HIGH overclaim**: "12+ cells" (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1 = 합 11, 12+ 아님) + "4 commits secret leak 0 hits" (3756e83은 docs-only — code chunks 0건)
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:38:> ... + Owner Happy Path 11 planned cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 중 Phase 6 7/7 owner-direct localhost ✅ 손글씨 기록 / Phase 7 #1·#4 production owner-notes evidence 컬럼 기록(marker 미flip) / Phase 7.5·7.5.6 owner 발화 "사이즈 괜찮음" verbal 확인 + code deploys 3건 (`6cda4c5`/`b94d362`/`40cd00c`) 각 build secret leak 0 hits 재확인 (`3756e83`은 docs-only commit — code chunks 변경 0건이라 secret leak 점검 대상 아님).
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:69:**Q1 재검증**: decision-log "강한 증거" 줄 — overclaim 0건? "11 planned cells" + "Phase 7/7.5/7.5.6 evidence 상태 명시(owner-notes / verbal)" + "code deploys 3건 (docs-only 3756e83 분리)" 표현이 smoke-golden-regression.md 실제 기록과 일치하는지. S10 "바꿀까" ①도 행동 변화 가능한 별 사이클 액션으로 구체화됐는지.
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:133:   356	- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:134:   357	- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 11 planned cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 중 Phase 6 7/7 owner-direct localhost ✅ 손글씨 기록 / Phase 7 #1·#4 production owner-notes evidence 컬럼 기록(marker 미flip) / Phase 7.5·7.5.6 owner 발화 "사이즈 괜찮음" verbal 확인 + code deploys 3건 (`6cda4c5`/`b94d362`/`40cd00c`) 각 build secret leak 0 hits 재확인 (`3756e83`은 docs-only commit — code chunks 변경 0건이라 secret leak 점검 대상 아님).
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:137:   360	- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:141:/bin/zsh -lc "rg -n \"Owner Happy Path|Phase 6|Phase 7|Phase 7\\.5|Phase 7\\.5\\.6|6cda4c5|b94d362|40cd00c|3756e83|secret leak|owner-notes|marker|verbal|사이즈\" tasks/folder-picker-ux/smoke-golden-regression.md" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:242:    55	## kbd 시인성 패턴 (Phase 7.5 + 7.5.6 누적)
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:246:    59	- `font-size: 15px` (Phase 5 11px → Phase 7.5 13px → Phase 7.5.6 15px 2단계 bump)
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:253:    66	WCAG AA 재확인(Phase 7.5.6): 15px kbd `#0A0A0A` on `#FAFAFA` = 18.97:1 ✅, `.kbd-label` `#525252` on `#FFFFFF` = 7.81:1 ✅.
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:271:    84	- `40cd00c` (Phase 7.5.6): kbd 13→15px font bump 마무리
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:370:/bin/zsh -lc 'rg -n "secret|leak|COLLECTOR_HMAC_SECRET|grep -c|6cda4c5|b94d362|40cd00c|3756e83|code chunks|docs-only|변경|chunk" tasks/folder-picker-ux/criteria-execution-log.md tasks/folder-picker-ux/smoke-golden-regression.md docs/decision/decision-log.md' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:379:docs/decision/decision-log.md:356:- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:380:docs/decision/decision-log.md:357:- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 11 planned cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 중 Phase 6 7/7 owner-direct localhost ✅ 손글씨 기록 / Phase 7 #1·#4 production owner-notes evidence 컬럼 기록(marker 미flip) / Phase 7.5·7.5.6 owner 발화 "사이즈 괜찮음" verbal 확인 + code deploys 3건 (`6cda4c5`/`b94d362`/`40cd00c`) 각 build secret leak 0 hits 재확인 (`3756e83`은 docs-only commit — code chunks 변경 0건이라 secret leak 점검 대상 아님).
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:381:docs/decision/decision-log.md:360:- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:389:tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:391:tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:393:tasks/folder-picker-ux/criteria-execution-log.md:16:| 6 | a11y WCAG AA 4.5:1 + Tab order | ✅ (contrast + tab order + Phase 7.5 v2 회복 + Phase 7.5.6 font bump 재검증) ⏳ (Lighthouse + owner SR smoke 잔여) | Phase 3 self-audit + **localhost computed 재확인** (`preflight-localhost-verification.md`): `--fg2 rgb(82,82,82)` on `--bg rgb(255,255,255)` = **7.52:1** (helper/row/hint 모두 동일) / kbd `--fg rgb(10,10,10)` on `--surface-muted rgb(250,250,250)` = **20.4:1** / `--young-coconut-dark` outline-only(text 미사용). Tab 순서 10 tabbables: close 첫 → 2 pickers → 5 timeframe → 폼 필드 = 자연 순서. **Phase 7.5 v2 contrast 회복** (`phase7.5-auxiliary-verification.md`): Edit 2 v2 `.kbd-label` 색상을 `--fg3 #8E8E8E` (3.28:1 AA fail) → `--fg2 #525252` (codex v2 권장 반영)으로 변경 → **production 재계산 PASS**: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code (inherit `--fg2`) `7.81:1`. **a11y 추가 강화** (Edit 3 v2 신규 클래스 `.path-preview-hint code` JetBrains Mono / Edit 4 inline `<kbd aria-label>` 2건 + `<span aria-hidden>` 1건): SR이 `⌘⇧.`을 "Command Shift Period"로, `Ctrl+H`를 "Control H"로 또박또박 발음 + `(period)` 시각 라벨은 SR 중복 announce 차단. **Phase 7.5.6 patch 후 contrast 재확인** (font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규): 15px kbd `#0A0A0A` on `#FAFAFA` = **18.97:1** ✅ (font-size 증가에도 색상 무변 → ratio 동일), `.kbd-label` `#525252` on `#FFFFFF` = **7.81:1** ✅. Lighthouse + owner VoiceOver smoke 잔여 (Codex Q6 follow-up — task #14) |
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:430:tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:432:tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:436:tasks/folder-picker-ux/criteria-execution-log.md:16:| 6 | a11y WCAG AA 4.5:1 + Tab order | ✅ (contrast + tab order + Phase 7.5 v2 회복 + Phase 7.5.6 font bump 재검증) ⏳ (Lighthouse + owner SR smoke 잔여) | Phase 3 self-audit + **localhost computed 재확인** (`preflight-localhost-verification.md`): `--fg2 rgb(82,82,82)` on `--bg rgb(255,255,255)` = **7.52:1** (helper/row/hint 모두 동일) / kbd `--fg rgb(10,10,10)` on `--surface-muted rgb(250,250,250)` = **20.4:1** / `--young-coconut-dark` outline-only(text 미사용). Tab 순서 10 tabbables: close 첫 → 2 pickers → 5 timeframe → 폼 필드 = 자연 순서. **Phase 7.5 v2 contrast 회복** (`phase7.5-auxiliary-verification.md`): Edit 2 v2 `.kbd-label` 색상을 `--fg3 #8E8E8E` (3.28:1 AA fail) → `--fg2 #525252` (codex v2 권장 반영)으로 변경 → **production 재계산 PASS**: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code (inherit `--fg2`) `7.81:1`. **a11y 추가 강화** (Edit 3 v2 신규 클래스 `.path-preview-hint code` JetBrains Mono / Edit 4 inline `<kbd aria-label>` 2건 + `<span aria-hidden>` 1건): SR이 `⌘⇧.`을 "Command Shift Period"로, `Ctrl+H`를 "Control H"로 또박또박 발음 + `(period)` 시각 라벨은 SR 중복 announce 차단. **Phase 7.5.6 patch 후 contrast 재확인** (font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규): 15px kbd `#0A0A0A` on `#FAFAFA` = **18.97:1** ✅ (font-size 증가에도 색상 무변 → ratio 동일), `.kbd-label` `#525252` on `#FFFFFF` = **7.81:1** ✅. Lighthouse + owner VoiceOver smoke 잔여 (Codex Q6 follow-up — task #14) |
+tasks/folder-picker-ux/codex-phase8-rerun.raw.log:445:Q1에서 한 가지 미세한 불일치가 보입니다. Phase 7의 두 production row는 결과 marker가 `⏳`인 채 notes에 owner 문구가 들어간 상태와 decision-log 설명이 맞지만, Phase 7.5/7.5.6의 verbal evidence는 smoke 로그 본문보다 criteria-execution-log 쪽에 더 직접적으로 남아 있습니다.
+tasks/folder-picker-ux/codex-phase8.md:24:Phase 7.5.6 closure (commit `40cd00c`, owner production self-test "사이즈 괜찮음") 후 Phase 8 docs cycle 진입. 8.1A (3 기존 산출물 갱신) + 8.1B (3 신규 산출물 작성) + 8.2 (Finding 1 별 사이클 brief) 완료. 본 Phase 8.3은 **commit 전 fact-check** — 신규 산출물의 사실 정확성·overclaim 위험·frontmatter 준수·회고 패턴·invariant 정의를 적대적 검토.
+tasks/folder-picker-ux/codex-phase8.md:32:5. **Cycle 4 commits git log** — 확인 명령: `git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'`
+tasks/folder-picker-ux/codex-phase8.md:43:- "Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 직접 기록"
+tasks/folder-picker-ux/codex-phase8.md:44:- "4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits"
+tasks/folder-picker-ux/codex-phase8.md:48:- `tasks/folder-picker-ux/smoke-golden-regression.md` 실제 owner-direct 손글씨 cells 카운트가 정확히 12+ 인지 (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1 합산 = 11)
+tasks/folder-picker-ux/codex-phase8.md:70:- 4 commit hash 인용 (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`)
+tasks/folder-picker-ux/codex-phase8.md:89:- **잘 됐나**: "ON-flip → owner self-test → 3 Finding 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출"
+tasks/folder-picker-ux/codex-phase8.md:371:- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+tasks/folder-picker-ux/codex-phase8.md:372:- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) owner 손글씨 직접 기록 + 4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits 재확인.
+tasks/folder-picker-ux/codex-phase8.md:375:- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+tasks/folder-picker-ux/codex-phase8.md:379:/bin/zsh -lc "git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:381:40cd00c fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:917:The first pass confirms Phase 6 is explicitly `needs-attention`, and the supplied git range only lists two path-touching commits (`b94d362`, `40cd00c`). I’m now checking the owner-cell count and the final B3 state because Q1 hinges on whether the decision-log’s “12+” and “4 commits” claims are materially overcounted.
+tasks/folder-picker-ux/codex-phase8.md:1109:/bin/zsh -lc 'for c in 6cda4c5 b94d362 3756e83 40cd00c; do git show --stat --oneline --name-only --no-renames "$c" -- '"'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'; done" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:1117:40cd00c fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1135:* 40cd00c (HEAD -> main, origin/main, origin/HEAD) fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1159:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8.md:1166:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8.md:1170:| 6 | a11y WCAG AA 4.5:1 + Tab order | ✅ (contrast + tab order + Phase 7.5 v2 회복 + Phase 7.5.6 font bump 재검증) ⏳ (Lighthouse + owner SR smoke 잔여) | Phase 3 self-audit + **localhost computed 재확인** (`preflight-localhost-verification.md`): `--fg2 rgb(82,82,82)` on `--bg rgb(255,255,255)` = **7.52:1** (helper/row/hint 모두 동일) / kbd `--fg rgb(10,10,10)` on `--surface-muted rgb(250,250,250)` = **20.4:1** / `--young-coconut-dark` outline-only(text 미사용). Tab 순서 10 tabbables: close 첫 → 2 pickers → 5 timeframe → 폼 필드 = 자연 순서. **Phase 7.5 v2 contrast 회복** (`phase7.5-auxiliary-verification.md`): Edit 2 v2 `.kbd-label` 색상을 `--fg3 #8E8E8E` (3.28:1 AA fail) → `--fg2 #525252` (codex v2 권장 반영)으로 변경 → **production 재계산 PASS**: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code (inherit `--fg2`) `7.81:1`. **a11y 추가 강화** (Edit 3 v2 신규 클래스 `.path-preview-hint code` JetBrains Mono / Edit 4 inline `<kbd aria-label>` 2건 + `<span aria-hidden>` 1건): SR이 `⌘⇧.`을 "Command Shift Period"로, `Ctrl+H`를 "Control H"로 또박또박 발음 + `(period)` 시각 라벨은 SR 중복 announce 차단. **Phase 7.5.6 patch 후 contrast 재확인** (font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규): 15px kbd `#0A0A0A` on `#FAFAFA` = **18.97:1** ✅ (font-size 증가에도 색상 무변 → ratio 동일), `.kbd-label` `#525252` on `#FFFFFF` = **7.81:1** ✅. Lighthouse + owner VoiceOver smoke 잔여 (Codex Q6 follow-up — task #14) |
+tasks/folder-picker-ux/codex-phase8.md:1417:## kbd 시인성 패턴 (Phase 7.5 + 7.5.6 누적)
+tasks/folder-picker-ux/codex-phase8.md:1421:- `font-size: 15px` (Phase 5 11px → Phase 7.5 13px → Phase 7.5.6 15px 2단계 bump)
+tasks/folder-picker-ux/codex-phase8.md:1428:WCAG AA 재확인(Phase 7.5.6): 15px kbd `#0A0A0A` on `#FAFAFA` = 18.97:1 ✅, `.kbd-label` `#525252` on `#FFFFFF` = 7.81:1 ✅.
+tasks/folder-picker-ux/codex-phase8.md:1446:- `40cd00c` (Phase 7.5.6): kbd 13→15px font bump 마무리
+tasks/folder-picker-ux/codex-phase8.md:1462:/bin/zsh -lc "rg -n \"사이즈|괜찮음|owner-direct|owner direct|손글씨|7\\.5\\.6|40cd00c|둘 다 잘 보임|kbd|home folder|Phase 7\\.5\" tasks/folder-picker-ux docs/decision/decision-log.md ~/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md ~/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_auto-detect-flip-procedure.md ~/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/MEMORY.md" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:1465:/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:55:## kbd 시인성 패턴 (Phase 7.5 + 7.5.6 누적)
+tasks/folder-picker-ux/codex-phase8.md:1466:/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:59:- `font-size: 15px` (Phase 5 11px → Phase 7.5 13px → Phase 7.5.6 15px 2단계 bump)
+tasks/folder-picker-ux/codex-phase8.md:1469:/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:66:WCAG AA 재확인(Phase 7.5.6): 15px kbd `#0A0A0A` on `#FAFAFA` = 18.97:1 ✅, `.kbd-label` `#525252` on `#FFFFFF` = 7.81:1 ✅.
+tasks/folder-picker-ux/codex-phase8.md:1472:/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:84:- `40cd00c` (Phase 7.5.6): kbd 13→15px font bump 마무리
+tasks/folder-picker-ux/codex-phase8.md:1473:/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_auto-detect-flip-procedure.md:29:**UX iteration 1 (2026-05-22)**: folder picker 가시성·에러 복구 patch — commits `6cda4c5`+`b94d362`+`3756e83`+`40cd00c`. 4 Finding 흡수 (Finding 1=별 사이클 이관, Finding 2/3=Phase 7.5 patch, Finding 4=Phase 7.5.6 patch). 참고: [[project-folder-picker-ux-2026-05-22]]
+tasks/folder-picker-ux/codex-phase8.md:1475:docs/decision/decision-log.md:356:- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+tasks/folder-picker-ux/codex-phase8.md:1476:docs/decision/decision-log.md:357:- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) owner 손글씨 직접 기록 + 4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits 재확인.
+tasks/folder-picker-ux/codex-phase8.md:1477:docs/decision/decision-log.md:360:- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+tasks/folder-picker-ux/codex-phase8.md:1659:tasks/folder-picker-ux/diff.md:3:**Date**: 2026-05-22 (Phase 7.5.6 closure)
+tasks/folder-picker-ux/codex-phase8.md:1660:tasks/folder-picker-ux/diff.md:4:**Status**: Phase 7.5.6 완료 (Phase 5 base + Phase 7.5 hint/aria 강화 + Phase 7.5.6 kbd font 15px bump). 다음 단계 Phase 8 docs cycle.
+tasks/folder-picker-ux/codex-phase8.md:1661:tasks/folder-picker-ux/diff.md:28:## Phase 7.5 + 7.5.6 Subsequent Iterations
+tasks/folder-picker-ux/codex-phase8.md:1664:tasks/folder-picker-ux/diff.md:34:| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+tasks/folder-picker-ux/codex-phase8.md:1665:tasks/folder-picker-ux/diff.md:36:**Phase 7.5 + 7.5.6 합산**: code 2 files (`JoinBurnIndexForm.tsx` + `app/globals.css`). Phase 5 base 위에 점진적 누적.
+tasks/folder-picker-ux/codex-phase8.md:1666:tasks/folder-picker-ux/diff.md:45:**Owner Happy Path Gate (Phase 7.5.6)**: owner 2026-05-22 production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 ✅. mcp__claude-in-chrome computed style verify (font-size 15px / padding 2px 8px / line-height 21px) 부합.
+tasks/folder-picker-ux/codex-phase8.md:1675:tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8.md:1676:tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8.md:1680:tasks/folder-picker-ux/criteria-execution-log.md:16:| 6 | a11y WCAG AA 4.5:1 + Tab order | ✅ (contrast + tab order + Phase 7.5 v2 회복 + Phase 7.5.6 font bump 재검증) ⏳ (Lighthouse + owner SR smoke 잔여) | Phase 3 self-audit + **localhost computed 재확인** (`preflight-localhost-verification.md`): `--fg2 rgb(82,82,82)` on `--bg rgb(255,255,255)` = **7.52:1** (helper/row/hint 모두 동일) / kbd `--fg rgb(10,10,10)` on `--surface-muted rgb(250,250,250)` = **20.4:1** / `--young-coconut-dark` outline-only(text 미사용). Tab 순서 10 tabbables: close 첫 → 2 pickers → 5 timeframe → 폼 필드 = 자연 순서. **Phase 7.5 v2 contrast 회복** (`phase7.5-auxiliary-verification.md`): Edit 2 v2 `.kbd-label` 색상을 `--fg3 #8E8E8E` (3.28:1 AA fail) → `--fg2 #525252` (codex v2 권장 반영)으로 변경 → **production 재계산 PASS**: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code (inherit `--fg2`) `7.81:1`. **a11y 추가 강화** (Edit 3 v2 신규 클래스 `.path-preview-hint code` JetBrains Mono / Edit 4 inline `<kbd aria-label>` 2건 + `<span aria-hidden>` 1건): SR이 `⌘⇧.`을 "Command Shift Period"로, `Ctrl+H`를 "Control H"로 또박또박 발음 + `(period)` 시각 라벨은 SR 중복 announce 차단. **Phase 7.5.6 patch 후 contrast 재확인** (font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규): 15px kbd `#0A0A0A` on `#FAFAFA` = **18.97:1** ✅ (font-size 증가에도 색상 무변 → ratio 동일), `.kbd-label` `#525252` on `#FFFFFF` = **7.81:1** ✅. Lighthouse + owner VoiceOver smoke 잔여 (Codex Q6 follow-up — task #14) |
+tasks/folder-picker-ux/codex-phase8.md:1682:tasks/folder-picker-ux/codex-phase8-input.md:11:Phase 7.5.6 closure (commit `40cd00c`, owner production self-test "사이즈 괜찮음") 후 Phase 8 docs cycle 진입. 8.1A (3 기존 산출물 갱신) + 8.1B (3 신규 산출물 작성) + 8.2 (Finding 1 별 사이클 brief) 완료. 본 Phase 8.3은 **commit 전 fact-check** — 신규 산출물의 사실 정확성·overclaim 위험·frontmatter 준수·회고 패턴·invariant 정의를 적대적 검토.
+tasks/folder-picker-ux/codex-phase8.md:1683:tasks/folder-picker-ux/codex-phase8-input.md:19:5. **Cycle 4 commits git log** — 확인 명령: `git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'`
+tasks/folder-picker-ux/codex-phase8.md:1684:tasks/folder-picker-ux/codex-phase8-input.md:30:- "Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 직접 기록"
+tasks/folder-picker-ux/codex-phase8.md:1685:tasks/folder-picker-ux/codex-phase8-input.md:31:- "4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits"
+tasks/folder-picker-ux/codex-phase8.md:1686:tasks/folder-picker-ux/codex-phase8-input.md:35:- `tasks/folder-picker-ux/smoke-golden-regression.md` 실제 owner-direct 손글씨 cells 카운트가 정확히 12+ 인지 (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1 합산 = 11)
+tasks/folder-picker-ux/codex-phase8.md:1688:tasks/folder-picker-ux/codex-phase8-input.md:57:- 4 commit hash 인용 (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`)
+tasks/folder-picker-ux/codex-phase8.md:1689:tasks/folder-picker-ux/codex-phase8-input.md:76:- **잘 됐나**: "ON-flip → owner self-test → 3 Finding 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출"
+tasks/folder-picker-ux/codex-phase8.md:1691:tasks/folder-picker-ux/unverified.md:3:**Date**: 2026-05-22 (Phase 7.5.6 closure)
+tasks/folder-picker-ux/codex-phase8.md:1692:tasks/folder-picker-ux/unverified.md:34:## Phase 7.5.6 Closure (2026-05-22)
+tasks/folder-picker-ux/codex-phase8.md:1696:tasks/folder-picker-ux/unverified.md:39:- **Deploy**: Vercel commit `40cd00c` auto-deploy 완료.
+tasks/folder-picker-ux/codex-phase8.md:1697:tasks/folder-picker-ux/unverified.md:40:- **Owner Happy Path Gate**: Phase 7.5.6 (40cd00c) 2026-05-22 owner-direct production check ✅ + mcp computed style verify ✅ (font-size 15px / padding 2px 8px / line-height 21px) + owner 발화 "사이즈 괜찮음". `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 완료. 잔여 미검증 unchanged (Brave/Vivaldi, telemetry counter, parent-path validation Q3).
+tasks/folder-picker-ux/codex-phase8.md:1709:tasks/folder-picker-ux/codex-phase8.md:24:Phase 7.5.6 closure (commit `40cd00c`, owner production self-test "사이즈 괜찮음") 후 Phase 8 docs cycle 진입. 8.1A (3 기존 산출물 갱신) + 8.1B (3 신규 산출물 작성) + 8.2 (Finding 1 별 사이클 brief) 완료. 본 Phase 8.3은 **commit 전 fact-check** — 신규 산출물의 사실 정확성·overclaim 위험·frontmatter 준수·회고 패턴·invariant 정의를 적대적 검토.
+tasks/folder-picker-ux/codex-phase8.md:1710:tasks/folder-picker-ux/codex-phase8.md:32:5. **Cycle 4 commits git log** — 확인 명령: `git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'`
+tasks/folder-picker-ux/codex-phase8.md:1711:tasks/folder-picker-ux/codex-phase8.md:43:- "Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 직접 기록"
+tasks/folder-picker-ux/codex-phase8.md:1712:tasks/folder-picker-ux/codex-phase8.md:44:- "4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits"
+tasks/folder-picker-ux/codex-phase8.md:1713:tasks/folder-picker-ux/codex-phase8.md:48:- `tasks/folder-picker-ux/smoke-golden-regression.md` 실제 owner-direct 손글씨 cells 카운트가 정확히 12+ 인지 (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1 합산 = 11)
+tasks/folder-picker-ux/codex-phase8.md:1715:tasks/folder-picker-ux/codex-phase8.md:70:- 4 commit hash 인용 (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`)
+tasks/folder-picker-ux/codex-phase8.md:1716:tasks/folder-picker-ux/codex-phase8.md:89:- **잘 됐나**: "ON-flip → owner self-test → 3 Finding 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출"
+tasks/folder-picker-ux/codex-phase8.md:1719:tasks/folder-picker-ux/codex-phase8.md:371:- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+tasks/folder-picker-ux/codex-phase8.md:1720:tasks/folder-picker-ux/codex-phase8.md:372:- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) owner 손글씨 직접 기록 + 4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits 재확인.
+tasks/folder-picker-ux/codex-phase8.md:1721:tasks/folder-picker-ux/codex-phase8.md:375:- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+tasks/folder-picker-ux/codex-phase8.md:1723:tasks/folder-picker-ux/codex-phase8.md:379:/bin/zsh -lc "git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:1724:tasks/folder-picker-ux/codex-phase8.md:381:40cd00c fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1740:tasks/folder-picker-ux/codex-phase8.md:917:The first pass confirms Phase 6 is explicitly `needs-attention`, and the supplied git range only lists two path-touching commits (`b94d362`, `40cd00c`). I’m now checking the owner-cell count and the final B3 state because Q1 hinges on whether the decision-log’s “12+” and “4 commits” claims are materially overcounted.
+tasks/folder-picker-ux/codex-phase8.md:1781:tasks/folder-picker-ux/codex-phase8.md:1109:/bin/zsh -lc 'for c in 6cda4c5 b94d362 3756e83 40cd00c; do git show --stat --oneline --name-only --no-renames "$c" -- '"'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'; done" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:1783:tasks/folder-picker-ux/codex-phase8.md:1117:40cd00c fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1785:tasks/folder-picker-ux/codex-phase8.md:1135:* 40cd00c (HEAD -> main, origin/main, origin/HEAD) fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1788:tasks/folder-picker-ux/codex-phase8.md:1159:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8.md:1789:tasks/folder-picker-ux/codex-phase8.md:1166:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8.md:1793:tasks/folder-picker-ux/codex-phase8.md:1170:| 6 | a11y WCAG AA 4.5:1 + Tab order | ✅ (contrast + tab order + Phase 7.5 v2 회복 + Phase 7.5.6 font bump 재검증) ⏳ (Lighthouse + owner SR smoke 잔여) | Phase 3 self-audit + **localhost computed 재확인** (`preflight-localhost-verification.md`): `--fg2 rgb(82,82,82)` on `--bg rgb(255,255,255)` = **7.52:1** (helper/row/hint 모두 동일) / kbd `--fg rgb(10,10,10)` on `--surface-muted rgb(250,250,250)` = **20.4:1** / `--young-coconut-dark` outline-only(text 미사용). Tab 순서 10 tabbables: close 첫 → 2 pickers → 5 timeframe → 폼 필드 = 자연 순서. **Phase 7.5 v2 contrast 회복** (`phase7.5-auxiliary-verification.md`): Edit 2 v2 `.kbd-label` 색상을 `--fg3 #8E8E8E` (3.28:1 AA fail) → `--fg2 #525252` (codex v2 권장 반영)으로 변경 → **production 재계산 PASS**: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code (inherit `--fg2`) `7.81:1`. **a11y 추가 강화** (Edit 3 v2 신규 클래스 `.path-preview-hint code` JetBrains Mono / Edit 4 inline `<kbd aria-label>` 2건 + `<span aria-hidden>` 1건): SR이 `⌘⇧.`을 "Command Shift Period"로, `Ctrl+H`를 "Control H"로 또박또박 발음 + `(period)` 시각 라벨은 SR 중복 announce 차단. **Phase 7.5.6 patch 후 contrast 재확인** (font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규): 15px kbd `#0A0A0A` on `#FAFAFA` = **18.97:1** ✅ (font-size 증가에도 색상 무변 → ratio 동일), `.kbd-label` `#525252` on `#FFFFFF` = **7.81:1** ✅. Lighthouse + owner VoiceOver smoke 잔여 (Codex Q6 follow-up — task #14) |
+tasks/folder-picker-ux/codex-phase8.md:1844:**UX iteration 1 (2026-05-22)**: folder picker 가시성·에러 복구 patch — commits `6cda4c5`+`b94d362`+`3756e83`+`40cd00c`. 4 Finding 흡수 (Finding 1=별 사이클 이관, Finding 2/3=Phase 7.5 patch, Finding 4=Phase 7.5.6 patch). 참고: [[project-folder-picker-ux-2026-05-22]]
+tasks/folder-picker-ux/codex-phase8.md:1854:The owner-cell evidence is weaker than the decision-log wording: the current smoke file has 7 Phase 6 rows, but Phase 7 and Phase 7.5 rows remain `⏳ owner-direct` despite memo text in the notes, and I do not see a separate 7.5.6 row there. I’m checking the Finding 1 brief and the stated “risk 3 axes” rule next.
+tasks/folder-picker-ux/codex-phase8.md:2092:**Date**: 2026-05-22 (Phase 7.5.6 closure)
+tasks/folder-picker-ux/codex-phase8.md:2093:**Status**: Phase 7.5.6 완료 (Phase 5 base + Phase 7.5 hint/aria 강화 + Phase 7.5.6 kbd font 15px bump). 다음 단계 Phase 8 docs cycle.
+tasks/folder-picker-ux/codex-phase8.md:2117:## Phase 7.5 + 7.5.6 Subsequent Iterations
+tasks/folder-picker-ux/codex-phase8.md:2123:| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+tasks/folder-picker-ux/codex-phase8.md:2125:**Phase 7.5 + 7.5.6 합산**: code 2 files (`JoinBurnIndexForm.tsx` + `app/globals.css`). Phase 5 base 위에 점진적 누적.
+tasks/folder-picker-ux/codex-phase8.md:2134:**Owner Happy Path Gate (Phase 7.5.6)**: owner 2026-05-22 production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 ✅. mcp__claude-in-chrome computed style verify (font-size 15px / padding 2px 8px / line-height 21px) 부합.
+tasks/folder-picker-ux/codex-phase8.md:2154:**Date**: 2026-05-22 (Phase 7.5.6 closure)
+tasks/folder-picker-ux/codex-phase8.md:2185:## Phase 7.5.6 Closure (2026-05-22)
+tasks/folder-picker-ux/codex-phase8.md:2190:- **Deploy**: Vercel commit `40cd00c` auto-deploy 완료.
+tasks/folder-picker-ux/codex-phase8.md:2191:- **Owner Happy Path Gate**: Phase 7.5.6 (40cd00c) 2026-05-22 owner-direct production check ✅ + mcp computed style verify ✅ (font-size 15px / padding 2px 8px / line-height 21px) + owner 발화 "사이즈 괜찮음". `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 완료. 잔여 미검증 unchanged (Brave/Vivaldi, telemetry counter, parent-path validation Q3).
+tasks/folder-picker-ux/codex-phase8.md:2777:/bin/zsh -lc 'rg -n "COLLECTOR_HMAC_SECRET|secret|0 hits|40cd00c|3756e83|b94d362|6cda4c5" tasks/folder-picker-ux/criteria-execution-log.md tasks/folder-picker-ux/diff.md tasks/folder-picker-ux/unverified.md tasks/folder-picker-ux/phase7-auxiliary-verification.md tasks/folder-picker-ux/phase7.5-auxiliary-verification.md' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:2779:tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8.md:2781:tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8.md:2792:tasks/folder-picker-ux/unverified.md:39:- **Deploy**: Vercel commit `40cd00c` auto-deploy 완료.
+tasks/folder-picker-ux/codex-phase8.md:2793:tasks/folder-picker-ux/unverified.md:40:- **Owner Happy Path Gate**: Phase 7.5.6 (40cd00c) 2026-05-22 owner-direct production check ✅ + mcp computed style verify ✅ (font-size 15px / padding 2px 8px / line-height 21px) + owner 발화 "사이즈 괜찮음". `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 완료. 잔여 미검증 unchanged (Brave/Vivaldi, telemetry counter, parent-path validation Q3).
+tasks/folder-picker-ux/codex-phase8.md:2798:tasks/folder-picker-ux/diff.md:34:| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+tasks/folder-picker-ux/codex-phase8.md:2851:- CONCERN: **HIGH**. Codex Phase 1/6/7 실제 verdict는 `needs-attention`이고, entry가 PASS로 쓰지는 않아 이 부분은 OK. 하지만 `Owner Happy Path 12+ cells`는 산술상도 `7+2+1+1 = 11`이고, 현재 `smoke-golden-regression.md`에는 Phase 7/7.5 rows가 아직 `⏳ owner-direct`로 남아 있어 11개 완료도 primary artifact만으로는 불충분합니다. 또한 path-limited `git log 6cda4c5..40cd00c`는 `b94d362`, `40cd00c`만 반환하며, `3756e83`은 docs-only입니다. “4 commits 각 build secret leak 0 hits”도 per-commit 근거가 부족합니다.
+tasks/folder-picker-ux/codex-phase8.md:2852:- MITIGATION: decision-log를 “11 planned cells” 또는 실제 완료 row 기준으로 정정하고, smoke file result columns/7.5.6 row를 primary evidence로 맞추세요. Secret-leak 문구는 “code deploys checked: 6cda4c5/b94d362/40cd00c; 3756e83 docs-only”처럼 낮추거나 commit별 evidence를 추가해야 합니다.
+tasks/folder-picker-ux/codex-phase8.md:2880:- CONCERN: **HIGH**. Codex Phase 1/6/7 실제 verdict는 `needs-attention`이고, entry가 PASS로 쓰지는 않아 이 부분은 OK. 하지만 `Owner Happy Path 12+ cells`는 산술상도 `7+2+1+1 = 11`이고, 현재 `smoke-golden-regression.md`에는 Phase 7/7.5 rows가 아직 `⏳ owner-direct`로 남아 있어 11개 완료도 primary artifact만으로는 불충분합니다. 또한 path-limited `git log 6cda4c5..40cd00c`는 `b94d362`, `40cd00c`만 반환하며, `3756e83`은 docs-only입니다. “4 commits 각 build secret leak 0 hits”도 per-commit 근거가 부족합니다.
+tasks/folder-picker-ux/codex-phase8.md:2881:- MITIGATION: decision-log를 “11 planned cells” 또는 실제 완료 row 기준으로 정정하고, smoke file result columns/7.5.6 row를 primary evidence로 맞추세요. Secret-leak 문구는 “code deploys checked: 6cda4c5/b94d362/40cd00c; 3756e83 docs-only”처럼 낮추거나 commit별 evidence를 추가해야 합니다.
+
+exec
+/bin/zsh -lc 'ls -la tasks/folder-picker-ux' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+total 1392
+drwxr-xr-x  23 dg-2412-pn-002  staff     736 May 22 12:04 .
+drwxr-xr-x   7 dg-2412-pn-002  staff     224 May 22 11:50 ..
+-rw-r--r--   1 dg-2412-pn-002  staff    9927 May 21 22:38 codex-phase1.5-history-cleanup.md
+-rw-r--r--   1 dg-2412-pn-002  staff   14064 May 21 21:52 codex-phase1.md
+-rw-r--r--   1 dg-2412-pn-002  staff   13261 May 21 23:17 codex-phase6.md
+-rw-r--r--   1 dg-2412-pn-002  staff   16503 May 22 10:43 codex-phase7-findings.md
+-rw-r--r--   1 dg-2412-pn-002  staff   41235 May 22 10:34 codex-phase7.md
+-rw-r--r--   1 dg-2412-pn-002  staff    7956 May 22 11:52 codex-phase8-input.md
+-rw-r--r--   1 dg-2412-pn-002  staff    5953 May 22 12:04 codex-phase8-rerun-input.md
+-rw-r--r--   1 dg-2412-pn-002  staff   66832 May 22 12:05 codex-phase8-rerun.raw.log
+-rw-r--r--   1 dg-2412-pn-002  staff  337599 May 22 11:58 codex-phase8.md
+-rw-r--r--   1 dg-2412-pn-002  staff   10598 May 22 11:43 criteria-execution-log.md
+-rw-r--r--   1 dg-2412-pn-002  staff    5003 May 21 21:57 criteria.md
+-rw-r--r--   1 dg-2412-pn-002  staff   13178 May 21 22:49 design-review-phase3.md
+-rw-r--r--   1 dg-2412-pn-002  staff    4674 May 22 11:43 diff.md
+-rw-r--r--   1 dg-2412-pn-002  staff     153 May 21 21:34 notes-used.txt
+-rw-r--r--   1 dg-2412-pn-002  staff    4404 May 22 07:55 phase7-auxiliary-verification.md
+-rw-r--r--   1 dg-2412-pn-002  staff    5509 May 22 10:52 phase7.5-auxiliary-verification.md
+-rw-r--r--   1 dg-2412-pn-002  staff    7738 May 21 21:56 plan-v2-delta.md
+-rw-r--r--   1 dg-2412-pn-002  staff    4679 May 21 23:07 preflight-localhost-verification.md
+-rw-r--r--   1 dg-2412-pn-002  staff   16209 May 21 23:23 preflight-phase6-simulated.md
+-rw-r--r--   1 dg-2412-pn-002  staff   10655 May 22 11:14 smoke-golden-regression.md
+-rw-r--r--   1 dg-2412-pn-002  staff    6787 May 22 11:44 unverified.md
+
+exec
+/bin/zsh -lc 'rg -n "3756e83|6cda4c5|b94d362|40cd00c|COLLECTOR_HMAC_SECRET|0 hits|grep -c|secret" tasks/folder-picker-ux/*.md' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+tasks/folder-picker-ux/codex-phase8-rerun-input.md:13:- **Q1 HIGH overclaim**: "12+ cells" (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1 = 합 11, 12+ 아님) + "4 commits secret leak 0 hits" (3756e83은 docs-only — code chunks 0건)
+tasks/folder-picker-ux/codex-phase8-rerun-input.md:26:> ... + Owner Happy Path 11 planned cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) 중 Phase 6 7/7 owner-direct localhost ✅ 손글씨 기록 / Phase 7 #1·#4 production owner-notes evidence 컬럼 기록(marker 미flip) / Phase 7.5·7.5.6 owner 발화 "사이즈 괜찮음" verbal 확인 + code deploys 3건 (`6cda4c5`/`b94d362`/`40cd00c`) 각 build secret leak 0 hits 재확인 (`3756e83`은 docs-only commit — code chunks 변경 0건이라 secret leak 점검 대상 아님).
+tasks/folder-picker-ux/codex-phase8-rerun-input.md:57:**Q1 재검증**: decision-log "강한 증거" 줄 — overclaim 0건? "11 planned cells" + "Phase 7/7.5/7.5.6 evidence 상태 명시(owner-notes / verbal)" + "code deploys 3건 (docs-only 3756e83 분리)" 표현이 smoke-golden-regression.md 실제 기록과 일치하는지. S10 "바꿀까" ①도 행동 변화 가능한 별 사이클 액션으로 구체화됐는지.
+tasks/folder-picker-ux/diff.md:23:| **Invariant #1** (HMAC 노출) | `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` | ✅ 0 hits |
+tasks/folder-picker-ux/diff.md:32:| `b94d362` | 2026-05-22 | fix(forms): folder picker kbd visibility + home folder hint | `JoinBurnIndexForm.tsx` + `app/globals.css` (hint copy rephrase + `<code>` 3개 + `(period)` aria-hidden 라벨 + `aria-label` 2건 + `.path-preview-hint kbd` font 11→13px + `.kbd-label` 신규 + `.path-preview-hint code` 신규) |
+tasks/folder-picker-ux/diff.md:33:| `3756e83` | 2026-05-22 | docs(folder-picker-ux): Phase 7.5 patch docs | `tasks/folder-picker-ux/` artifacts 갱신만 (code 변경 0) |
+tasks/folder-picker-ux/diff.md:34:| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+tasks/folder-picker-ux/diff.md:42:- `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` ✅ 0 hits (Invariant #1)
+tasks/folder-picker-ux/diff.md:43:- Vercel auto-deploy ✅ 각 commit 완료 (production secret 재확인 same-origin fetch 보조 검증)
+tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/criteria-execution-log.md:11:| 1 | Build secret 노출 0건 | ✅ (local build PASS + Vercel deploy success + production main chunks 8개 전수 0 hits) | Phase 5.3 + Phase 7 commit 직전 `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. Vercel deploy `6cda4c5` success (gh api). **Production curl 검증은 Vercel Bot Challenge로 차단** (`x-vercel-mitigated: challenge`, 403) → **Claude-in-Chrome 보조 검증 (2026-05-22)**: same-origin browser `fetch()`로 production main chunks 8개 (총 707,406 B) 전수 grep → **COLLECTOR_HMAC_SECRET 0 hits**. 상세 `phase7-auxiliary-verification.md`. Invariant #1 production 직접 검증 PASS |
+tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/criteria-execution-log.md:14:| 4 | SecurityError actionable → AbortError count-based fsaWarning | ✅ (Cell #2 재실측 PASS, owner localhost) ⏳ (production cell #2 재실측) | **2026-05-22 Cell #2 1차 실측**: `[picker-rejection] {name: "AbortError", code: 20, message: "Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request."}` — Codex CONCERN 확인 CORRECT. Chrome은 홈 디렉터리 거절을 AbortError로 dispatch (SecurityError 아님). 단순 silent return이 SecurityError 분기를 preempt → 메시지 무노출. **Contingency Patch v2 (count-based) 적용** `JoinBurnIndexForm.tsx:99 + 126-134`: `abortCountRef = useRef<number>(0)` → 1회 silent / 2회 누적 시 `fsaWarning` (yellow, non-fatal). timing-based 1500ms 폐기 (picker 호출당 10-15초 → 1500ms 내 2회 불가능 → count-based pivot). Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234/234 / build / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. **Cell #2 재실측 PASS (2026-05-22 owner-direct localhost)**: 1차 silent ✅ / 2차 연두색 fsaWarning 텍스트 정확 일치 ✅ / Scan 버튼 enabled 유지 ✅. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 잔여 = Phase 7 production redeploy 후 cell #2 재실측 |
+tasks/folder-picker-ux/phase7-auxiliary-verification.md:3:**Date**: 2026-05-22 (post-Vercel `6cda4c5` deploy)
+tasks/folder-picker-ux/phase7-auxiliary-verification.md:13:- **Vercel commit**: `6cda4c5` (deployment URL `9zFwEtq2UE3436K9m6ZrnNQX7Zyw`)
+tasks/folder-picker-ux/phase7-auxiliary-verification.md:37:### 2. COLLECTOR_HMAC_SECRET 노출 0건 (Invariant #1 production 재확인)
+tasks/folder-picker-ux/phase7-auxiliary-verification.md:41:| Chunk | Size (B) | `COLLECTOR_HMAC_SECRET` hits |
+tasks/folder-picker-ux/phase7-auxiliary-verification.md:69:본 파일이 owner에게 주는 가치: **사전 신뢰 부여** — owner 1-2분 incognito 확인 시 "이미 마크업·secret leak 검증됨, 내가 할 일은 시각 1회 + 손글씨 1줄"이라는 축약된 게이트 통과 경로 제공.
+tasks/folder-picker-ux/phase7-auxiliary-verification.md:78:4. (선택) DevTools → Network → main chunk JS 하나 클릭 → Response 탭 → `⌘F` `COLLECTOR_HMAC_SECRET` 0건 확인 (위 8 chunks × 0 hits 보조 증거로 갈음 가능)
+tasks/folder-picker-ux/unverified.md:30:- **Contingency Patch v2 (count-based) 적용**: `JoinBurnIndexForm.tsx:99 + 126-134` — `abortCountRef = useRef<number>(0)`. 1회 AbortError silent (UX exploration), 2회 누적 시 `fsaWarning` (yellow, non-fatal) 노출. Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234 / build / secret leak 0.
+tasks/folder-picker-ux/unverified.md:38:- **검증**: `npx tsc --noEmit` ✅ / `npx vitest run` 234/234 ✅ / `npm run build` ✅ / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0 ✅. WCAG AA contrast 재계산 PASS (font-size 변동은 ratio 무관 — 15px kbd `#0A0A0A` on `#FAFAFA` = 18.97:1, `.kbd-label` `#525252` on `#FFFFFF` = 7.81:1, 둘 다 ≥ 4.5:1).
+tasks/folder-picker-ux/unverified.md:39:- **Deploy**: Vercel commit `40cd00c` auto-deploy 완료.
+tasks/folder-picker-ux/unverified.md:40:- **Owner Happy Path Gate**: Phase 7.5.6 (40cd00c) 2026-05-22 owner-direct production check ✅ + mcp computed style verify ✅ (font-size 15px / padding 2px 8px / line-height 21px) + owner 발화 "사이즈 괜찮음". `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 완료. 잔여 미검증 unchanged (Brave/Vivaldi, telemetry counter, parent-path validation Q3).
+tasks/folder-picker-ux/unverified.md:54:**2026-05-22 Cell #3 owner 실측 발견**: Plan §S1 + 구현은 `⌘⇧·` (U+00B7 MIDDLE DOT) 사용. 이는 **macOS 실제 단축키 `⌘⇧.` (U+002E PERIOD)과 다른 문자** — Codex Phase 1 Q2 검토 시 문자 식별까지 명시했으나 typo 그대로 통과. owner Cell #3 시도 시 "search로 안 잡혀" 보고로 발견. **1자 fix 적용** `JoinBurnIndexForm.tsx:423`: `·` → `.`. 검증 4종 PASS (tsc / vitest 234/234 / build / secret leak 0). Cell #1 PASS는 시각 노출 기준이므로 retroactive 영향 없음. 잔여 Windows/Linux tofu 검증은 별 사이클.
+tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:3:**Date**: 2026-05-22 (post-Vercel `b94d362` deploy)
+tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:11:- **URL**: `https://www.coconutlabs.xyz/?auto-detect=1&cachebust=b94d362`
+tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:13:- **Vercel commit**: `b94d362` (deployment target_url `https://vercel.com/chongwon-shins-projects/coconutlabs/3kKrsZNWTyZpr8TzozqVvWPmwPeR`, GitHub combined status `success`, "Deployment has completed" 2026-05-22T01:46:39Z)
+tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:56:### 3. COLLECTOR_HMAC_SECRET 노출 0건 (Invariant #1 production 재확인)
+tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:60:| Chunk | Size (B) | `COLLECTOR_HMAC_SECRET` hits |
+tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:69:**Invariant #1 production 직접 검증 PASS** (Bot Challenge same-origin fetch 우회 동일 절차, `phase7-auxiliary-verification.md` 형식 차용). Phase 7 (`6cda4c5`) 707,406 B / 8 chunks → Phase 7.5 (`b94d362`) 394,084 B / 5 chunks — Next.js Turbopack chunk 재구성 결과 (코드 변경량 대비 자연스러운 변동).
+tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:81:본 파일이 owner에게 주는 가치: **사전 신뢰 부여** — owner 1-2분 incognito 확인 시 "이미 마크업·contrast·secret leak 검증됨, 내가 할 일은 시각 1회 + 손글씨 1줄"이라는 축약된 게이트 통과 경로 제공.
+tasks/folder-picker-ux/codex-phase8.md:24:Phase 7.5.6 closure (commit `40cd00c`, owner production self-test "사이즈 괜찮음") 후 Phase 8 docs cycle 진입. 8.1A (3 기존 산출물 갱신) + 8.1B (3 신규 산출물 작성) + 8.2 (Finding 1 별 사이클 brief) 완료. 본 Phase 8.3은 **commit 전 fact-check** — 신규 산출물의 사실 정확성·overclaim 위험·frontmatter 준수·회고 패턴·invariant 정의를 적대적 검토.
+tasks/folder-picker-ux/codex-phase8.md:32:5. **Cycle 4 commits git log** — 확인 명령: `git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'`
+tasks/folder-picker-ux/codex-phase8.md:44:- "4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits"
+tasks/folder-picker-ux/codex-phase8.md:70:- 4 commit hash 인용 (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`)
+tasks/folder-picker-ux/codex-phase8.md:321:- 선택 이유: 단일 shared-secret HMAC + Redis nonce + fail-closed가 솔로 프로젝트 위협 모델에 최소 침습이고 gate 신뢰성 확보. workflow_dispatch는 Vercel deployment protection 401 우회 + 일반 PR 개발 흐름 보호. Codex 12건 BLOCK 전량 반영.
+tasks/folder-picker-ux/codex-phase8.md:358:- 강한 증거: Smoke test 4/4 PASS (Chrome "Auto-detect Burn Summary" ✅, FSA-off fallback "Join Burn Index" ✅, env wins over `?auto-detect=0` ✅, 무토큰 POST → 401 ✅). Build secret 노출 0건. Redeploy 34초 완료.
+tasks/folder-picker-ux/codex-phase8.md:371:- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+tasks/folder-picker-ux/codex-phase8.md:372:- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) owner 손글씨 직접 기록 + 4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits 재확인.
+tasks/folder-picker-ux/codex-phase8.md:375:- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+tasks/folder-picker-ux/codex-phase8.md:379:/bin/zsh -lc "git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:381:40cd00c fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:382:b94d362 fix(forms): folder picker kbd visibility + home folder hint
+tasks/folder-picker-ux/codex-phase8.md:917:The first pass confirms Phase 6 is explicitly `needs-attention`, and the supplied git range only lists two path-touching commits (`b94d362`, `40cd00c`). I’m now checking the owner-cell count and the final B3 state because Q1 hinges on whether the decision-log’s “12+” and “4 commits” claims are materially overcounted.
+tasks/folder-picker-ux/codex-phase8.md:947:**Deploy 상태**: ✅ Vercel commit `6cda4c5` deployment 완료 (2026-05-22, gh api 확인 — `https://vercel.com/chongwon-shins-projects/coconutlabs/9zFwEtq2UE3436K9m6ZrnNQX7Zyw`).
+tasks/folder-picker-ux/codex-phase8.md:949:**Production secret leak 재검증 메모**: `curl https://www.coconutlabs.xyz/_next/static/chunks/*.js`는 Vercel Bot Challenge (`x-vercel-mitigated: challenge`, 403)로 차단됨. **Local build verification (`grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0)이 Phase 7 commit 직전에 PASS**한 상태로 동일 source가 Vercel build pipeline 통과 → derivatively verified.
+tasks/folder-picker-ux/codex-phase8.md:951:**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+tasks/folder-picker-ux/codex-phase8.md:962:**Deploy 상태**: ✅ Vercel commit `b94d362` deployment 완료 (2026-05-22T01:46:39Z, GitHub combined status `success` — `https://vercel.com/chongwon-shins-projects/coconutlabs/3kKrsZNWTyZpr8TzozqVvWPmwPeR`).
+tasks/folder-picker-ux/codex-phase8.md:967:- production main chunks 5개 (총 394 KB) 전수 grep `COLLECTOR_HMAC_SECRET` = **0 hits** — Invariant #1 PASS
+tasks/folder-picker-ux/codex-phase8.md:1019:tasks/folder-picker-ux/codex-phase7-findings.md:9:- `phase7-auxiliary-verification.md` — Claude-in-Chrome 보조 검증 PASS (production main chunks 8개 × 0 secret hits)
+tasks/folder-picker-ux/codex-phase8.md:1052:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:69:**Invariant #1 production 직접 검증 PASS** (Bot Challenge same-origin fetch 우회 동일 절차, `phase7-auxiliary-verification.md` 형식 차용). Phase 7 (`6cda4c5`) 707,406 B / 8 chunks → Phase 7.5 (`b94d362`) 394,084 B / 5 chunks — Next.js Turbopack chunk 재구성 결과 (코드 변경량 대비 자연스러운 변동).
+tasks/folder-picker-ux/codex-phase8.md:1078:tasks/folder-picker-ux/codex-phase7.md:263:- `phase7-auxiliary-verification.md` — Claude-in-Chrome 보조 검증 PASS (production main chunks 8개 × 0 secret hits)
+tasks/folder-picker-ux/codex-phase8.md:1109:/bin/zsh -lc 'for c in 6cda4c5 b94d362 3756e83 40cd00c; do git show --stat --oneline --name-only --no-renames "$c" -- '"'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'; done" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:1111:6cda4c5 feat(forms): folder picker discoverability + smart error recovery
+tasks/folder-picker-ux/codex-phase8.md:1114:b94d362 fix(forms): folder picker kbd visibility + home folder hint
+tasks/folder-picker-ux/codex-phase8.md:1117:40cd00c fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1124:/bin/zsh -lc 'git show --stat --oneline --name-only --no-renames 3756e83' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:1126:3756e83 docs(folder-picker-ux): Phase 7.5 handoff — owner re-measure template
+tasks/folder-picker-ux/codex-phase8.md:1135:* 40cd00c (HEAD -> main, origin/main, origin/HEAD) fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1136:* 3756e83 docs(folder-picker-ux): Phase 7.5 handoff — owner re-measure template
+tasks/folder-picker-ux/codex-phase8.md:1137:* b94d362 fix(forms): folder picker kbd visibility + home folder hint
+tasks/folder-picker-ux/codex-phase8.md:1138:* 6cda4c5 feat(forms): folder picker discoverability + smart error recovery
+tasks/folder-picker-ux/codex-phase8.md:1159:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8.md:1165:| 1 | Build secret 노출 0건 | ✅ (local build PASS + Vercel deploy success + production main chunks 8개 전수 0 hits) | Phase 5.3 + Phase 7 commit 직전 `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. Vercel deploy `6cda4c5` success (gh api). **Production curl 검증은 Vercel Bot Challenge로 차단** (`x-vercel-mitigated: challenge`, 403) → **Claude-in-Chrome 보조 검증 (2026-05-22)**: same-origin browser `fetch()`로 production main chunks 8개 (총 707,406 B) 전수 grep → **COLLECTOR_HMAC_SECRET 0 hits**. 상세 `phase7-auxiliary-verification.md`. Invariant #1 production 직접 검증 PASS |
+tasks/folder-picker-ux/codex-phase8.md:1166:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8.md:1168:| 4 | SecurityError actionable → AbortError count-based fsaWarning | ✅ (Cell #2 재실측 PASS, owner localhost) ⏳ (production cell #2 재실측) | **2026-05-22 Cell #2 1차 실측**: `[picker-rejection] {name: "AbortError", code: 20, message: "Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request."}` — Codex CONCERN 확인 CORRECT. Chrome은 홈 디렉터리 거절을 AbortError로 dispatch (SecurityError 아님). 단순 silent return이 SecurityError 분기를 preempt → 메시지 무노출. **Contingency Patch v2 (count-based) 적용** `JoinBurnIndexForm.tsx:99 + 126-134`: `abortCountRef = useRef<number>(0)` → 1회 silent / 2회 누적 시 `fsaWarning` (yellow, non-fatal). timing-based 1500ms 폐기 (picker 호출당 10-15초 → 1500ms 내 2회 불가능 → count-based pivot). Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234/234 / build / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. **Cell #2 재실측 PASS (2026-05-22 owner-direct localhost)**: 1차 silent ✅ / 2차 연두색 fsaWarning 텍스트 정확 일치 ✅ / Scan 버튼 enabled 유지 ✅. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 잔여 = Phase 7 production redeploy 후 cell #2 재실측 |
+tasks/folder-picker-ux/codex-phase8.md:1234:**Deploy 상태**: ✅ Vercel commit `6cda4c5` deployment 완료 (2026-05-22, gh api 확인 — `https://vercel.com/chongwon-shins-projects/coconutlabs/9zFwEtq2UE3436K9m6ZrnNQX7Zyw`).
+tasks/folder-picker-ux/codex-phase8.md:1236:**Production secret leak 재검증 메모**: `curl https://www.coconutlabs.xyz/_next/static/chunks/*.js`는 Vercel Bot Challenge (`x-vercel-mitigated: challenge`, 403)로 차단됨. **Local build verification (`grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0)이 Phase 7 commit 직전에 PASS**한 상태로 동일 source가 Vercel build pipeline 통과 → derivatively verified.
+tasks/folder-picker-ux/codex-phase8.md:1238:**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+tasks/folder-picker-ux/codex-phase8.md:1249:**Deploy 상태**: ✅ Vercel commit `b94d362` deployment 완료 (2026-05-22T01:46:39Z, GitHub combined status `success` — `https://vercel.com/chongwon-shins-projects/coconutlabs/3kKrsZNWTyZpr8TzozqVvWPmwPeR`).
+tasks/folder-picker-ux/codex-phase8.md:1254:- production main chunks 5개 (총 394 KB) 전수 grep `COLLECTOR_HMAC_SECRET` = **0 hits** — Invariant #1 PASS
+tasks/folder-picker-ux/codex-phase8.md:1304:| 1 | security | Build secret 노출 0건 (재확인) | `curl -sS https://www.coconutlabs.xyz/_next/static/chunks/*.js \| grep -c COLLECTOR_HMAC_SECRET` → 0 |
+tasks/folder-picker-ux/codex-phase8.md:1327:1. **Build secret 노출 ≥ 1건** → `env=false` 롤백 + `COLLECTOR_HMAC_SECRET` 회전
+tasks/folder-picker-ux/codex-phase8.md:1443:- `6cda4c5` (Phase 5 base): S1 Path Preview Card + S2 pickFolder 재작성 + S3 helper text
+tasks/folder-picker-ux/codex-phase8.md:1444:- `b94d362` (Phase 7.5 code): kbd 11→13px + (period) aria-hidden 라벨 + home folder hint
+tasks/folder-picker-ux/codex-phase8.md:1445:- `3756e83` (Phase 7.5 docs): tasks/ artifacts 갱신만
+tasks/folder-picker-ux/codex-phase8.md:1446:- `40cd00c` (Phase 7.5.6): kbd 13→15px font bump 마무리
+tasks/folder-picker-ux/codex-phase8.md:1462:/bin/zsh -lc "rg -n \"사이즈|괜찮음|owner-direct|owner direct|손글씨|7\\.5\\.6|40cd00c|둘 다 잘 보임|kbd|home folder|Phase 7\\.5\" tasks/folder-picker-ux docs/decision/decision-log.md ~/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md ~/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_auto-detect-flip-procedure.md ~/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/MEMORY.md" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:1470:/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:82:- `b94d362` (Phase 7.5 code): kbd 11→13px + (period) aria-hidden 라벨 + home folder hint
+tasks/folder-picker-ux/codex-phase8.md:1471:/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:83:- `3756e83` (Phase 7.5 docs): tasks/ artifacts 갱신만
+tasks/folder-picker-ux/codex-phase8.md:1472:/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:84:- `40cd00c` (Phase 7.5.6): kbd 13→15px font bump 마무리
+tasks/folder-picker-ux/codex-phase8.md:1473:/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_auto-detect-flip-procedure.md:29:**UX iteration 1 (2026-05-22)**: folder picker 가시성·에러 복구 patch — commits `6cda4c5`+`b94d362`+`3756e83`+`40cd00c`. 4 Finding 흡수 (Finding 1=별 사이클 이관, Finding 2/3=Phase 7.5 patch, Finding 4=Phase 7.5.6 patch). 참고: [[project-folder-picker-ux-2026-05-22]]
+tasks/folder-picker-ux/codex-phase8.md:1475:docs/decision/decision-log.md:356:- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+tasks/folder-picker-ux/codex-phase8.md:1476:docs/decision/decision-log.md:357:- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) owner 손글씨 직접 기록 + 4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits 재확인.
+tasks/folder-picker-ux/codex-phase8.md:1477:docs/decision/decision-log.md:360:- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+tasks/folder-picker-ux/codex-phase8.md:1497:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:69:**Invariant #1 production 직접 검증 PASS** (Bot Challenge same-origin fetch 우회 동일 절차, `phase7-auxiliary-verification.md` 형식 차용). Phase 7 (`6cda4c5`) 707,406 B / 8 chunks → Phase 7.5 (`b94d362`) 394,084 B / 5 chunks — Next.js Turbopack chunk 재구성 결과 (코드 변경량 대비 자연스러운 변동).
+tasks/folder-picker-ux/codex-phase8.md:1500:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:81:본 파일이 owner에게 주는 가치: **사전 신뢰 부여** — owner 1-2분 incognito 확인 시 "이미 마크업·contrast·secret leak 검증됨, 내가 할 일은 시각 1회 + 손글씨 1줄"이라는 축약된 게이트 통과 경로 제공.
+tasks/folder-picker-ux/codex-phase8.md:1583:tasks/folder-picker-ux/smoke-golden-regression.md:31:**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+tasks/folder-picker-ux/codex-phase8.md:1662:tasks/folder-picker-ux/diff.md:32:| `b94d362` | 2026-05-22 | fix(forms): folder picker kbd visibility + home folder hint | `JoinBurnIndexForm.tsx` + `app/globals.css` (hint copy rephrase + `<code>` 3개 + `(period)` aria-hidden 라벨 + `aria-label` 2건 + `.path-preview-hint kbd` font 11→13px + `.kbd-label` 신규 + `.path-preview-hint code` 신규) |
+tasks/folder-picker-ux/codex-phase8.md:1663:tasks/folder-picker-ux/diff.md:33:| `3756e83` | 2026-05-22 | docs(folder-picker-ux): Phase 7.5 patch docs | `tasks/folder-picker-ux/` artifacts 갱신만 (code 변경 0) |
+tasks/folder-picker-ux/codex-phase8.md:1664:tasks/folder-picker-ux/diff.md:34:| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+tasks/folder-picker-ux/codex-phase8.md:1673:tasks/folder-picker-ux/phase7-auxiliary-verification.md:69:본 파일이 owner에게 주는 가치: **사전 신뢰 부여** — owner 1-2분 incognito 확인 시 "이미 마크업·secret leak 검증됨, 내가 할 일은 시각 1회 + 손글씨 1줄"이라는 축약된 게이트 통과 경로 제공.
+tasks/folder-picker-ux/codex-phase8.md:1675:tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8.md:1676:tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8.md:1678:tasks/folder-picker-ux/criteria-execution-log.md:14:| 4 | SecurityError actionable → AbortError count-based fsaWarning | ✅ (Cell #2 재실측 PASS, owner localhost) ⏳ (production cell #2 재실측) | **2026-05-22 Cell #2 1차 실측**: `[picker-rejection] {name: "AbortError", code: 20, message: "Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request."}` — Codex CONCERN 확인 CORRECT. Chrome은 홈 디렉터리 거절을 AbortError로 dispatch (SecurityError 아님). 단순 silent return이 SecurityError 분기를 preempt → 메시지 무노출. **Contingency Patch v2 (count-based) 적용** `JoinBurnIndexForm.tsx:99 + 126-134`: `abortCountRef = useRef<number>(0)` → 1회 silent / 2회 누적 시 `fsaWarning` (yellow, non-fatal). timing-based 1500ms 폐기 (picker 호출당 10-15초 → 1500ms 내 2회 불가능 → count-based pivot). Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234/234 / build / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. **Cell #2 재실측 PASS (2026-05-22 owner-direct localhost)**: 1차 silent ✅ / 2차 연두색 fsaWarning 텍스트 정확 일치 ✅ / Scan 버튼 enabled 유지 ✅. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 잔여 = Phase 7 production redeploy 후 cell #2 재실측 |
+tasks/folder-picker-ux/codex-phase8.md:1682:tasks/folder-picker-ux/codex-phase8-input.md:11:Phase 7.5.6 closure (commit `40cd00c`, owner production self-test "사이즈 괜찮음") 후 Phase 8 docs cycle 진입. 8.1A (3 기존 산출물 갱신) + 8.1B (3 신규 산출물 작성) + 8.2 (Finding 1 별 사이클 brief) 완료. 본 Phase 8.3은 **commit 전 fact-check** — 신규 산출물의 사실 정확성·overclaim 위험·frontmatter 준수·회고 패턴·invariant 정의를 적대적 검토.
+tasks/folder-picker-ux/codex-phase8.md:1683:tasks/folder-picker-ux/codex-phase8-input.md:19:5. **Cycle 4 commits git log** — 확인 명령: `git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'`
+tasks/folder-picker-ux/codex-phase8.md:1685:tasks/folder-picker-ux/codex-phase8-input.md:31:- "4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits"
+tasks/folder-picker-ux/codex-phase8.md:1688:tasks/folder-picker-ux/codex-phase8-input.md:57:- 4 commit hash 인용 (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`)
+tasks/folder-picker-ux/codex-phase8.md:1695:tasks/folder-picker-ux/unverified.md:38:- **검증**: `npx tsc --noEmit` ✅ / `npx vitest run` 234/234 ✅ / `npm run build` ✅ / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0 ✅. WCAG AA contrast 재계산 PASS (font-size 변동은 ratio 무관 — 15px kbd `#0A0A0A` on `#FAFAFA` = 18.97:1, `.kbd-label` `#525252` on `#FFFFFF` = 7.81:1, 둘 다 ≥ 4.5:1).
+tasks/folder-picker-ux/codex-phase8.md:1696:tasks/folder-picker-ux/unverified.md:39:- **Deploy**: Vercel commit `40cd00c` auto-deploy 완료.
+tasks/folder-picker-ux/codex-phase8.md:1697:tasks/folder-picker-ux/unverified.md:40:- **Owner Happy Path Gate**: Phase 7.5.6 (40cd00c) 2026-05-22 owner-direct production check ✅ + mcp computed style verify ✅ (font-size 15px / padding 2px 8px / line-height 21px) + owner 발화 "사이즈 괜찮음". `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 완료. 잔여 미검증 unchanged (Brave/Vivaldi, telemetry counter, parent-path validation Q3).
+tasks/folder-picker-ux/codex-phase8.md:1709:tasks/folder-picker-ux/codex-phase8.md:24:Phase 7.5.6 closure (commit `40cd00c`, owner production self-test "사이즈 괜찮음") 후 Phase 8 docs cycle 진입. 8.1A (3 기존 산출물 갱신) + 8.1B (3 신규 산출물 작성) + 8.2 (Finding 1 별 사이클 brief) 완료. 본 Phase 8.3은 **commit 전 fact-check** — 신규 산출물의 사실 정확성·overclaim 위험·frontmatter 준수·회고 패턴·invariant 정의를 적대적 검토.
+tasks/folder-picker-ux/codex-phase8.md:1710:tasks/folder-picker-ux/codex-phase8.md:32:5. **Cycle 4 commits git log** — 확인 명령: `git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'`
+tasks/folder-picker-ux/codex-phase8.md:1712:tasks/folder-picker-ux/codex-phase8.md:44:- "4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits"
+tasks/folder-picker-ux/codex-phase8.md:1715:tasks/folder-picker-ux/codex-phase8.md:70:- 4 commit hash 인용 (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`)
+tasks/folder-picker-ux/codex-phase8.md:1719:tasks/folder-picker-ux/codex-phase8.md:371:- 선택 이유: First-impression UX 즉시 해소(production live state에서 catch-all 에러 → 4분기 actionable) + Invariant 5축 모두 보호 (#1 build secret 0, #2 WCAG AA 4.5:1, #3 auto-detect 진입 회귀 0, #4 error.name only, #5 handle React state ↔ IDB persistence 분리). Phase 7.5.6 closure 후 owner "사이즈 괜찮음" 발화로 가시성 마지막 결함도 해소.
+tasks/folder-picker-ux/codex-phase8.md:1720:tasks/folder-picker-ux/codex-phase8.md:372:- 강한 증거: ON-flip 직후 owner production 자체검증에서 SecurityError 케이스 직접 발견 + 3 Codex 적대적 라운드 (Phase 1 IDB persistence MEDIUM → Plan v2 §B mitigation / Phase 6 Cell #2 AbortError CONCERN → Contingency Patch v2 count-based / Phase 7.5 kbd 시인성 + home folder 안내 발산 후 patch) 모두 의미 있는 결함 발견 + B3 5종 산출물(criteria/criteria-execution-log/diff/unverified/smoke-golden-regression) 누적 + Owner Happy Path 12+ cells (Phase 6×7 + Phase 7×2 + Phase 7.5×1 + Phase 7.5.6×1) owner 손글씨 직접 기록 + 4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits 재확인.
+tasks/folder-picker-ux/codex-phase8.md:1721:tasks/folder-picker-ux/codex-phase8.md:375:- 무엇이 잘 됐나: ON-flip → owner self-test → 3 Finding(모달 자동 오픈 / kbd 시인성 / home folder 안내) 발견 → 단일 patch 사이클(Phase 7.5 + 7.5.6)로 2건 흡수, Finding 1만 별 사이클 이관. Codex 3 라운드(Phase 1/6/7.5) 모두 사각지대 검출 — Cell #2 AbortError(timing-based pivot 근거 확보), kbd 시인성(13→15px 2단계 bump 필요성). Invariant 5축이 매 Phase 머지 게이트로 작동해 production secret leak / a11y 회귀 / auto-detect 진입 회귀 0건 유지.
+tasks/folder-picker-ux/codex-phase8.md:1723:tasks/folder-picker-ux/codex-phase8.md:379:/bin/zsh -lc "git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:1724:tasks/folder-picker-ux/codex-phase8.md:381:40cd00c fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1725:tasks/folder-picker-ux/codex-phase8.md:382:b94d362 fix(forms): folder picker kbd visibility + home folder hint
+tasks/folder-picker-ux/codex-phase8.md:1740:tasks/folder-picker-ux/codex-phase8.md:917:The first pass confirms Phase 6 is explicitly `needs-attention`, and the supplied git range only lists two path-touching commits (`b94d362`, `40cd00c`). I’m now checking the owner-cell count and the final B3 state because Q1 hinges on whether the decision-log’s “12+” and “4 commits” claims are materially overcounted.
+tasks/folder-picker-ux/codex-phase8.md:1748:tasks/folder-picker-ux/codex-phase8.md:951:**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+tasks/folder-picker-ux/codex-phase8.md:1768:tasks/folder-picker-ux/codex-phase8.md:1052:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:69:**Invariant #1 production 직접 검증 PASS** (Bot Challenge same-origin fetch 우회 동일 절차, `phase7-auxiliary-verification.md` 형식 차용). Phase 7 (`6cda4c5`) 707,406 B / 8 chunks → Phase 7.5 (`b94d362`) 394,084 B / 5 chunks — Next.js Turbopack chunk 재구성 결과 (코드 변경량 대비 자연스러운 변동).
+tasks/folder-picker-ux/codex-phase8.md:1781:tasks/folder-picker-ux/codex-phase8.md:1109:/bin/zsh -lc 'for c in 6cda4c5 b94d362 3756e83 40cd00c; do git show --stat --oneline --name-only --no-renames "$c" -- '"'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'; done" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:1782:tasks/folder-picker-ux/codex-phase8.md:1114:b94d362 fix(forms): folder picker kbd visibility + home folder hint
+tasks/folder-picker-ux/codex-phase8.md:1783:tasks/folder-picker-ux/codex-phase8.md:1117:40cd00c fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1784:tasks/folder-picker-ux/codex-phase8.md:1126:3756e83 docs(folder-picker-ux): Phase 7.5 handoff — owner re-measure template
+tasks/folder-picker-ux/codex-phase8.md:1785:tasks/folder-picker-ux/codex-phase8.md:1135:* 40cd00c (HEAD -> main, origin/main, origin/HEAD) fix(forms): bump path-preview kbd 13→15px for legibility
+tasks/folder-picker-ux/codex-phase8.md:1786:tasks/folder-picker-ux/codex-phase8.md:1136:* 3756e83 docs(folder-picker-ux): Phase 7.5 handoff — owner re-measure template
+tasks/folder-picker-ux/codex-phase8.md:1787:tasks/folder-picker-ux/codex-phase8.md:1137:* b94d362 fix(forms): folder picker kbd visibility + home folder hint
+tasks/folder-picker-ux/codex-phase8.md:1788:tasks/folder-picker-ux/codex-phase8.md:1159:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8.md:1789:tasks/folder-picker-ux/codex-phase8.md:1166:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8.md:1791:tasks/folder-picker-ux/codex-phase8.md:1168:| 4 | SecurityError actionable → AbortError count-based fsaWarning | ✅ (Cell #2 재실측 PASS, owner localhost) ⏳ (production cell #2 재실측) | **2026-05-22 Cell #2 1차 실측**: `[picker-rejection] {name: "AbortError", code: 20, message: "Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request."}` — Codex CONCERN 확인 CORRECT. Chrome은 홈 디렉터리 거절을 AbortError로 dispatch (SecurityError 아님). 단순 silent return이 SecurityError 분기를 preempt → 메시지 무노출. **Contingency Patch v2 (count-based) 적용** `JoinBurnIndexForm.tsx:99 + 126-134`: `abortCountRef = useRef<number>(0)` → 1회 silent / 2회 누적 시 `fsaWarning` (yellow, non-fatal). timing-based 1500ms 폐기 (picker 호출당 10-15초 → 1500ms 내 2회 불가능 → count-based pivot). Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234/234 / build / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. **Cell #2 재실측 PASS (2026-05-22 owner-direct localhost)**: 1차 silent ✅ / 2차 연두색 fsaWarning 텍스트 정확 일치 ✅ / Scan 버튼 enabled 유지 ✅. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 잔여 = Phase 7 production redeploy 후 cell #2 재실측 |
+tasks/folder-picker-ux/codex-phase8.md:1802:tasks/folder-picker-ux/codex-phase8.md:1238:**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+tasks/folder-picker-ux/codex-phase8.md:1844:**UX iteration 1 (2026-05-22)**: folder picker 가시성·에러 복구 patch — commits `6cda4c5`+`b94d362`+`3756e83`+`40cd00c`. 4 Finding 흡수 (Finding 1=별 사이클 이관, Finding 2/3=Phase 7.5 patch, Finding 4=Phase 7.5.6 patch). 참고: [[project-folder-picker-ux-2026-05-22]]
+tasks/folder-picker-ux/codex-phase8.md:2008:- `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0 (Invariant #1 본 cycle도 유지)
+tasks/folder-picker-ux/codex-phase8.md:2112:| **Invariant #1** (HMAC 노출) | `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` | ✅ 0 hits |
+tasks/folder-picker-ux/codex-phase8.md:2121:| `b94d362` | 2026-05-22 | fix(forms): folder picker kbd visibility + home folder hint | `JoinBurnIndexForm.tsx` + `app/globals.css` (hint copy rephrase + `<code>` 3개 + `(period)` aria-hidden 라벨 + `aria-label` 2건 + `.path-preview-hint kbd` font 11→13px + `.kbd-label` 신규 + `.path-preview-hint code` 신규) |
+tasks/folder-picker-ux/codex-phase8.md:2122:| `3756e83` | 2026-05-22 | docs(folder-picker-ux): Phase 7.5 patch docs | `tasks/folder-picker-ux/` artifacts 갱신만 (code 변경 0) |
+tasks/folder-picker-ux/codex-phase8.md:2123:| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+tasks/folder-picker-ux/codex-phase8.md:2131:- `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` ✅ 0 hits (Invariant #1)
+tasks/folder-picker-ux/codex-phase8.md:2132:- Vercel auto-deploy ✅ 각 commit 완료 (production secret 재확인 same-origin fetch 보조 검증)
+tasks/folder-picker-ux/codex-phase8.md:2181:- **Contingency Patch v2 (count-based) 적용**: `JoinBurnIndexForm.tsx:99 + 126-134` — `abortCountRef = useRef<number>(0)`. 1회 AbortError silent (UX exploration), 2회 누적 시 `fsaWarning` (yellow, non-fatal) 노출. Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234 / build / secret leak 0.
+tasks/folder-picker-ux/codex-phase8.md:2189:- **검증**: `npx tsc --noEmit` ✅ / `npx vitest run` 234/234 ✅ / `npm run build` ✅ / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0 ✅. WCAG AA contrast 재계산 PASS (font-size 변동은 ratio 무관 — 15px kbd `#0A0A0A` on `#FAFAFA` = 18.97:1, `.kbd-label` `#525252` on `#FFFFFF` = 7.81:1, 둘 다 ≥ 4.5:1).
+tasks/folder-picker-ux/codex-phase8.md:2190:- **Deploy**: Vercel commit `40cd00c` auto-deploy 완료.
+tasks/folder-picker-ux/codex-phase8.md:2191:- **Owner Happy Path Gate**: Phase 7.5.6 (40cd00c) 2026-05-22 owner-direct production check ✅ + mcp computed style verify ✅ (font-size 15px / padding 2px 8px / line-height 21px) + owner 발화 "사이즈 괜찮음". `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 완료. 잔여 미검증 unchanged (Brave/Vivaldi, telemetry counter, parent-path validation Q3).
+tasks/folder-picker-ux/codex-phase8.md:2205:**2026-05-22 Cell #3 owner 실측 발견**: Plan §S1 + 구현은 `⌘⇧·` (U+00B7 MIDDLE DOT) 사용. 이는 **macOS 실제 단축키 `⌘⇧.` (U+002E PERIOD)과 다른 문자** — Codex Phase 1 Q2 검토 시 문자 식별까지 명시했으나 typo 그대로 통과. owner Cell #3 시도 시 "search로 안 잡혀" 보고로 발견. **1자 fix 적용** `JoinBurnIndexForm.tsx:423`: `·` → `.`. 검증 4종 PASS (tsc / vitest 234/234 / build / secret leak 0). Cell #1 PASS는 시각 노출 기준이므로 retroactive 영향 없음. 잔여 Windows/Linux tofu 검증은 별 사이클.
+tasks/folder-picker-ux/codex-phase8.md:2777:/bin/zsh -lc 'rg -n "COLLECTOR_HMAC_SECRET|secret|0 hits|40cd00c|3756e83|b94d362|6cda4c5" tasks/folder-picker-ux/criteria-execution-log.md tasks/folder-picker-ux/diff.md tasks/folder-picker-ux/unverified.md tasks/folder-picker-ux/phase7-auxiliary-verification.md tasks/folder-picker-ux/phase7.5-auxiliary-verification.md' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+tasks/folder-picker-ux/codex-phase8.md:2779:tasks/folder-picker-ux/criteria-execution-log.md:5:**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+tasks/folder-picker-ux/codex-phase8.md:2780:tasks/folder-picker-ux/criteria-execution-log.md:11:| 1 | Build secret 노출 0건 | ✅ (local build PASS + Vercel deploy success + production main chunks 8개 전수 0 hits) | Phase 5.3 + Phase 7 commit 직전 `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. Vercel deploy `6cda4c5` success (gh api). **Production curl 검증은 Vercel Bot Challenge로 차단** (`x-vercel-mitigated: challenge`, 403) → **Claude-in-Chrome 보조 검증 (2026-05-22)**: same-origin browser `fetch()`로 production main chunks 8개 (총 707,406 B) 전수 grep → **COLLECTOR_HMAC_SECRET 0 hits**. 상세 `phase7-auxiliary-verification.md`. Invariant #1 production 직접 검증 PASS |
+tasks/folder-picker-ux/codex-phase8.md:2781:tasks/folder-picker-ux/criteria-execution-log.md:12:| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+tasks/folder-picker-ux/codex-phase8.md:2782:tasks/folder-picker-ux/criteria-execution-log.md:14:| 4 | SecurityError actionable → AbortError count-based fsaWarning | ✅ (Cell #2 재실측 PASS, owner localhost) ⏳ (production cell #2 재실측) | **2026-05-22 Cell #2 1차 실측**: `[picker-rejection] {name: "AbortError", code: 20, message: "Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request."}` — Codex CONCERN 확인 CORRECT. Chrome은 홈 디렉터리 거절을 AbortError로 dispatch (SecurityError 아님). 단순 silent return이 SecurityError 분기를 preempt → 메시지 무노출. **Contingency Patch v2 (count-based) 적용** `JoinBurnIndexForm.tsx:99 + 126-134`: `abortCountRef = useRef<number>(0)` → 1회 silent / 2회 누적 시 `fsaWarning` (yellow, non-fatal). timing-based 1500ms 폐기 (picker 호출당 10-15초 → 1500ms 내 2회 불가능 → count-based pivot). Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234/234 / build / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. **Cell #2 재실측 PASS (2026-05-22 owner-direct localhost)**: 1차 silent ✅ / 2차 연두색 fsaWarning 텍스트 정확 일치 ✅ / Scan 버튼 enabled 유지 ✅. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 잔여 = Phase 7 production redeploy 후 cell #2 재실측 |
+tasks/folder-picker-ux/codex-phase8.md:2783:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:3:**Date**: 2026-05-22 (post-Vercel `b94d362` deploy)
+tasks/folder-picker-ux/codex-phase8.md:2784:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:11:- **URL**: `https://www.coconutlabs.xyz/?auto-detect=1&cachebust=b94d362`
+tasks/folder-picker-ux/codex-phase8.md:2785:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:13:- **Vercel commit**: `b94d362` (deployment target_url `https://vercel.com/chongwon-shins-projects/coconutlabs/3kKrsZNWTyZpr8TzozqVvWPmwPeR`, GitHub combined status `success`, "Deployment has completed" 2026-05-22T01:46:39Z)
+tasks/folder-picker-ux/codex-phase8.md:2786:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:56:### 3. COLLECTOR_HMAC_SECRET 노출 0건 (Invariant #1 production 재확인)
+tasks/folder-picker-ux/codex-phase8.md:2787:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:60:| Chunk | Size (B) | `COLLECTOR_HMAC_SECRET` hits |
+tasks/folder-picker-ux/codex-phase8.md:2788:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:69:**Invariant #1 production 직접 검증 PASS** (Bot Challenge same-origin fetch 우회 동일 절차, `phase7-auxiliary-verification.md` 형식 차용). Phase 7 (`6cda4c5`) 707,406 B / 8 chunks → Phase 7.5 (`b94d362`) 394,084 B / 5 chunks — Next.js Turbopack chunk 재구성 결과 (코드 변경량 대비 자연스러운 변동).
+tasks/folder-picker-ux/codex-phase8.md:2789:tasks/folder-picker-ux/phase7.5-auxiliary-verification.md:81:본 파일이 owner에게 주는 가치: **사전 신뢰 부여** — owner 1-2분 incognito 확인 시 "이미 마크업·contrast·secret leak 검증됨, 내가 할 일은 시각 1회 + 손글씨 1줄"이라는 축약된 게이트 통과 경로 제공.
+tasks/folder-picker-ux/codex-phase8.md:2790:tasks/folder-picker-ux/unverified.md:30:- **Contingency Patch v2 (count-based) 적용**: `JoinBurnIndexForm.tsx:99 + 126-134` — `abortCountRef = useRef<number>(0)`. 1회 AbortError silent (UX exploration), 2회 누적 시 `fsaWarning` (yellow, non-fatal) 노출. Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234 / build / secret leak 0.
+tasks/folder-picker-ux/codex-phase8.md:2791:tasks/folder-picker-ux/unverified.md:38:- **검증**: `npx tsc --noEmit` ✅ / `npx vitest run` 234/234 ✅ / `npm run build` ✅ / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0 ✅. WCAG AA contrast 재계산 PASS (font-size 변동은 ratio 무관 — 15px kbd `#0A0A0A` on `#FAFAFA` = 18.97:1, `.kbd-label` `#525252` on `#FFFFFF` = 7.81:1, 둘 다 ≥ 4.5:1).
+tasks/folder-picker-ux/codex-phase8.md:2792:tasks/folder-picker-ux/unverified.md:39:- **Deploy**: Vercel commit `40cd00c` auto-deploy 완료.
+tasks/folder-picker-ux/codex-phase8.md:2793:tasks/folder-picker-ux/unverified.md:40:- **Owner Happy Path Gate**: Phase 7.5.6 (40cd00c) 2026-05-22 owner-direct production check ✅ + mcp computed style verify ✅ (font-size 15px / padding 2px 8px / line-height 21px) + owner 발화 "사이즈 괜찮음". `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 완료. 잔여 미검증 unchanged (Brave/Vivaldi, telemetry counter, parent-path validation Q3).
+tasks/folder-picker-ux/codex-phase8.md:2794:tasks/folder-picker-ux/unverified.md:54:**2026-05-22 Cell #3 owner 실측 발견**: Plan §S1 + 구현은 `⌘⇧·` (U+00B7 MIDDLE DOT) 사용. 이는 **macOS 실제 단축키 `⌘⇧.` (U+002E PERIOD)과 다른 문자** — Codex Phase 1 Q2 검토 시 문자 식별까지 명시했으나 typo 그대로 통과. owner Cell #3 시도 시 "search로 안 잡혀" 보고로 발견. **1자 fix 적용** `JoinBurnIndexForm.tsx:423`: `·` → `.`. 검증 4종 PASS (tsc / vitest 234/234 / build / secret leak 0). Cell #1 PASS는 시각 노출 기준이므로 retroactive 영향 없음. 잔여 Windows/Linux tofu 검증은 별 사이클.
+tasks/folder-picker-ux/codex-phase8.md:2795:tasks/folder-picker-ux/diff.md:23:| **Invariant #1** (HMAC 노출) | `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` | ✅ 0 hits |
+tasks/folder-picker-ux/codex-phase8.md:2796:tasks/folder-picker-ux/diff.md:32:| `b94d362` | 2026-05-22 | fix(forms): folder picker kbd visibility + home folder hint | `JoinBurnIndexForm.tsx` + `app/globals.css` (hint copy rephrase + `<code>` 3개 + `(period)` aria-hidden 라벨 + `aria-label` 2건 + `.path-preview-hint kbd` font 11→13px + `.kbd-label` 신규 + `.path-preview-hint code` 신규) |
+tasks/folder-picker-ux/codex-phase8.md:2797:tasks/folder-picker-ux/diff.md:33:| `3756e83` | 2026-05-22 | docs(folder-picker-ux): Phase 7.5 patch docs | `tasks/folder-picker-ux/` artifacts 갱신만 (code 변경 0) |
+tasks/folder-picker-ux/codex-phase8.md:2798:tasks/folder-picker-ux/diff.md:34:| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+tasks/folder-picker-ux/codex-phase8.md:2799:tasks/folder-picker-ux/diff.md:42:- `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` ✅ 0 hits (Invariant #1)
+tasks/folder-picker-ux/codex-phase8.md:2800:tasks/folder-picker-ux/diff.md:43:- Vercel auto-deploy ✅ 각 commit 완료 (production secret 재확인 same-origin fetch 보조 검증)
+tasks/folder-picker-ux/codex-phase8.md:2801:tasks/folder-picker-ux/phase7-auxiliary-verification.md:3:**Date**: 2026-05-22 (post-Vercel `6cda4c5` deploy)
+tasks/folder-picker-ux/codex-phase8.md:2802:tasks/folder-picker-ux/phase7-auxiliary-verification.md:13:- **Vercel commit**: `6cda4c5` (deployment URL `9zFwEtq2UE3436K9m6ZrnNQX7Zyw`)
+tasks/folder-picker-ux/codex-phase8.md:2803:tasks/folder-picker-ux/phase7-auxiliary-verification.md:37:### 2. COLLECTOR_HMAC_SECRET 노출 0건 (Invariant #1 production 재확인)
+tasks/folder-picker-ux/codex-phase8.md:2804:tasks/folder-picker-ux/phase7-auxiliary-verification.md:41:| Chunk | Size (B) | `COLLECTOR_HMAC_SECRET` hits |
+tasks/folder-picker-ux/codex-phase8.md:2805:tasks/folder-picker-ux/phase7-auxiliary-verification.md:69:본 파일이 owner에게 주는 가치: **사전 신뢰 부여** — owner 1-2분 incognito 확인 시 "이미 마크업·secret leak 검증됨, 내가 할 일은 시각 1회 + 손글씨 1줄"이라는 축약된 게이트 통과 경로 제공.
+tasks/folder-picker-ux/codex-phase8.md:2806:tasks/folder-picker-ux/phase7-auxiliary-verification.md:78:4. (선택) DevTools → Network → main chunk JS 하나 클릭 → Response 탭 → `⌘F` `COLLECTOR_HMAC_SECRET` 0건 확인 (위 8 chunks × 0 hits 보조 증거로 갈음 가능)
+tasks/folder-picker-ux/codex-phase8.md:2851:- CONCERN: **HIGH**. Codex Phase 1/6/7 실제 verdict는 `needs-attention`이고, entry가 PASS로 쓰지는 않아 이 부분은 OK. 하지만 `Owner Happy Path 12+ cells`는 산술상도 `7+2+1+1 = 11`이고, 현재 `smoke-golden-regression.md`에는 Phase 7/7.5 rows가 아직 `⏳ owner-direct`로 남아 있어 11개 완료도 primary artifact만으로는 불충분합니다. 또한 path-limited `git log 6cda4c5..40cd00c`는 `b94d362`, `40cd00c`만 반환하며, `3756e83`은 docs-only입니다. “4 commits 각 build secret leak 0 hits”도 per-commit 근거가 부족합니다.
+tasks/folder-picker-ux/codex-phase8.md:2852:- MITIGATION: decision-log를 “11 planned cells” 또는 실제 완료 row 기준으로 정정하고, smoke file result columns/7.5.6 row를 primary evidence로 맞추세요. Secret-leak 문구는 “code deploys checked: 6cda4c5/b94d362/40cd00c; 3756e83 docs-only”처럼 낮추거나 commit별 evidence를 추가해야 합니다.
+tasks/folder-picker-ux/codex-phase8.md:2880:- CONCERN: **HIGH**. Codex Phase 1/6/7 실제 verdict는 `needs-attention`이고, entry가 PASS로 쓰지는 않아 이 부분은 OK. 하지만 `Owner Happy Path 12+ cells`는 산술상도 `7+2+1+1 = 11`이고, 현재 `smoke-golden-regression.md`에는 Phase 7/7.5 rows가 아직 `⏳ owner-direct`로 남아 있어 11개 완료도 primary artifact만으로는 불충분합니다. 또한 path-limited `git log 6cda4c5..40cd00c`는 `b94d362`, `40cd00c`만 반환하며, `3756e83`은 docs-only입니다. “4 commits 각 build secret leak 0 hits”도 per-commit 근거가 부족합니다.
+tasks/folder-picker-ux/codex-phase8.md:2881:- MITIGATION: decision-log를 “11 planned cells” 또는 실제 완료 row 기준으로 정정하고, smoke file result columns/7.5.6 row를 primary evidence로 맞추세요. Secret-leak 문구는 “code deploys checked: 6cda4c5/b94d362/40cd00c; 3756e83 docs-only”처럼 낮추거나 commit별 evidence를 추가해야 합니다.
+tasks/folder-picker-ux/codex-phase1.5-history-cleanup.md:94:grep -c 'pypi-Ag' ~/.zsh_history
+tasks/folder-picker-ux/codex-phase1.5-history-cleanup.md:98:**실패**: 새 셸이 시작될 때 `HISTFILE`을 읽어들이는데, 그 파일은 Attempt 3에서 dirty buffer가 append된 상태. 또한 새 셸에서 입력한 진단 명령(`grep -c 'pypi-Ag'`)도 in-memory에 추가됨 → 다음 exit 시 또 append.
+tasks/folder-picker-ux/codex-phase1.5-history-cleanup.md:221:- 비밀 값 (token, password, secret)을 cli 인자로 직접 입력 금지
+tasks/folder-picker-ux/criteria.md:14:| 1 | security | Build secret 노출 0건 (재확인) | `curl -sS https://www.coconutlabs.xyz/_next/static/chunks/*.js \| grep -c COLLECTOR_HMAC_SECRET` → 0 |
+tasks/folder-picker-ux/criteria.md:37:1. **Build secret 노출 ≥ 1건** → `env=false` 롤백 + `COLLECTOR_HMAC_SECRET` 회전
+tasks/folder-picker-ux/codex-phase8-input.md:11:Phase 7.5.6 closure (commit `40cd00c`, owner production self-test "사이즈 괜찮음") 후 Phase 8 docs cycle 진입. 8.1A (3 기존 산출물 갱신) + 8.1B (3 신규 산출물 작성) + 8.2 (Finding 1 별 사이클 brief) 완료. 본 Phase 8.3은 **commit 전 fact-check** — 신규 산출물의 사실 정확성·overclaim 위험·frontmatter 준수·회고 패턴·invariant 정의를 적대적 검토.
+tasks/folder-picker-ux/codex-phase8-input.md:19:5. **Cycle 4 commits git log** — 확인 명령: `git log --oneline 6cda4c5..40cd00c -- 'components/forms/JoinBurnIndexForm.tsx' 'app/globals.css'`
+tasks/folder-picker-ux/codex-phase8-input.md:31:- "4 commits production deploy (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`) 각 build secret leak 0 hits"
+tasks/folder-picker-ux/codex-phase8-input.md:57:- 4 commit hash 인용 (`6cda4c5`/`b94d362`/`3756e83`/`40cd00c`)
+tasks/folder-picker-ux/smoke-golden-regression.md:27:**Deploy 상태**: ✅ Vercel commit `6cda4c5` deployment 완료 (2026-05-22, gh api 확인 — `https://vercel.com/chongwon-shins-projects/coconutlabs/9zFwEtq2UE3436K9m6ZrnNQX7Zyw`).
+tasks/folder-picker-ux/smoke-golden-regression.md:29:**Production secret leak 재검증 메모**: `curl https://www.coconutlabs.xyz/_next/static/chunks/*.js`는 Vercel Bot Challenge (`x-vercel-mitigated: challenge`, 403)로 차단됨. **Local build verification (`grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0)이 Phase 7 commit 직전에 PASS**한 상태로 동일 source가 Vercel build pipeline 통과 → derivatively verified.
+tasks/folder-picker-ux/smoke-golden-regression.md:31:**2026-05-22 Claude-in-Chrome 보조 검증 (Option B 하이브리드)** — Bot Challenge를 same-origin browser fetch로 우회해 **production main chunks 8개 전수 검사 = COLLECTOR_HMAC_SECRET 0건 (총 707KB 검사)**. Path Preview Card 마크업도 같은 세션에서 검증 완료 (2 rows + 2 hidden segments + hint + kbds 정확 일치). 상세: `phase7-auxiliary-verification.md`. **단 owner-direct manual record는 여전히 의무** — 본 표 cells #1/#4는 owner incognito 직접 실행 후 손으로 기록 (1-2분 축약 가능).
+tasks/folder-picker-ux/smoke-golden-regression.md:42:**Deploy 상태**: ✅ Vercel commit `b94d362` deployment 완료 (2026-05-22T01:46:39Z, GitHub combined status `success` — `https://vercel.com/chongwon-shins-projects/coconutlabs/3kKrsZNWTyZpr8TzozqVvWPmwPeR`).
+tasks/folder-picker-ux/smoke-golden-regression.md:47:- production main chunks 5개 (총 394 KB) 전수 grep `COLLECTOR_HMAC_SECRET` = **0 hits** — Invariant #1 PASS
+tasks/folder-picker-ux/codex-phase7.md:263:- `phase7-auxiliary-verification.md` — Claude-in-Chrome 보조 검증 PASS (production main chunks 8개 × 0 secret hits)
+tasks/folder-picker-ux/codex-phase7.md:269:- **Vercel commit**: `6cda4c5` deployment `9zFwEtq2UE3436K9m6ZrnNQX7Zyw` (success)
+tasks/folder-picker-ux/codex-phase7.md:271:  1. Build secret leak 0 (production main chunks 8개 × 707,406 B × 0 hits)
+tasks/folder-picker-ux/codex-phase7-findings.md:9:- `phase7-auxiliary-verification.md` — Claude-in-Chrome 보조 검증 PASS (production main chunks 8개 × 0 secret hits)
+tasks/folder-picker-ux/codex-phase7-findings.md:15:- **Vercel commit**: `6cda4c5` deployment `9zFwEtq2UE3436K9m6ZrnNQX7Zyw` (success)
+tasks/folder-picker-ux/codex-phase7-findings.md:17:  1. Build secret leak 0 (production main chunks 8개 × 707,406 B × 0 hits)
+
+exec
+/bin/zsh -lc 'cd "$HOME/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory" && cd "../../../../Desktop/Project/Coconut Labs/web/tasks/folder-picker-ux" && pwd -P' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+/Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web/tasks/folder-picker-ux
+
+exec
+/bin/zsh -lc 'git show --stat --oneline --name-only --no-renames 6cda4c5 b94d362 3756e83 40cd00c -- components/forms/JoinBurnIndexForm.tsx app/globals.css tasks/folder-picker-ux' in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+6cda4c5 feat(forms): folder picker discoverability + smart error recovery
+app/globals.css
+components/forms/JoinBurnIndexForm.tsx
+tasks/folder-picker-ux/codex-phase1.5-history-cleanup.md
+tasks/folder-picker-ux/codex-phase1.md
+tasks/folder-picker-ux/codex-phase6.md
+tasks/folder-picker-ux/criteria-execution-log.md
+tasks/folder-picker-ux/criteria.md
+tasks/folder-picker-ux/design-review-phase3.md
+tasks/folder-picker-ux/diff.md
+tasks/folder-picker-ux/notes-used.txt
+tasks/folder-picker-ux/plan-v2-delta.md
+tasks/folder-picker-ux/preflight-localhost-verification.md
+tasks/folder-picker-ux/preflight-phase6-simulated.md
+tasks/folder-picker-ux/smoke-golden-regression.md
+tasks/folder-picker-ux/unverified.md
+b94d362 fix(forms): folder picker kbd visibility + home folder hint
+app/globals.css
+components/forms/JoinBurnIndexForm.tsx
+tasks/folder-picker-ux/codex-phase7-findings.md
+tasks/folder-picker-ux/codex-phase7.md
+3756e83 docs(folder-picker-ux): Phase 7.5 handoff — owner re-measure template
+tasks/folder-picker-ux/criteria-execution-log.md
+tasks/folder-picker-ux/phase7-auxiliary-verification.md
+tasks/folder-picker-ux/phase7.5-auxiliary-verification.md
+tasks/folder-picker-ux/smoke-golden-regression.md
+40cd00c fix(forms): bump path-preview kbd 13→15px for legibility
+app/globals.css
+
+exec
+/bin/zsh -lc "nl -ba tasks/folder-picker-ux/diff.md | sed -n '28,45p'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+exec
+/bin/zsh -lc "nl -ba tasks/folder-picker-ux/unverified.md | sed -n '34,42p'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+    34	## Phase 7.5.6 Closure (2026-05-22)
+    35	
+    36	- **Trigger**: Phase 7.5 deploy 후 owner 추가 발화 "사이즈는 좀 키워야겠음. 좀 더 키워줘" — kbd 13px 여전히 작아 보임. font-size 1단계 추가 bump.
+    37	- **Patch**: `app/globals.css` `.path-preview-hint kbd` font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규. 색상·letter-spacing·token 무변.
+    38	- **검증**: `npx tsc --noEmit` ✅ / `npx vitest run` 234/234 ✅ / `npm run build` ✅ / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0 ✅. WCAG AA contrast 재계산 PASS (font-size 변동은 ratio 무관 — 15px kbd `#0A0A0A` on `#FAFAFA` = 18.97:1, `.kbd-label` `#525252` on `#FFFFFF` = 7.81:1, 둘 다 ≥ 4.5:1).
+    39	- **Deploy**: Vercel commit `40cd00c` auto-deploy 완료.
+    40	- **Owner Happy Path Gate**: Phase 7.5.6 (40cd00c) 2026-05-22 owner-direct production check ✅ + mcp computed style verify ✅ (font-size 15px / padding 2px 8px / line-height 21px) + owner 발화 "사이즈 괜찮음". `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 완료. 잔여 미검증 unchanged (Brave/Vivaldi, telemetry counter, parent-path validation Q3).
+    41	
+    42	## 잔여 미검증 (Phase 5 이후 갱신)
+
+ succeeded in 0ms:
+    28	## Phase 7.5 + 7.5.6 Subsequent Iterations
+    29	
+    30	| Commit | 날짜 | 메시지 | 파일 변경 |
+    31	|--------|------|--------|-----------|
+    32	| `b94d362` | 2026-05-22 | fix(forms): folder picker kbd visibility + home folder hint | `JoinBurnIndexForm.tsx` + `app/globals.css` (hint copy rephrase + `<code>` 3개 + `(period)` aria-hidden 라벨 + `aria-label` 2건 + `.path-preview-hint kbd` font 11→13px + `.kbd-label` 신규 + `.path-preview-hint code` 신규) |
+    33	| `3756e83` | 2026-05-22 | docs(folder-picker-ux): Phase 7.5 patch docs | `tasks/folder-picker-ux/` artifacts 갱신만 (code 변경 0) |
+    34	| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+    35	
+    36	**Phase 7.5 + 7.5.6 합산**: code 2 files (`JoinBurnIndexForm.tsx` + `app/globals.css`). Phase 5 base 위에 점진적 누적.
+    37	
+    38	**검증** (각 commit 직후 동일 절차):
+    39	- `npx tsc --noEmit` ✅ exit 0
+    40	- `npx vitest run` ✅ 234/234 passed
+    41	- `npm run build` ✅ success
+    42	- `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` ✅ 0 hits (Invariant #1)
+    43	- Vercel auto-deploy ✅ 각 commit 완료 (production secret 재확인 same-origin fetch 보조 검증)
+    44	
+    45	**Owner Happy Path Gate (Phase 7.5.6)**: owner 2026-05-22 production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 ✅. mcp__claude-in-chrome computed style verify (font-size 15px / padding 2px 8px / line-height 21px) 부합.
+
+exec
+/bin/zsh -lc "nl -ba tasks/folder-picker-ux/criteria-execution-log.md | sed -n '1,18p'" in /Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web
+ succeeded in 0ms:
+     1	# Criteria Execution Log — Folder Picker UX
+     2	
+     3	**Cycle**: 2026-05-21 (Approach B: inline preview + smart error recovery)
+     4	**Based on**: `tasks/folder-picker-ux/criteria.md`
+     5	**Last updated**: Phase 7.5.6 closure (Vercel `40cd00c`) — 2026-05-22. Owner production direct check + "사이즈 괜찮음" 발화로 Owner Happy Path Gate 통과. 다음 단계: Phase 8 docs cycle (decision-log + memory + Finding 1 별 사이클 brief).
+     6	
+     7	## Must-Pass Results (6/6 required)
+     8	
+     9	| # | Criterion | Result | Evidence |
+    10	|---|-----------|--------|----------|
+    11	| 1 | Build secret 노출 0건 | ✅ (local build PASS + Vercel deploy success + production main chunks 8개 전수 0 hits) | Phase 5.3 + Phase 7 commit 직전 `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. Vercel deploy `6cda4c5` success (gh api). **Production curl 검증은 Vercel Bot Challenge로 차단** (`x-vercel-mitigated: challenge`, 403) → **Claude-in-Chrome 보조 검증 (2026-05-22)**: same-origin browser `fetch()`로 production main chunks 8개 (총 707,406 B) 전수 grep → **COLLECTOR_HMAC_SECRET 0 hits**. 상세 `phase7-auxiliary-verification.md`. Invariant #1 production 직접 검증 PASS |
+    12	| 2 | Path Preview Card 시각 노출 | ✅ PASS (Phase 7.5.6 owner-direct closure) | `JoinBurnIndexForm.tsx:392-411` 마크업 삽입. globals.css 6 신규 클래스. **localhost:3000/?auto-detect=1 + Join modal 자동 검증 통과** (`preflight-localhost-verification.md`): 2 rows `~/.claude/projects` + `~/.codex/sessions`, 2 hidden segments outlined, hint + kbd labels rendered. **Phase 7 production (`6cda4c5`) Claude-in-Chrome 보조 검증** (`phase7-auxiliary-verification.md`): 2 rows + 2 hidden segments + hint + 2 kbds 정확 일치. **Phase 7.5 production (`b94d362`) 추가 검증** (`phase7.5-auxiliary-verification.md`): hint copy 갱신 ("From your home folder (~), open .claude/projects or .codex/sessions. Reveal hidden folders with ⌘⇧.(period) on macOS or Ctrl+H on Linux.") + `<code>` 3개 (`~`, `.claude/projects`, `.codex/sessions`) + `(period)` 라벨 + aria-label 2건 (`Command Shift Period`, `Control H`) 모두 정확 일치. **Phase 7.5.6 production deploy `40cd00c` (2026-05-22)**: mcp__claude-in-chrome computed style verify — font-size 15px / padding 2px 8px / line-height 21px; owner production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 (Owner Happy Path Gate 통과). |
+    13	| 3 | AbortError silent | ✅ (code + Cell #5 owner localhost PASS) | `JoinBurnIndexForm.tsx:126-134` count-based — 1차 cancel silent (count 0→1), 2차 cancel fsaWarning 노출 (count 1→2). locale-independent (Invariant #4). **Cell #5 owner-direct (2026-05-22 localhost)**: 2회 cancel variant — Cell #4 success 직후 `abortCountRef`=0 리셋된 상태에서 0→1 silent + 1→2 fsaWarning 정확 텍스트 일치. count-based heuristic post-reset cycle 검증 PASS. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.53.44.png` |
+    14	| 4 | SecurityError actionable → AbortError count-based fsaWarning | ✅ (Cell #2 재실측 PASS, owner localhost) ⏳ (production cell #2 재실측) | **2026-05-22 Cell #2 1차 실측**: `[picker-rejection] {name: "AbortError", code: 20, message: "Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request."}` — Codex CONCERN 확인 CORRECT. Chrome은 홈 디렉터리 거절을 AbortError로 dispatch (SecurityError 아님). 단순 silent return이 SecurityError 분기를 preempt → 메시지 무노출. **Contingency Patch v2 (count-based) 적용** `JoinBurnIndexForm.tsx:99 + 126-134`: `abortCountRef = useRef<number>(0)` → 1회 silent / 2회 누적 시 `fsaWarning` (yellow, non-fatal). timing-based 1500ms 폐기 (picker 호출당 10-15초 → 1500ms 내 2회 불가능 → count-based pivot). Invariant #4 (e.name only) 유지. **검증 4종 PASS**: tsc / vitest 234/234 / build / `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` = 0. **Cell #2 재실측 PASS (2026-05-22 owner-direct localhost)**: 1차 silent ✅ / 2차 연두색 fsaWarning 텍스트 정확 일치 ✅ / Scan 버튼 enabled 유지 ✅. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.33.04.png`. 잔여 = Phase 7 production redeploy 후 cell #2 재실측 |
+    15	| 5 | Name mismatch 동적 표기 | ✅ (code + Cell #3 owner localhost PASS) | `JoinBurnIndexForm.tsx:157-161` `You picked "${h.name}". We need the directory literally named "${expectedName}"…`. **Cell #3 owner-direct (2026-05-22 localhost)**: `~/.claude` 직접 선택 → 빨간 fsaError 노출, `.claude` 동적 + `projects` expected 정확 일치. typo fix `⌘⇧·` → `⌘⇧.` (line 423) 함께 검증. 스크린샷 `issues/스크린샷 2026-05-22 오전 12.42.51.png` |
+    16	| 6 | a11y WCAG AA 4.5:1 + Tab order | ✅ (contrast + tab order + Phase 7.5 v2 회복 + Phase 7.5.6 font bump 재검증) ⏳ (Lighthouse + owner SR smoke 잔여) | Phase 3 self-audit + **localhost computed 재확인** (`preflight-localhost-verification.md`): `--fg2 rgb(82,82,82)` on `--bg rgb(255,255,255)` = **7.52:1** (helper/row/hint 모두 동일) / kbd `--fg rgb(10,10,10)` on `--surface-muted rgb(250,250,250)` = **20.4:1** / `--young-coconut-dark` outline-only(text 미사용). Tab 순서 10 tabbables: close 첫 → 2 pickers → 5 timeframe → 폼 필드 = 자연 순서. **Phase 7.5 v2 contrast 회복** (`phase7.5-auxiliary-verification.md`): Edit 2 v2 `.kbd-label` 색상을 `--fg3 #8E8E8E` (3.28:1 AA fail) → `--fg2 #525252` (codex v2 권장 반영)으로 변경 → **production 재계산 PASS**: kbd `18.97:1` / label `7.81:1` / hint `7.81:1` / code (inherit `--fg2`) `7.81:1`. **a11y 추가 강화** (Edit 3 v2 신규 클래스 `.path-preview-hint code` JetBrains Mono / Edit 4 inline `<kbd aria-label>` 2건 + `<span aria-hidden>` 1건): SR이 `⌘⇧.`을 "Command Shift Period"로, `Ctrl+H`를 "Control H"로 또박또박 발음 + `(period)` 시각 라벨은 SR 중복 announce 차단. **Phase 7.5.6 patch 후 contrast 재확인** (font-size 13→15px / padding 2px 7px → 2px 8px / line-height 1.4 신규): 15px kbd `#0A0A0A` on `#FAFAFA` = **18.97:1** ✅ (font-size 증가에도 색상 무변 → ratio 동일), `.kbd-label` `#525252` on `#FFFFFF` = **7.81:1** ✅. Lighthouse + owner VoiceOver smoke 잔여 (Codex Q6 follow-up — task #14) |
+    17	
+    18	**Must-Pass 현 시점**: 5/6 code-side ✅ + #4 ⚠️ PARTIAL (Codex CONCERN on Cell #2 dispatch) + #2/#6 localhost auto-verification 강화 + #3/#5 dynamic simulation 강화 (`preflight-phase6-simulated.md` 7/7 cells PASS for synthetic inputs). **Codex Phase 6 verdict: needs-attention** — single critical concern: real Chrome may dispatch home-folder rejection as `AbortError` (not `SecurityError`), in which case `JoinBurnIndexForm.tsx:120` silent return preempts the actionable SecurityError branch. owner 실측 잔여 = **🔴 P1 Cell #2 real `~` pick + capture `e.name`** + 🟡 P2 Cell #7 real DevTools IDB clear + 🟢 P3 production cell #1 + remaining 5 cells real picker + Safari + Lighthouse/screen reader.
+
+codex
+## Verdict (re-run): PASS
+
+### Q1 재검증 [decision-log overclaim 해소]
+- 잔존 결함 severity: NIT
+- 근거: [decision-log.md](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/docs/decision/decision-log.md:357)의 `11 planned cells` 산술은 맞습니다. Phase 6 7/7은 [smoke-golden-regression.md](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/tasks/folder-picker-ux/smoke-golden-regression.md:65)에 일치하고, Phase 7 #1/#4는 marker가 `⏳`인 채 notes에 owner 문구가 남은 상태라 “owner-notes evidence / marker 미flip” 표현과 맞습니다.
+- `3756e83` docs-only 분리도 맞습니다. `git show` 기준 `6cda4c5`, `b94d362`, `40cd00c`만 code deploy이고, `3756e83`은 tasks 문서만 변경했습니다.
+- NIT: Phase 7.5/7.5.6의 “사이즈 괜찮음” 근거는 smoke 원문보다는 [criteria-execution-log.md](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/tasks/folder-picker-ux/criteria-execution-log.md:5), [unverified.md](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/tasks/folder-picker-ux/unverified.md:40)에 더 직접적입니다. 하지만 decision-log가 “verbal 확인”으로 낮춰 썼으므로 overclaim은 아닙니다.
+- S10 ①은 별 cycle brief, ON-flip 게이트, Vercel Preview deploy, owner 직접 진입 절차까지 명시되어 행동 가능한 액션으로 구체화됐습니다.
+
+### Q2 재검증 [memory source_link]
+- 잔존 결함 severity: NONE
+- 근거: [memory frontmatter](/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:10)의 `../../../../Desktop/Project/Coconut Labs/web/...` 경로가 `/Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web/tasks/folder-picker-ux`로 정상 resolve됩니다. frontmatter 필수 필드도 [lines 4-12](/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:4)에 존재합니다.
+
+### Q3 재검증 [memory 본문 staleness]
+- 잔존 결함 severity: NONE
+- 근거: memory의 `--young-coconut-dark` 설명은 [globals.css](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/app/globals.css:2025)의 실제 `.path-segment--hidden` outline과 일치합니다. Reveal hint도 [JoinBurnIndexForm.tsx](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/components/forms/JoinBurnIndexForm.tsx:422)의 현재 JSX 렌더 copy와 일치합니다.
+- 재사용 전 source/code 재검증 caveat도 [memory line 86](/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:86)에 있어 90일 expiry staleness 위험을 충분히 낮춥니다.
+
+## Phase 8 진입 결정
+- 재시도 1회 한도 소진 기준으로 최종 PASS.
+- HIGH/MEDIUM 잔존 결함 0건, Q1은 nit-only입니다. Phase 8.4 진입 가능.
+tokens used
+93,034
+## Verdict (re-run): PASS
+
+### Q1 재검증 [decision-log overclaim 해소]
+- 잔존 결함 severity: NIT
+- 근거: [decision-log.md](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/docs/decision/decision-log.md:357)의 `11 planned cells` 산술은 맞습니다. Phase 6 7/7은 [smoke-golden-regression.md](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/tasks/folder-picker-ux/smoke-golden-regression.md:65)에 일치하고, Phase 7 #1/#4는 marker가 `⏳`인 채 notes에 owner 문구가 남은 상태라 “owner-notes evidence / marker 미flip” 표현과 맞습니다.
+- `3756e83` docs-only 분리도 맞습니다. `git show` 기준 `6cda4c5`, `b94d362`, `40cd00c`만 code deploy이고, `3756e83`은 tasks 문서만 변경했습니다.
+- NIT: Phase 7.5/7.5.6의 “사이즈 괜찮음” 근거는 smoke 원문보다는 [criteria-execution-log.md](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/tasks/folder-picker-ux/criteria-execution-log.md:5), [unverified.md](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/tasks/folder-picker-ux/unverified.md:40)에 더 직접적입니다. 하지만 decision-log가 “verbal 확인”으로 낮춰 썼으므로 overclaim은 아닙니다.
+- S10 ①은 별 cycle brief, ON-flip 게이트, Vercel Preview deploy, owner 직접 진입 절차까지 명시되어 행동 가능한 액션으로 구체화됐습니다.
+
+### Q2 재검증 [memory source_link]
+- 잔존 결함 severity: NONE
+- 근거: [memory frontmatter](/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:10)의 `../../../../Desktop/Project/Coconut Labs/web/...` 경로가 `/Users/dg-2412-pn-002/Desktop/Project/Coconut Labs/web/tasks/folder-picker-ux`로 정상 resolve됩니다. frontmatter 필수 필드도 [lines 4-12](/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:4)에 존재합니다.
+
+### Q3 재검증 [memory 본문 staleness]
+- 잔존 결함 severity: NONE
+- 근거: memory의 `--young-coconut-dark` 설명은 [globals.css](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/app/globals.css:2025)의 실제 `.path-segment--hidden` outline과 일치합니다. Reveal hint도 [JoinBurnIndexForm.tsx](/Users/dg-2412-pn-002/Desktop/Project/Coconut%20Labs/web/components/forms/JoinBurnIndexForm.tsx:422)의 현재 JSX 렌더 copy와 일치합니다.
+- 재사용 전 source/code 재검증 caveat도 [memory line 86](/Users/dg-2412-pn-002/.claude/projects/-Users-dg-2412-pn-002-Desktop-Project-Coconut-Labs/memory/project_folder-picker-ux-2026-05-22.md:86)에 있어 90일 expiry staleness 위험을 충분히 낮춥니다.
+
+## Phase 8 진입 결정
+- 재시도 1회 한도 소진 기준으로 최종 PASS.
+- HIGH/MEDIUM 잔존 결함 0건, Q1은 nit-only입니다. Phase 8.4 진입 가능.

@@ -1,7 +1,7 @@
 # Diff Summary — Folder Picker UX
 
-**Date**: 2026-05-21
-**Status**: Phase 5 완료 (구현 + tsc/vitest/build/secret-leak 검증 통과)
+**Date**: 2026-05-22 (Phase 7.5.6 closure)
+**Status**: Phase 7.5.6 완료 (Phase 5 base + Phase 7.5 hint/aria 강화 + Phase 7.5.6 kbd font 15px bump). 다음 단계 Phase 8 docs cycle.
 
 ## 변경 파일 (실측, `git diff --stat`)
 
@@ -24,6 +24,25 @@
 | 린트 | `npm run lint -- --max-warnings=0` | ⚠️ 15 warnings (모두 pre-existing, 본 변경 도입 0건) |
 
 **린트 warning 노트**: 15건 모두 본 작업 이전부터 존재 (확인: 본 변경 영향 파일은 `JoinBurnIndexForm.tsx:103` 의 `react-hooks/exhaustive-deps` 1건이나 useEffect L98-104는 본 작업 미터치 영역). Should-pass #9 80% 룰 적용 가능 — 5/6 통과로 간주.
+
+## Phase 7.5 + 7.5.6 Subsequent Iterations
+
+| Commit | 날짜 | 메시지 | 파일 변경 |
+|--------|------|--------|-----------|
+| `b94d362` | 2026-05-22 | fix(forms): folder picker kbd visibility + home folder hint | `JoinBurnIndexForm.tsx` + `app/globals.css` (hint copy rephrase + `<code>` 3개 + `(period)` aria-hidden 라벨 + `aria-label` 2건 + `.path-preview-hint kbd` font 11→13px + `.kbd-label` 신규 + `.path-preview-hint code` 신규) |
+| `3756e83` | 2026-05-22 | docs(folder-picker-ux): Phase 7.5 patch docs | `tasks/folder-picker-ux/` artifacts 갱신만 (code 변경 0) |
+| `40cd00c` | 2026-05-22 | fix(forms): bump path-preview kbd 13→15px | `app/globals.css` 1 file +2/-1 (font-size 13→15px, padding 2px 7px → 2px 8px, line-height 1.4 신규) |
+
+**Phase 7.5 + 7.5.6 합산**: code 2 files (`JoinBurnIndexForm.tsx` + `app/globals.css`). Phase 5 base 위에 점진적 누적.
+
+**검증** (각 commit 직후 동일 절차):
+- `npx tsc --noEmit` ✅ exit 0
+- `npx vitest run` ✅ 234/234 passed
+- `npm run build` ✅ success
+- `grep -c COLLECTOR_HMAC_SECRET .next/static/chunks/*.js` ✅ 0 hits (Invariant #1)
+- Vercel auto-deploy ✅ 각 commit 완료 (production secret 재확인 same-origin fetch 보조 검증)
+
+**Owner Happy Path Gate (Phase 7.5.6)**: owner 2026-05-22 production direct check + 발화 "사이즈 괜찮음" → `smoke-golden-regression.md` Phase 7.5 row owner-direct 손글씨 기록 ✅. mcp__claude-in-chrome computed style verify (font-size 15px / padding 2px 8px / line-height 21px) 부합.
 
 ## Phase별 변경 의도
 
