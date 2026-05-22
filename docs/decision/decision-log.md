@@ -385,3 +385,17 @@ S0에서 작성, S10에서 회고 2줄 추가.
 [S10 회고]
 - 무엇이 잘 됐나: /codex Phase 1 6묶음 질문(Q1-Q6)이 plan-brief.md §진입 시점에서 사전 정의되어 있어 owner가 Codex 응답을 채택/거부할 때 판단 기준 명확. Q6 비-버튼 close 경로 누락 Hard gate가 `showToast` 내부 `setModal(null)` 경로 식별 → `closeModal` useCallback 단일 close path 통일로 Invariant #6 latch 우회 차단(Cell #7 runtime 검증으로 confirmed). 위험 3축 2/3 충족이 명문화돼 검증 분리 의무가 자동 발동, Suspense Option A(AutoDetectListener 자식 분리)로 `/` Static prerender 유지.
 - 다음엔 무엇을 바꿀까: ① `useSearchParams` 같은 Next.js client-only API 사용 시 AGENTS.md `node_modules/next/dist/docs/` 사전 확인 의무를 plan v1 작성 단계(S3)에 명시 — 본 사이클은 Phase 3 구현 단계(Task C.6 Step 1)에 검증해 plan revision risk 있었음 (Suspense boundary 의무 사실을 Phase 3에서야 확인). ② Phase 6 cells 표 작성 시 "비-버튼 close 경로 인벤토리" 1줄 의무 항목 추가 — 본 사이클은 Q6 Codex 적대적 검토로 `showToast` 경로를 사후 발견. close path가 N개인 컴포넌트는 모두 단일 useCallback 통일을 plan-brief 단계 패턴화.
+
+---
+
+### 2026-05-22 [Hygiene + e2e Phase #1 — 핸드오프 stale 발견 + CI e2e 3-spec fixup]
+
+- 문제: 핸드오프(`tasks/hygiene-and-e2e/SESSION_HANDOFF.md`)는 "Phase #1 미완료, 신규 인프라 60~75분 헤비"라고 주장했으나 실제 git에는 산출물(`playwright.config.ts`, `e2e/burn-import-fsa-picker.spec.ts`, fixtures, `ci.yml` e2e job)이 commits `edff1c7` + `378c034` (PR #8, 2026-05-21)로 모두 머지됨. CI는 5연속 fail — 3 specs 전부 빨강: ① happy path `waitForResponse` 30s timeout (POST 미발사) ② reject 문자열 mismatch (실제 `JoinBurnIndexForm.tsx:159` "You picked ..." vs 기대 "Selected folder must be ...") ③ onboarding-30s toast 120s timeout. 핸드오프 작성자가 plan만 보고 working tree·HEAD·CI 상태 누락.
+- 버린 대안: ① audit-only 종료 — CI 빨강을 다른 사이클로 미루면 다음 머지에서 false alarm fatigue ② 2 spec + 1 spec 분리 사이클 — 같은 컴포넌트 변경(folder-picker-ux finding 1)에서 파생된 desync이므로 분리 시 root cause 중복 분석 + commit history 노이즈 ③ 컴포넌트 메시지/selector를 spec에 맞게 조정 — 회귀 위험(folder-picker-ux 의도된 UX 변경 무효화).
+- 핵심 트레이드오프: 한 commit에 3 specs + B3 5종 + 2 codex input 묶음(blast radius ↑) vs spec-only invariant 엄수로 component 회귀 0 (책임 경계 명확). 결과적으로 +910/-15 lines 중 코드 변경은 +84/-15 (`e2e/*` only), 나머지는 audit trail.
+- 선택 이유: 동일 root cause(folder-picker-ux finding 1 component drift) → 단일 fixup이 일관성 ↑. spec-only invariant + Codex 2-phase 적대적 검토 + B3 5종 + owner happy path 손기록 게이트가 자동 우회 위험 차단. CI 그린이 머지 가능 조건이므로 fixup 자체는 reversible.
+- 강한 증거: ① CI run `26276170000` 3 spec 모두 component message/selector 변경 영향 직접 확인 ② Codex Phase 1 NEEDS_REVISION → 6 mitigations (P0 token verify path bypass + Q2-Q6 P2/P3) ③ Phase 2 mid-execution에서 `?auto-detect=1` modal-overlay click-intercept regression 추가 발견 → overlay-first hardening (Codex Q2 P3) 채택 → CONDITIONAL APPROVE ④ 최종 CI run `26279720906` test/e2e job + parity-test + security-test 3 워크플로우 모두 success.
+
+[S10 회고]
+- 무엇이 잘 됐나: 핸드오프 stale 의심 → git HEAD/working tree/CI 상태 3종 cross-check가 5분 안에 root cause 확정. /codex 2-phase가 mid-execution 회귀(auto-detect modal-overlay)를 Phase 2에서 추가 검출 — Phase 1만 했으면 spec PASS 후 prod 사각지대 남음. spec-only invariant가 9-field whitelist 보안 경계 + folder-picker-ux UX 의도 양쪽 보존. B3 5종 산출물 + smoke-golden-regression.md owner 직접 손기록 게이트가 자동 우회 차단을 실제로 강제.
+- 다음엔 무엇을 바꿀까: ① 핸드오프 stale 검증을 plan v1 작성 단계(S3) 첫 5분 의무 항목으로 패턴화 — `git status` + `git log --oneline -5` + `gh run list --limit 3` 3종 + `plan vs HEAD diff` 확인 후 plan 진입. ② Component 변경 사이클(folder-picker-ux finding 1)이 끝나면 영향 받는 e2e specs를 plan-brief.md §retro에 명시 — 본 사이클은 spec sync 누락이 별 사이클(이번 fixup)로 분리되어 commit history 분기 발생. ③ Phase 2 input에 component 정확한 경로(`!process.env.CI` vs `!!process.env.CI`) 직접 grep 후 작성 — typo 시 Codex 응답 결론 자체는 유지됐으나 future-self 혼동 위험.
