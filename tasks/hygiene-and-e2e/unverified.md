@@ -21,7 +21,11 @@ Codex Phase 2 verdict: **CONDITIONAL APPROVE** — 2 follow-up 항목을 본 사
 
 ### #1 [P2] Token-path real verification unit test
 
-**문제**: e2e stub이 `verifyAndConsumeToken` (`lib/server/burn/token.ts:94`)를 우회. 향후 token 스펙 변경 (예: 새 claim 추가, header 검증 강화) 시 e2e는 그린이지만 prod는 500.
+**상태**: ✅ [resolved by `__tests__/burn-route-token-integration.test.ts` 2026-05-22, Option C — route-layer integration]
+
+**해결 요약**: Plan `~/.claude/plans/rosy-greeting-crab.md` Option C 채택. unverified.md 액면가(B1) `__tests__/burn-token-verify.test.ts`는 commit 8e435d2 `burn-token.test.ts`와 100% 중복으로 폐기. 진짜 gap이 route layer(e2e `route.fulfill` + period-gate.test.ts `vi.mock` 우회)에 있다는 사전 조사 결과를 반영해 `/api/burnindex` POST + `/api/telemetry/auto-detect` POST 양쪽에 real-issued token 경유 통합 테스트 10케이스 추가. invariant: `@/lib/server/burn/token` 모듈 mock 0건 (sanity check 통과 — 임시 mock 추가 시 cases 3/4/5/7/8/10 + 8-replay 총 7 fail로 진짜 token 경로 검증 자체 증명).
+
+**문제** (원본 기록 보존): e2e stub이 `verifyAndConsumeToken` (`lib/server/burn/token.ts:94`)를 우회. 향후 token 스펙 변경 (예: 새 claim 추가, header 검증 강화) 시 e2e는 그린이지만 prod는 500.
 
 **필요 작업**:
 - `__tests__/burn-token-verify.test.ts` 신규 작성
