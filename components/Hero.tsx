@@ -16,11 +16,11 @@ function ProductShot({ tab }: { tab: HeroTab }) {
   if (tab === "burn") {
     return (
       <div className="product-shot product-shot-burn">
-        <div className="product-shot-header">
+        <div className="product-shot-header" data-testid="product-shot-header">
           <span className="product-shot-label">Burn Index · Live</span>
           <span className="product-shot-dot" />
         </div>
-        <div className="product-shot-rows">
+        <div className="product-shot-rows" data-testid="product-shot-content" data-mask="dynamic">
           {[
             { rank: 1, handle: "@shellcoder", ves: "201.7", cost: "$4.20" },
             { rank: 2, handle: "@tinyshipper", ves: "197.8", cost: "$3.60" },
@@ -40,11 +40,11 @@ function ProductShot({ tab }: { tab: HeroTab }) {
   if (tab === "challenge") {
     return (
       <div className="product-shot product-shot-challenge">
-        <div className="product-shot-header">
+        <div className="product-shot-header" data-testid="product-shot-header">
           <span className="product-shot-label">Challenge · Active</span>
           <Badge kind="accent">$50 reward</Badge>
         </div>
-        <div className="product-shot-body">
+        <div className="product-shot-body" data-testid="product-shot-content" data-mask="dynamic">
           <p className="product-shot-title">Fix a real Lighthouse regression</p>
           <p className="product-shot-meta">14 participants · 48h remaining</p>
           <div className="product-shot-code">
@@ -57,10 +57,10 @@ function ProductShot({ tab }: { tab: HeroTab }) {
   }
   return (
     <div className="product-shot product-shot-drops">
-      <div className="product-shot-header">
+      <div className="product-shot-header" data-testid="product-shot-header">
         <span className="product-shot-label">Workflow Drops</span>
       </div>
-      <div className="product-shot-drop-list">
+      <div className="product-shot-drop-list" data-testid="product-shot-content" data-mask="dynamic">
         {[
           { title: "Low-Cost Debugging", badge: "Free" },
           { title: "Claude Code Review Loop", badge: "$24" },
@@ -78,7 +78,7 @@ function ProductShot({ tab }: { tab: HeroTab }) {
 
 function HeroSecondaryCard() {
   return (
-    <div className="hero-secondary-card">
+    <div className="hero-secondary-card" data-testid="hero-secondary-card" data-mask="dynamic">
       <div className="hero-secondary-row">
         <span className="hero-secondary-label">Top VES</span>
         <span className="hero-secondary-value accent">201.7</span>
@@ -100,30 +100,30 @@ export function Hero({ onJoin, onChallenge }: HeroProps) {
   const activeTab: HeroTab = SHOW_LEGACY ? tab : "burn";
 
   return (
-    <section className="hero-v3" id="hero">
+    <section className="hero-v3" id="hero" data-testid="hero-section">
       <div className="hero-inner">
         <div className="hero-left">
-          <div className="hero-eyebrow">
+          <div className="hero-eyebrow" data-testid="hero-eyebrow">
             <span className="eyebrow-dot" />
             Burn Index · public leaderboard
           </div>
-          <h1 className="hero-headline">
+          <h1 className="hero-headline" data-testid="hero-headline">
             Burn Index puts a number on your{" "}
             <span className="hero-accent">drag</span>.
           </h1>
-          <p className="hero-sub">
+          <p className="hero-sub" data-testid="hero-sub">
             {SHOW_LEGACY
               ? "Track your AI coding burn, compete in verified cost-per-fix challenges, and learn the workflows behind top builders."
               : "Get your burn score. See where you rank against verified solo devs."}
           </p>
-          <div className="hero-chips">
+          <div className="hero-chips" data-testid="hero-chips">
             <span className="hero-chip">Claude Code</span>
             <span className="hero-chip">Codex</span>
             <span className="hero-chip">Cursor</span>
             <span className="hero-chip">+ more</span>
           </div>
-          <div className="hero-actions">
-            <Button variant="primary" size="lg" onClick={onJoin}>
+          <div className="hero-actions" data-testid="hero-cta-group">
+            <Button variant="primary" size="lg" onClick={onJoin} data-testid="hero-cta-primary">
               Join Burn Index
             </Button>
             {SHOW_LEGACY && (
@@ -135,7 +135,7 @@ export function Hero({ onJoin, onChallenge }: HeroProps) {
           <HeroSecondaryCard />
         </div>
 
-        <div className="hero-right">
+        <div className="hero-right" data-testid="hero-right">
           {SHOW_LEGACY && (
             <div className="hero-tabs">
               {(["burn", "challenge", "drops"] as HeroTab[]).map((t) => (

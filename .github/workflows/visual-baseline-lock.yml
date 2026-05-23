@@ -1,0 +1,73 @@
+# visual-baseline-lock.yml — Track 4 Step C one-shot baseline generator.
+#
+# Why workflow_dispatch (not push trigger): baseline generation is destructive
+# to baseline determinism. Every run produces fresh PNGs that overwrite the
+# committed lock. A push trigger would re-bake the baseline on every commit
+# and defeat the entire regression-lock purpose. Manual dispatch makes
+# "I am intentionally rebasing the visual baseline" an explicit owner action.
+#
+# Workflow lifecycle:
+#   1. Owner runs: gh workflow run visual-baseline-lock.yml
+#   2. Job spins up Ubuntu, builds prod, runs visual.spec.ts with
+#      --update-snapshots → 3 PNGs land in e2e/visual.spec.ts-snapshots/
+#   3. Job uploads PNGs as artifact "visual-baseline"
+#   4. Owner downloads artifact, copies PNGs to repo, commits with
+#      explicit message ("rebase visual baseline: <reason>")
+#   5. Push triggers ci.yml visual job which compares future PRs against
+#      the newly committed baseline
+#
+# Keeping this workflow permanently (not C-6 deleted) means future
+# rebaselines (font upgrade, intentional layout change) follow the same
+# one-shot dispatch → artifact → commit dance — no need to re-author
+# the temp step every time. The cost is one extra workflow file in the
+# repo; the benefit is a documented, repeatable rebaseline procedure.
+
+name: Visual baseline lock (one-shot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why are you rebasing? (e.g. font upgrade, intentional hero layout change)"
+        required: true
+        type: string
+
+jobs:
+  generate-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Generate visual baseline (prod build)
+        # --config=playwright.config.visual.ts uses `next build && next start`
+        # — the only mode producing reproducible CSS chunk hashes.
+        # --update-snapshots forces fresh PNG generation.
+        run: npx playwright test --config=playwright.config.visual.ts --update-snapshots
+
+      - name: Upload baseline artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baseline
+          path: e2e/visual.spec.ts-snapshots/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Echo download instructions
+        run: |
+          echo "=== Baseline generated. Reason: ${{ inputs.reason }} ==="
+          echo "Download with:"
+          echo "  gh run download ${{ github.run_id }} -n visual-baseline -D /tmp/visual-baseline"
+          echo "Then commit:"
+          echo "  cp /tmp/visual-baseline/*.png e2e/visual.spec.ts-snapshots/"
+          echo "  git add e2e/visual.spec.ts-snapshots/"
+          echo "  git commit -m 'chore(visual): rebase baseline — ${{ inputs.reason }}'"

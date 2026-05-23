@@ -20,6 +20,13 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  // visual.spec.ts MUST only run via playwright.config.visual.ts (prod build).
+  // If picked up under dev mode (this config's webServer), Turbopack CSS hash
+  // drift produces non-deterministic baseline diffs — silent rot of the
+  // baseline lock. Excluding it from the default project keeps the dev-mode
+  // e2e harness (preflight + hero-fold + testid-coverage) fast and the visual
+  // baseline single-source-of-truth.
+  testIgnore: /visual\.spec\.ts/,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -28,6 +35,41 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3002",
     trace: "on-first-retry",
+    // Visual regression baseline stability (Track 4 — Codex A-0 권장).
+    // DPR=1 keeps raster integer-pixel; en-US/UTC/light pin locale-derived
+    // chrome (date strings, time formats, prefers-color-scheme).
+    // reducedMotion option omitted: @playwright/test@1.60.0 TestOptions
+    // typedef doesn't expose it, and expect.toHaveScreenshot.animations
+    // "disabled" below already freezes CSS animations for visual baselines
+    // (the only place motion would corrupt a raster).
+    deviceScaleFactor: 1,
+    locale: "en-US",
+    timezoneId: "UTC",
+    colorScheme: "light",
+    launchOptions: {
+      // font-render-hinting=none + disable-font-subpixel-positioning +
+      // disable-skia-runtime-opts: 3 flags absorb most macOS↔Linux raster diff.
+      // force-color-profile=srgb (Codex A-0 #1) pins ICC profile so wide-gamut
+      // displays don't shift baseline colors.
+      args: [
+        "--font-render-hinting=none",
+        "--disable-font-subpixel-positioning",
+        "--disable-skia-runtime-opts",
+        "--force-color-profile=srgb",
+      ],
+    },
+  },
+  expect: {
+    // maxDiffPixelRatio 0.02 start (Codex A-0 #3): 0.005 generates false
+    // positives until 10× CI runs stabilize. Tighten to 0.01 → 0.005 after
+    // 6-week ops data. threshold=0.15 per-pixel color tolerance.
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.02,
+      threshold: 0.15,
+      animations: "disabled",
+      caret: "hide",
+      scale: "css",
+    },
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
