@@ -144,7 +144,7 @@ export function Hero({ onJoin, onChallenge }: HeroProps) {
                   className={`hero-tab${tab === t ? " hero-tab-active" : ""}`}
                   onClick={() => setTab(t)}
                 >
-                  {t === "burn" ? "Burn Index" : t === "challenge" ? "Challenges" : "Drops"}
+                  {t === "burn" ? "Burn Index" : t === "challenge" ? "Challenges" : "Workflow Drops"}
                 </button>
               ))}
             </div>
