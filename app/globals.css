@@ -2077,7 +2077,14 @@ textarea.form-input {
   .footer-inner { grid-template-columns: 1fr; gap: 32px; }
   .footer-links { grid-template-columns: repeat(2, 1fr); }
   .hero-inner { grid-template-columns: 1fr; gap: 40px; }
-  .hero-right { order: -1; }
+  /* Track 2 (2026-05-23) HYBRID lock policy:
+     above-fold primary path = headline + sub + CTA
+     secondary-card MAY appear after CTA as trust continuation (allowed, not invasion)
+     ProductShot MUST NOT enter fold (hidden on mobile)
+     eyebrow/chips hidden on mobile to keep CTA path uncluttered. */
+  .hero-eyebrow { display: none; }
+  .hero-chips { display: none; }
+  .hero-right { display: none; }
   .builders-layout { grid-template-columns: 1fr; }
   .lb-v3 .lb-head, .lb-v3 .lb-row {
     grid-template-columns: 28px 1fr 100px 60px;
