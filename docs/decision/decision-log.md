@@ -544,3 +544,17 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 무엇이 잘 됐나: codex 사전 검토 1회로 premise mismatch(모바일 nav-links 이미 hidden)를 실측 전 검출 → shortLabel 도입 + a11y/analytics 분리 + Footer hardcoded 정합 등 약 3 파일·40+ 라인 변경을 사전 회피. Playwright 측정 스크립트(`scripts/measure-nav.mjs` 9 viewport + wrap/overlap detection)가 1회 실행으로 Gate A/B 판정 자동화 — 향후 nav label 변경 회귀 가드로 재사용 가능(Track 4 visual baseline 후보). 위험 3축 0/3 충족 + Fast-Path 진입 조건 부합으로 검증 분리 원칙 면제, owner 단독 "no-op 완료" 발화 정당.
 - 다음엔 무엇을 바꿀까: ① `scripts/measure-nav.mjs` 의 wrap detection heuristic `rectHeight > lineHeight*1.25`는 padding-induced bloat에서 false positive(desktop 3 viewport 전부 wrap=WRAP 오판) — heuristic을 `scrollWidth > clientWidth` 단일 신호로 단순화하거나 padding 차감 후 비교로 정정. Track 4 visual baseline 도입 시 본 스크립트를 e2e/nav-width.spec.ts로 승격하면 자동 갱신 후보. ② Track 3 plan의 premise("모바일 375에서 14자 라벨 overflow 가능")는 owner 직관 기반 — 안 2 사이클 후속이라 mobile breakpoint 검토 누락. plan template에 "premise validation step 0"(grep 대상 selector의 CSS visibility 확인) 항목 추가 안건. ③ `.nav-link { white-space: nowrap }` 방어 패턴은 본 사이클 미채택(실측 통과) — Track 5 retro 안건으로 이월, 향후 V3_NAV 라벨 추가 시 일괄 적용 검토.
 
+
+
+---
+
+### 2026-05-23 잔존 로컬 브랜치 마무리 + cherry vs ancestry 검증
+- 문제: 4 local branches 잔존. ancestry로만 분류 시 C(chore/ci) 4 unique → 미머지 오판
+- 버린 대안: (a) ancestry 단독 → squash-merge 놓침 / (b) `gh pr list --state all` 단독 → 로컬 브랜치 컨텍스트 부족
+- 핵심 트레이드오프: cherry -v 추가 1 step vs 잘못된 보존/삭제 위험
+- 선택 이유: codex 적대적 검토 "가장 큰 사각지대" 즉시 적용. C는 squash-merged stale, D는 진짜 WIP로 분리
+- 강한 증거: `git cherry -v origin/main chore/ci-github-actions` 4개 commit 전부 `-` (content-equivalent). PR #2 머지 2026-05-20 확인
+
+[S10 회고]
+- 무엇이 잘 됐나: ancestry+cherry+PR 삼중 검증으로 C(squash-merged stale, `-D` retire)와 D(post-merge WIP 8 commits, default keep)를 정반대 결정으로 분리. archive tag 4개(`archive/<name>-2026-05-23`) 사전 작성으로 reflog 90일 만료 후에도 복구 가능. owner per-branch delegation("/codex와 토론해서 네가 결정해줘") + Tier 1 #4 destructive 명시 게이트(default=keep)로 D는 보존 — codex 권고 "기본값은 keep" 그대로 적용. Track 1 archive → Track 2 detach(`git switch --detach origin/main`, sister web/ main 점유 우회) → Track 4 local delete(-d×2 + -D×1) → Track 5 remote delete(A/C ALIVE, B GONE no-op) 7 Track 순차 0 회귀 통과. plan 예측 vs 실측 1건 발산(A remote ALIVE — plan은 GONE 예측)도 ls-remote 사전 점검으로 흡수.
+- 다음엔 무엇을 바꿀까: ① branch 정리 routine에 `git cherry -v origin/main <branch>` 단계를 default로 편입 — owner 분류표 제시 전 자동 실행, ancestry-merged ≠ content-merged 함정 사전 차단. ② multi-worktree 환경에서 현재 worktree HEAD가 삭제 대상 branch에 걸린 경우 `git switch --detach origin/main` default 패턴화 — `git checkout main` 차단 회피 + workflow state pollution 0. ③ archive tag 6개월 미참조 cleanup 정책은 harness-loop.md "페이즈별 git tag" §와 정합 — 2026-11-23 점검 backlog 등록 안건.
