@@ -18,6 +18,82 @@ S0에서 작성, S10에서 회고 2줄 추가.
 
 ---
 
+### 2026-05-23 Above-fold + Sticky-header DOM invariant gate (Playwright, screenshot baseline deferred)
+
+- 문제: HYBRID lock 3 invariants(mobile 375 fold=H+sub+CTA / cta_bottom≤640 /
+  hero-right hidden ≤920px) + sticky-header nav wrap·overlap 0건은 모두 CSS
+  driven layout이라 vitest 단위 테스트로 검출 불가. "Drops"→"Workflow Drops"
+  14자 변경 + display:none 조건이 3번 사이클에 걸쳐 silent drift됐던 영역.
+- 버린 대안: (a) Playwright `toHaveScreenshot` baseline lock — codex Track 4
+  검토에서 "Linux CI vs macOS local font raster 차이가 first-green-baseline
+  안티패턴의 가장 큰 진입로"로 지적 / (b) 단위 컴포넌트 테스트 — CSS @media
+  query 적용 후 actual `display` value를 못 봄 / (c) E2E를 prod build로
+  돌려서 `next dev`와 분리 — DOM gate는 dev/prod 양쪽에서 결정적이므로 불필요
+- 핵심 트레이드오프: DOM gate만 lock하면 색·간격·typography 회귀를 못 잡지만,
+  HYBRID lock의 3 invariants는 모두 `display`/`boundingBox.height`/horizontal
+  rect 비교로 충분 검증 가능. baseline screenshot은 Linux Chromium font 환경
+  lock 후 next cycle에서 추가.
+- 선택 이유: 영구 invariant 3개를 다음 사이클에 미루지 말고 즉시 deterministic
+  gate로 lock(`e2e/hero-fold.spec.ts` 9 tests, ~9s). codex 6 corrections 반영
+  — fonts.ready/animation disable global(addInitScript) / 920 boundary 포함 /
+  nav-link rect/lineHeight 비교 폐기(`.nav-link` padding 6px 12px가
+  rect=lineHeight+12px로 false positive) → `scrollWidth ≤ clientWidth` +
+  nav-container right vs CTA left gap ≥ -1px.
+- 강한 증거: Track 1 실측 cta_bottom=467.19 → 임계 640까지 173px 헤드룸.
+  9 tests 첫 실행 100% pass(current main HEAD). Next 16 official Playwright
+  docs `node_modules/next/dist/docs/01-app/02-guides/testing/playwright.md`
+  L136-138 "production code로 돌리라" 권고는 screenshot baseline용이고 DOM
+  invariant gate에는 적용 안 됨(dev server에서도 동일 결과). 기존 ci.yml e2e
+  job L51 `npx playwright test`(필터 없음)이 본 spec 자동 픽업.
+
+[S10 회고]
+- 무엇이 잘 됐나: codex Track 4 사전 검토에서 "first-green-baseline 안티패턴"
+  지적 → screenshot baseline을 다음 사이클로 미루고 DOM invariant gate만 단독
+  lock한 판단이 정확. nav-link wrap 검출 시 `rectHeight > lineHeight*1.25`
+  heuristic을 폐기하고 `scrollWidth ≤ clientWidth`로 단순화한 것도 codex 6
+  corrections 중 false-positive 회피의 핵심. 9 tests 첫 실행 100% pass + ci.yml
+  무수정 auto-pickup으로 추가 운영 비용 0.
+- 다음엔 무엇을 바꿀까: screenshot baseline은 Linux Chromium font 환경을 CI에서
+  먼저 lock한 뒤 다음 cycle에 추가(현 cycle에서 무리하게 합치면 font raster diff
+  flake가 누적). hero-secondary-card 동적 카운트(VES/spend)는 baseline 도입 시
+  `mask` 의무. DOM gate는 invariant 3개에 한정 — typography/color 회귀는 별도
+  axis로 분리(통합 spec 금지).
+
+---
+
+### 2026-05-23 Turbopack root 상위 디렉토리 지정 (symlink guard 적용)
+
+- 문제: web-landing-mvp-4/node_modules가 sister web/로의 symlink. Next.js 16
+  Turbopack이 filesystem root 밖 symlink를 거부 (FATAL panic
+  `Symlink invalid, it points out of the filesystem root`). dev/build 전면 차단.
+- 버린 대안: (a) node_modules symlink 제거 + 로컬 npm install — sister 동기화
+  추적 부담 / (b) `next dev --webpack` fallback — Next 16 신기능 못 씀
+- 핵심 트레이드오프: `turbopack.root: path.join(__dirname, "..")` 상위 지정 시
+  filesystem watching perimeter 확장 (Next docs cache miss 증가 경고) vs
+  symlink 유지로 sister 디렉토리 동기화 이점 보존.
+- 선택 이유: codex 적대적 검토에서 "dependency ownership drift" 지적 →
+  `fs.lstatSync().isSymbolicLink()` guard로 symlink 일 때만 옵션 적용. CI
+  환경(npm ci로 실재 node_modules 설치)에서는 자동 no-op. AGENTS.md 의무 read 후
+  official docs L113-120 패턴 차용.
+- 강한 증거: Next.js 16 release notes `turbopack.root` 옵션 공식 등재. 4축
+  검증 — 라우트 `200 OK` / `.hero-headline` 렌더 / Playwright 1.60.0 가용 /
+  `Ready in 282ms` (FATAL 0건).
+
+[S10 회고]
+- 무엇이 잘 됐나: codex 적대적 검토에서 "dependency ownership drift" 지적을
+  받자마자 `fs.lstatSync().isSymbolicLink()` guard로 conditional 적용한 패턴이
+  로컬 sister-symlink ↔ CI npm-ci 환경 양쪽에서 자동 분기 작동. AGENTS.md "NOT
+  the Next.js you know" 의무 read를 우회하지 않고 Next 16 official docs 패턴을
+  그대로 차용해 추측 0건. Track 0 decision-log entry를 사이클 종료까지 보류하지
+  않고 즉시 작성한 codex 비판 #7 반영도 후속 Track의 컨텍스트 손실 차단에 기여.
+- 다음엔 무엇을 바꿀까: monorepo `pnpm`/`turborepo` 정식 도입 시 sister-symlink
+  workaround는 폐기 대상 — turbopack.root 상위 지정 자체가 cache miss 증가
+  trade-off라 영구 해법 아님. CI 환경에서 `next build` 실측이 본 cycle에 누락
+  (Track 0-7 미완료 위험으로 기록만) → 다음 사이클 의무 추가. Next 16 minor
+  업그레이드 시 `turbopack.root` API 변경 가능성을 release notes diff로 체크.
+
+---
+
 ### 2026-05-18 usage PoC — 단가표 확장 + estimate_cost.py
 
 - 문제: `estimate_cost.py`가 cost를 추정하려면 전 모델 단가표가 필요한데, 초기
@@ -452,4 +528,19 @@ S0에서 작성, S10에서 회고 2줄 추가.
 [S10 회고]
 - 무엇이 잘 됐나: 3차 /senior 5단계 dispatch(brand-creative-director-ko + brand-copywriter-ko + fa-devils-advocate + /codex + /cc-gemini-plugin:gemini + marketing-skills:page-cro)가 안 2 lock 근거를 5축으로 교차검증 — 특히 devil 시나리오 4(Hero 라인업 충돌 42-50% 인지 실패율) 정량화가 Option A 직설 카피("Burn Index puts a number on your drag.") 채택 hard gate가 됨. /codex 정적 검증으로 teal #0F766E WCAG AA 5.47:1 PASS + DESIGN.md token PASS + above-fold invariant PASS 3종 모두 사전 확인 → S6 구현 단계에서 lint 회귀 0건. 13항목 체크리스트가 6단계 Phase A-F로 자연 분할돼 owner Happy Path Gate(verbal "확인했어 통과") 작동, DESIGN.md ## Overview + Do's/Don'ts 동시 개정으로 prose 4섹션 invariant ↔ 안 2 FAIL 사전 해소. BurnIndexSection 260L → 296L (350L 한도 내) + TrustSection/FinalCTA 삭제로 cross-file -58L 추정치 부합.
 - 다음엔 무엇을 바꿀까: ① Mobile 375x667 fold fit 검증을 plan v1 단계(S3)에 의무 항목으로 명시 — 본 사이클은 Phase F 직전에야 nav-tagline 가용 폭 한계(140px max-width + ellipsis fallback) 발견 후 Option 2(축소 노출) 결정. ② Turbopack 16.2 cross-worktree symlink 한계(`Symlink ... points out of the filesystem root`)는 `npx next dev --webpack` fallback 사용 — 다음 worktree 작업 시 dev server 명령 default를 webpack으로 두고 plan template에 명시. ③ V3_NAV "Challenges"/"Drops" 링크가 안 2 IA에서 anchor 없는 silent 404 → 별 사이클로 정리(본 사이클 scope 외, GA `nav_link_click_404` 모니터링 후 결정). ④ smoke-golden-regression.md owner 직접 손기록은 verbal confirmation으로 대체했음 — 다음 헤비 사이클부터 Owner Happy Path Gate 직접 파일 기록 강제(harness-loop B3 자동 우회 차단).
+
+
+---
+
+### 2026-05-23 [Track 3 — Nav width Gate A no-op (mobile premise refuted)]
+
+- 문제: 2026-05-23 안 2 머지 사이클에서 V3_NAV "Drops"(5자) → "Workflow Drops"(14자) 변경. 375x667 모바일 sticky-header에서 nav-links + "Join Burn Index" CTA가 동시 표시될 경우 width overflow / wrap 가능성. 단계별 plan(`~/.claude/plans/context-precious-flute.md` Track 3)에서 Playwright 9개 viewport(375/390/430/767/768/920/921/1024/1280) 실측 후 wrap·overlap 발생 시 `V3_NAV.shortLabel?: string` + a11y(`aria-label` long) + analytics(`data-analytics-label` long) 분리 도입 예정.
+- 버린 대안: ① 즉시 `shortLabel: "Drops"` 추가(premise 검증 없이) — codex Track 3 적대적 검토(`/tmp/codex-track-3.txt`)에서 a11y 함정 3건 지적: 스크린리더 의미 손실 / analytics funnel 혼재 / desktop ≥768px viewport branching 누락. 본 안 동시 채택 위험 High. ② `.nav-link { white-space: nowrap }` 방어 추가 — 본 사이클은 실측 후 결정으로 보류, Track 5 retro 안건으로 이월. ③ Footer.tsx hardcoded "Workflow Drops" → V3_NAV consumer 100% 통일(codex 제안) — drift TIL의 "Footer는 desktop 공간 충분 + semantic 분리" owner 결정 존중하여 미채택.
+- 핵심 트레이드오프: shortLabel 도입 시 시각 표시(short) ↔ a11y/analytics(long) 분리로 SSOT 위반 위험 vs 모바일 viewport 실측 0 회귀 보존(no-op). Playwright 9 viewport 실측의 약 15분 cost vs premise 미검증 채택 시 retro에서 rollback 부담. codex 사전 검토 1회 비용으로 premise mismatch 사전 검출.
+- 선택 이유: codex 적대적 검토에서 **premise mismatch 직접 검출** — `app/globals.css` L1242 `@media (max-width: 920px) { .nav-links { display: none; } }` 가 모바일(≤920px)에서 nav-links 전체를 숨김. 따라서 "Workflow Drops" 라벨 변경은 모바일 렌더 자체에 영향 없음(zero visual impact). 실측 대상은 desktop ≥921px로 이동. Playwright 9 viewport 실측 결과 desktop(921/1024/1280)에서 `scrollWidth == clientWidth`(91/91, 93/93, 124/124) → 텍스트 1-line 적합 + nav-links right ↔ cta left gap 139-498px → wrap·overlap 모두 0건. `.nav-link { padding: 6px 12px; font-size: 13px }`로 rectHeight 31.5px = lineHeight 19.5 + padding 12 누적은 padding-induced bloat이지 실제 wrap이 아님. Gate A 통과 → Step 3-3 shortLabel 구현 / Step 3-4 재측정 / Step 3-7 머지 전부 skip(no-op verdict). 위험 3축 0/3 충족(① 실패비용 < 2시간 ② 영향범위 0 ③ 관찰가능성 충족 — Playwright 실측 직접 검출).
+- 강한 증거: ① codex Track 3 사전 검토(`codex exec --sandbox read-only --skip-git-repo-check` default gpt-5.5, `/tmp/codex-track-3.txt`)에서 "shortLabel은 기본 해법으로 두지 않는 게 맞다" 결론 + 모바일 nav-links display:none 직접 지적 / ② globals.css L1240-1254 mobile breakpoint 직접 read 확인 / ③ Nav.tsx L18-29 nav-links + nav-actions DOM 구조 직접 read 확인 / ④ Playwright 측정 스크립트(`scripts/measure-nav.mjs`) 9 viewport 실행 결과: 375-920에서 navLinkCount=0 또는 navLinksContainer.width=0 (mobile hidden), 921-1280에서 scrollWidth==clientWidth + gap ≥139px(desktop OK) / ⑤ 검증 게이트 3종 통과 — `npx tsc --noEmit` 0 errors / `npx @google/design.md lint DESIGN.md` error 0 warning 0 / `wc -l components/BurnIndexSection.tsx` 296 ≤ 350(Tier1 #10 invariant). AGENTS.md 의무 read 후 Next.js 16 routing 영향 없음 재확인.
+
+[S10 회고]
+- 무엇이 잘 됐나: codex 사전 검토 1회로 premise mismatch(모바일 nav-links 이미 hidden)를 실측 전 검출 → shortLabel 도입 + a11y/analytics 분리 + Footer hardcoded 정합 등 약 3 파일·40+ 라인 변경을 사전 회피. Playwright 측정 스크립트(`scripts/measure-nav.mjs` 9 viewport + wrap/overlap detection)가 1회 실행으로 Gate A/B 판정 자동화 — 향후 nav label 변경 회귀 가드로 재사용 가능(Track 4 visual baseline 후보). 위험 3축 0/3 충족 + Fast-Path 진입 조건 부합으로 검증 분리 원칙 면제, owner 단독 "no-op 완료" 발화 정당.
+- 다음엔 무엇을 바꿀까: ① `scripts/measure-nav.mjs` 의 wrap detection heuristic `rectHeight > lineHeight*1.25`는 padding-induced bloat에서 false positive(desktop 3 viewport 전부 wrap=WRAP 오판) — heuristic을 `scrollWidth > clientWidth` 단일 신호로 단순화하거나 padding 차감 후 비교로 정정. Track 4 visual baseline 도입 시 본 스크립트를 e2e/nav-width.spec.ts로 승격하면 자동 갱신 후보. ② Track 3 plan의 premise("모바일 375에서 14자 라벨 overflow 가능")는 owner 직관 기반 — 안 2 사이클 후속이라 mobile breakpoint 검토 누락. plan template에 "premise validation step 0"(grep 대상 selector의 CSS visibility 확인) 항목 추가 안건. ③ `.nav-link { white-space: nowrap }` 방어 패턴은 본 사이클 미채택(실측 통과) — Track 5 retro 안건으로 이월, 향후 V3_NAV 라벨 추가 시 일괄 적용 검토.
 
