@@ -105,16 +105,16 @@ export function Hero({ onJoin, onChallenge }: HeroProps) {
         <div className="hero-left">
           <div className="hero-eyebrow">
             <span className="eyebrow-dot" />
-            AI coding efficiency · public leaderboard
+            Burn Index · public leaderboard
           </div>
           <h1 className="hero-headline">
-            Tiny tokens.<br />
-            <span className="hero-accent">Big ships.</span>
+            Burn Index puts a number on your{" "}
+            <span className="hero-accent">drag</span>.
           </h1>
           <p className="hero-sub">
             {SHOW_LEGACY
               ? "Track your AI coding burn, compete in verified cost-per-fix challenges, and learn the workflows behind top builders."
-              : "Track your AI coding burn and rank on the verified public leaderboard for cost-per-fix efficiency."}
+              : "Get your burn score. See where you rank against verified solo devs."}
           </p>
           <div className="hero-chips">
             <span className="hero-chip">Claude Code</span>

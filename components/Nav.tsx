@@ -11,9 +11,10 @@ export function Nav({ onJoin }: NavProps) {
   return (
     <nav className="nav-v3">
       <div className="nav-inner">
-        <a href="#" className="nav-logo">
+        <a href="#hero" className="nav-logo">
           CoconutLabs
         </a>
+        <span className="nav-tagline">Measure the burn. Own the ship.</span>
         <div className="nav-links">
           {V3_NAV.map((link) => (
             <a key={link.href} href={link.href} className="nav-link">
@@ -23,10 +24,7 @@ export function Nav({ onJoin }: NavProps) {
         </div>
         <div className="nav-actions">
           <Button variant="ghost" size="sm" onClick={onJoin}>
-            Join waitlist
-          </Button>
-          <Button variant="primary" size="sm" onClick={onJoin}>
-            Get early access
+            Join Burn Index
           </Button>
         </div>
       </div>

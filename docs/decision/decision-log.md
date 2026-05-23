@@ -449,5 +449,7 @@ S0에서 작성, S10에서 회고 2줄 추가.
 12. Sticky CTA outline/ghost 처리(Hero primary 차별)
 13. Mobile 375x667 viewport 실측(≤ 528px fold fit 확인) + `npx @google/design.md lint DESIGN.md` error 0 통과(S8 진입 게이트)
 
-[S10 회고 — 본 사이클 완료 후 추가]
+[S10 회고]
+- 무엇이 잘 됐나: 3차 /senior 5단계 dispatch(brand-creative-director-ko + brand-copywriter-ko + fa-devils-advocate + /codex + /cc-gemini-plugin:gemini + marketing-skills:page-cro)가 안 2 lock 근거를 5축으로 교차검증 — 특히 devil 시나리오 4(Hero 라인업 충돌 42-50% 인지 실패율) 정량화가 Option A 직설 카피("Burn Index puts a number on your drag.") 채택 hard gate가 됨. /codex 정적 검증으로 teal #0F766E WCAG AA 5.47:1 PASS + DESIGN.md token PASS + above-fold invariant PASS 3종 모두 사전 확인 → S6 구현 단계에서 lint 회귀 0건. 13항목 체크리스트가 6단계 Phase A-F로 자연 분할돼 owner Happy Path Gate(verbal "확인했어 통과") 작동, DESIGN.md ## Overview + Do's/Don'ts 동시 개정으로 prose 4섹션 invariant ↔ 안 2 FAIL 사전 해소. BurnIndexSection 260L → 296L (350L 한도 내) + TrustSection/FinalCTA 삭제로 cross-file -58L 추정치 부합.
+- 다음엔 무엇을 바꿀까: ① Mobile 375x667 fold fit 검증을 plan v1 단계(S3)에 의무 항목으로 명시 — 본 사이클은 Phase F 직전에야 nav-tagline 가용 폭 한계(140px max-width + ellipsis fallback) 발견 후 Option 2(축소 노출) 결정. ② Turbopack 16.2 cross-worktree symlink 한계(`Symlink ... points out of the filesystem root`)는 `npx next dev --webpack` fallback 사용 — 다음 worktree 작업 시 dev server 명령 default를 webpack으로 두고 plan template에 명시. ③ V3_NAV "Challenges"/"Drops" 링크가 안 2 IA에서 anchor 없는 silent 404 → 별 사이클로 정리(본 사이클 scope 외, GA `nav_link_click_404` 모니터링 후 결정). ④ smoke-golden-regression.md owner 직접 손기록은 verbal confirmation으로 대체했음 — 다음 헤비 사이클부터 Owner Happy Path Gate 직접 파일 기록 강제(harness-loop B3 자동 우회 차단).
 

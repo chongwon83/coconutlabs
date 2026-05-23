@@ -49,7 +49,6 @@ export const V3_NAV: NavLink[] = [
   { label: "Burn Index", href: "#burn" },
   { label: "Challenges", href: "#challenge" },
   { label: "Drops", href: "#drops" },
-  { label: "Trust & Safety", href: "#safety" },
 ];
 
 // Single source of truth for the collector repo URL — referenced from
