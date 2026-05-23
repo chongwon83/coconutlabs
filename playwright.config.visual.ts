@@ -24,6 +24,12 @@ export default defineConfig({
   // dev-mode contract tests; running them under prod build wastes ~60s of
   // build time per spec.
   testMatch: /visual\.spec\.ts/,
+  // Base config sets testIgnore: /visual\.spec\.ts/ so dev-mode runs exclude
+  // it. That ignore is inherited via spread and silently filters out the very
+  // file we want to run here — Playwright applies testIgnore AFTER testMatch,
+  // so the net set is empty ("No tests found"). Override to empty array to
+  // disable inheritance.
+  testIgnore: [],
 
   webServer: {
     // `next build` then `next start` — the only mode producing reproducible
