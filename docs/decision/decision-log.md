@@ -46,6 +46,19 @@ S0에서 작성, S10에서 회고 2줄 추가.
   invariant gate에는 적용 안 됨(dev server에서도 동일 결과). 기존 ci.yml e2e
   job L51 `npx playwright test`(필터 없음)이 본 spec 자동 픽업.
 
+[S10 회고]
+- 무엇이 잘 됐나: codex Track 4 사전 검토에서 "first-green-baseline 안티패턴"
+  지적 → screenshot baseline을 다음 사이클로 미루고 DOM invariant gate만 단독
+  lock한 판단이 정확. nav-link wrap 검출 시 `rectHeight > lineHeight*1.25`
+  heuristic을 폐기하고 `scrollWidth ≤ clientWidth`로 단순화한 것도 codex 6
+  corrections 중 false-positive 회피의 핵심. 9 tests 첫 실행 100% pass + ci.yml
+  무수정 auto-pickup으로 추가 운영 비용 0.
+- 다음엔 무엇을 바꿀까: screenshot baseline은 Linux Chromium font 환경을 CI에서
+  먼저 lock한 뒤 다음 cycle에 추가(현 cycle에서 무리하게 합치면 font raster diff
+  flake가 누적). hero-secondary-card 동적 카운트(VES/spend)는 baseline 도입 시
+  `mask` 의무. DOM gate는 invariant 3개에 한정 — typography/color 회귀는 별도
+  axis로 분리(통합 spec 금지).
+
 ---
 
 ### 2026-05-23 Turbopack root 상위 디렉토리 지정 (symlink guard 적용)
@@ -65,6 +78,19 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 강한 증거: Next.js 16 release notes `turbopack.root` 옵션 공식 등재. 4축
   검증 — 라우트 `200 OK` / `.hero-headline` 렌더 / Playwright 1.60.0 가용 /
   `Ready in 282ms` (FATAL 0건).
+
+[S10 회고]
+- 무엇이 잘 됐나: codex 적대적 검토에서 "dependency ownership drift" 지적을
+  받자마자 `fs.lstatSync().isSymbolicLink()` guard로 conditional 적용한 패턴이
+  로컬 sister-symlink ↔ CI npm-ci 환경 양쪽에서 자동 분기 작동. AGENTS.md "NOT
+  the Next.js you know" 의무 read를 우회하지 않고 Next 16 official docs 패턴을
+  그대로 차용해 추측 0건. Track 0 decision-log entry를 사이클 종료까지 보류하지
+  않고 즉시 작성한 codex 비판 #7 반영도 후속 Track의 컨텍스트 손실 차단에 기여.
+- 다음엔 무엇을 바꿀까: monorepo `pnpm`/`turborepo` 정식 도입 시 sister-symlink
+  workaround는 폐기 대상 — turbopack.root 상위 지정 자체가 cache miss 증가
+  trade-off라 영구 해법 아님. CI 환경에서 `next build` 실측이 본 cycle에 누락
+  (Track 0-7 미완료 위험으로 기록만) → 다음 사이클 의무 추가. Next 16 minor
+  업그레이드 시 `turbopack.root` API 변경 가능성을 release notes diff로 체크.
 
 ---
 
