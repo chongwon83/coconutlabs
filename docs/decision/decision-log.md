@@ -414,13 +414,40 @@ S0에서 작성, S10에서 회고 2줄 추가.
 
 ---
 
-### 2026-05-22 [Landing Page MVP-4 안 B — 11섹션 → Header/Hero/Burn Index/Trust+CTA 4섹션 축소]
+### 2026-05-22 [Landing Page MVP-4 안 B — 11섹션 → Header/Hero/Burn Index/Trust+CTA 4섹션 축소] [SUPERSEDED 2026-05-23 → 안 2 (3섹션 절충)]
 
 - 문제: coconutlabs.xyz 랜딩이 런칭 단계인데도 11섹션으로 비대 — owner 자체 진단 ① 섹션 시각 위계가 디자인적으로 희미함(spacing/contrast/typography rhythm 약함) ② 인지부하 과다(솔로 개발자/인디해커 타겟이 한 화면에 11개 메시지 소화 부담) ③ 핵심 CTA(waitlist) 도달까지 스크롤 깊이 과다. /senior advisory(5섹션 contract → DAG dispatch 3 rounds: 5-expert 병렬 → marketing-skills:page-cro 7축 audit → DESIGN.md anchor offline lint)에서 owner 옵션 a 채택. 안 A(2섹션 Burn+Challenges)와 안 C(6섹션 confidence-preserving) 사이에서 안 B(4섹션) 선택 — Brand Director 권고로 Challenges도 DEFER.
 - 버린 대안: ① 안 A 2섹션(Burn Index + Challenges만) — Header/Hero 없으면 카테고리 정의자 톤(VES 메트릭) 도입 anchor 부재 + waitlist CTA 위계 약화. ② 안 C 6섹션(How we measure + FAQ 유지) — 인지부하 감소 효과 약함(11→6도 여전히 과다). ③ 11섹션 그대로 두고 시각 위계만 보강 — 콘텐츠 양 자체가 본 문제, 시각 patch로 미봉. ④ /about 등 보조 페이지로 7섹션 분리(prune + redirect) vs 신규 페이지 전면 작성 — S3에서 owner 결정 위임.
 - 핵심 트레이드오프: 콘텐츠 정보량 보존(VES 메트릭 신뢰도, How we measure 투명성, Challenges 사회적 증명) vs 인지부하 감소(런칭 단계 첫인상은 단일 메시지 명확성이 본체). 4섹션 압축은 정보 보강을 /about·docs anchor link로 위임 — 호기심 유발 + 보조 페이지로 신뢰 근거 deferral. Trust 섹션 teal contrast 보정 필요(advisory offline lint에서 #0D9488 → #0F766E AA 4.5:1 PASS 확인).
 - 선택 이유: 솔로 개발자/인디해커 타겟의 의사결정 패턴(빠른 스캔 → 단일 가치 명제 흡수 → waitlist 결정)에 맞는 정보 밀도. Brand Director(VES 메트릭이 카테고리 정의자 톤의 핵심 anchor → Burn Index 섹션 보존 의무) + page-cro 7축(Visual Hierarchy 가장 취약 → 4섹션 압축으로 80px spacing/alt-background/per-section accent 5 패턴 적용 가능) + Brand Copywriter("Tiny tokens. Big ships." invariant 보존 + CTA "Start My Burn Index" outcome-focused 발산) 3축 합의. 위험 3축 2.5/3 충족(① 첫인상 회복 어려움 ② 4섹션 전면 개편 = 3+ 모듈 ③ waitlist 전환율 silent 실패 가능)이라 /codex 교차 리뷰 + /cso(이메일 수집) 의무.
 - 강한 증거: /senior advisory 3 rounds — Round 1 5-expert(brand-creative-director-ko / brand-copywriter-ko / analyst-market / voc-strategist / fa-devils-advocate) 병렬 결과 "4~6섹션 적정" 만장일치 + 섹션 3+7 redundancy 직접 지적 / Round 2 marketing-skills:page-cro 7축 진단에서 Visual Hierarchy가 가장 취약(spacing/contrast/typography rhythm 약함) 직접 확인 + Visual Hierarchy 5 패턴(80px section spacing / alt-background 2개 / H2 48px 균일화 / max-width 1200px container / per-section accent) 도출 / Round 3 DESIGN.md anchor offline lint 시뮬레이션에서 7 룰 중 1건(`tertiary #0D9488` Trust 섹션 contrast 3.4:1 AA 미달) 사전 검출 → `#0F766E` 보정안 도출. AGENTS.md 경고 "This is NOT the Next.js you know — breaking changes" 인지 → S3 plan v1 첫 단계에 `node_modules/next/dist/docs/` 사전 확인 의무 명시 예정.
+
+[S10 회고 — 본 사이클 완료 후 추가 / SUPERSEDED 2026-05-23: 본 안 B는 안 2 (3섹션 절충)로 교체됨. 아래 2026-05-23 엔트리 참조]
+
+---
+
+### 2026-05-23 [Landing Page MVP-4 안 2 — 4섹션 안 B supersede → Sticky Header + Hero + Burn Index(with Trust subsection) 3섹션 절충]
+
+- 문제: 2026-05-22 안 B(4섹션 Header/Hero/Burn/Trust+CTA) 머지 직후 owner self-review에서 ① 여전히 정보 밀도 높음 ② Trust 섹션이 위계상 본 메시지(Burn Index) 약화 ③ 1차 page-cro 평가에서 Burn Index 산출물 형태(메트릭? 리더보드? 점수?)가 fold 5초 안에 인지 안 됨 — 3건 잔류 의심 발생. 4섹션 유지는 owner 명시 거부 → 3차 /senior option (a) dispatch로 2섹션(과압축) vs 3섹션(절충) 1안 lock 목표.
+- 버린 대안: ① 안 1 2섹션 압축(Hero에 Burn 통합 + Trust micro-proof로 흡수) — page-cro 1차 평가 3축 모두 FAIL(5초 명료성 / CTA hierarchy / mobile fold ~532px > 528px overflow). 정체성 anchor 약화 + Trust 면적 소실. ② 4섹션 유지(현 운영) — owner 명시 거부(HANDOFF.md §안티패턴). ③ Hero 카피 Option B(은유 우선) — devil's advocate 시나리오 4(Hero 라인업 충돌, 인지 실패율 42-50%) High Severity로 폐기. ④ alt-BG contrast 전역 #FAFAFA → #F5F5F5 — 영향범위 광역, 본 사이클 scope 외(L806 #burn 단일 lock으로 축소). ⑤ #safety 302 redirect 유지 — 외부 인바운드 silent 잔존, 4섹션 invariant 흔적 → 404 fallback + GSC 모니터링으로 완전 제거.
+- 핵심 트레이드오프: Trust 콘텐츠 100% 보존(V3_TRUST → BurnIndexSection prop 흡수) vs Trust 분리 위계 약화(-12~22% waitlist 전환 잠재 영향). Burn Index 단일 메시지 축 강화 + score+rank 산출물 명시(5초 명료성 회복) vs BurnIndexSection 비대화(260L → 320~340L, Tier1 #10 코드↔도메인 1:1 위반 후보, 350L 한도 lock). teal #008C5A(4.29:1 AA FAIL) → #0F766E(5.47:1 AA PASS) 보정으로 Trust 카드 contrast 정합 회복.
+- 선택 이유: 솔로 dev/indie hacker cold traffic의 5초 스캔 패턴 + Burn Index 단일 anchor 명료성 우선. Phase 1 brand-creative-director-ko 안 2 권고 + Phase 2a fa-devils-advocate 시나리오 4 (Hero 라인업 충돌 High) → Option A 직설 카피("Burn Index puts a number on your drag.") 채택 + Phase 2b /codex 정적 검증(DESIGN.md token PASS, above-fold invariant PASS, teal #0F766E WCAG AA PASS) + Phase 2c gemini cross-file(-58L~-20L, Next.js 16 SSR 영향 없음) + Phase 3 page-cro 회귀(3축 모두 PASS, 1축 S6 구현 조건부) 5단계 합의. 위험 3축 2/3 충족(② 5+ 모듈 영향 / ③ 첫인상 회복 어려움 silent fallback) → /codex 교차 리뷰 + S6 13항목 체크리스트 + GA `waitlist_signup_rate` 4주 모니터링 의무.
+- 강한 증거: 3차 /senior option (a) dispatch 5단계 — Phase 1 brand-creative-director-ko/copywriter-ko 안 2 + Option A 카피 권고 / Phase 2a fa-devils-advocate 시나리오 4 High(42-50% 인지 실패율) 정량화 + Option A 채택 권고 / Phase 2b /codex(`codex exec --sandbox read-only --skip-git-repo-check`, default gpt-5.5) DESIGN.md token PASS + above-fold invariant PASS + teal #0F766E WCAG AA 5.47:1 PASS / Phase 2c /cc-gemini-plugin:gemini cross-file -58L~-20L + Next.js 16 routing/SSR 영향 없음 + Suspense 격리 유지 / Phase 3 marketing-skills:page-cro 회귀 3축 PASS(5초 명료성 ✅ / CTA hierarchy ✅ / above-fold 30초 ✅ 조건부). Owner Happy Path Gate 통과: 4 항목 verbal lock 확정 + 5 의견 충돌 일괄 수용("이렇게 가자") + DESIGN.md prose 4섹션 invariant ↔ 안 2 FAIL → S6 동시 개정 의무 인지. AGENTS.md 경고 "This is NOT the Next.js you know" → S6 진입 전 `node_modules/next/dist/docs/` 사전 참조 의무 재확인.
+
+[S6 구현 의무 13항목 체크리스트]
+1. Hero 카피 3건 lock: value prop "Burn Index puts a number on your drag." / subhead "Get your burn score. See where you rank against verified solo devs." / CTA "Join Burn Index"(현행 유지)
+2. Sticky Header anchor lock: "Measure the burn. Own the ship."
+3. globals.css teal #0F766E 4 위치(L24:25 `--young-coconut-dark` / L29:15 `--verified` / L30 `--verified-soft` rgba 동기화 / L1090 SVG fill `%230F766E`)
+4. #safety 5 위치 완전 제거(lib/data.ts L52 V3_NAV / Footer.tsx L20 / globals.css L1105-1106 selectors / TrustSection.tsx L18 / LegacySections.tsx fallback)
+5. V3_TRUST → BurnIndexSection prop 흡수 + TrustSection.tsx + FinalCTA.tsx 파일 삭제
+6. LegacySections.tsx FinalCTA import 제거 + return null fallback
+7. DESIGN.md ## Overview 동시 개정(L100-106 "four vertical sections" → "three vertical sections — Sticky Header, Hero, and a combined Burn Index + Trust section" / L226-227 "Do keep the four landing sections" → "Do keep the three landing sections in order: Sticky Header, Hero, Burn Index (with embedded Trust subsection)")
+8. hairline divider class 신규(globals.css +5L)
+9. alt-BG contrast L806 #burn 단일 스코프(#FAFAFA → #F5F5F5)
+10. Sticky Header height 56px 압축
+11. Hero padding 24px 압축
+12. Sticky CTA outline/ghost 처리(Hero primary 차별)
+13. Mobile 375x667 viewport 실측(≤ 528px fold fit 확인) + `npx @google/design.md lint DESIGN.md` error 0 통과(S8 진입 게이트)
 
 [S10 회고 — 본 사이클 완료 후 추가]
 
