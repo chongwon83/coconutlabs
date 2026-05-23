@@ -18,6 +18,26 @@ S0에서 작성, S10에서 회고 2줄 추가.
 
 ---
 
+### 2026-05-23 Turbopack root 상위 디렉토리 지정 (symlink guard 적용)
+
+- 문제: web-landing-mvp-4/node_modules가 sister web/로의 symlink. Next.js 16
+  Turbopack이 filesystem root 밖 symlink를 거부 (FATAL panic
+  `Symlink invalid, it points out of the filesystem root`). dev/build 전면 차단.
+- 버린 대안: (a) node_modules symlink 제거 + 로컬 npm install — sister 동기화
+  추적 부담 / (b) `next dev --webpack` fallback — Next 16 신기능 못 씀
+- 핵심 트레이드오프: `turbopack.root: path.join(__dirname, "..")` 상위 지정 시
+  filesystem watching perimeter 확장 (Next docs cache miss 증가 경고) vs
+  symlink 유지로 sister 디렉토리 동기화 이점 보존.
+- 선택 이유: codex 적대적 검토에서 "dependency ownership drift" 지적 →
+  `fs.lstatSync().isSymbolicLink()` guard로 symlink 일 때만 옵션 적용. CI
+  환경(npm ci로 실재 node_modules 설치)에서는 자동 no-op. AGENTS.md 의무 read 후
+  official docs L113-120 패턴 차용.
+- 강한 증거: Next.js 16 release notes `turbopack.root` 옵션 공식 등재. 4축
+  검증 — 라우트 `200 OK` / `.hero-headline` 렌더 / Playwright 1.60.0 가용 /
+  `Ready in 282ms` (FATAL 0건).
+
+---
+
 ### 2026-05-18 usage PoC — 단가표 확장 + estimate_cost.py
 
 - 문제: `estimate_cost.py`가 cost를 추정하려면 전 모델 단가표가 필요한데, 초기
