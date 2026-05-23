@@ -48,7 +48,7 @@ export interface NavLink {
 export const V3_NAV: NavLink[] = [
   { label: "Burn Index", href: "#burn" },
   { label: "Challenges", href: "#challenge" },
-  { label: "Drops", href: "#drops" },
+  { label: "Workflow Drops", href: "#drops" },
 ];
 
 // Single source of truth for the collector repo URL — referenced from
