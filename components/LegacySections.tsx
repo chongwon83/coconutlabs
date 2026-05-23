@@ -3,7 +3,6 @@
 import { ChallengeSection } from "@/components/ChallengeSection";
 import { BuildersSection } from "@/components/BuildersSection";
 import { DropsSection } from "@/components/DropsSection";
-import { FinalCTA } from "@/components/FinalCTA";
 
 interface LegacySectionsProps {
   slot: "mid" | "final";
@@ -25,5 +24,5 @@ export default function LegacySections({
       </>
     );
   }
-  return <FinalCTA onJoin={onJoin} onChallenge={onChallenge} />;
+  return null;
 }

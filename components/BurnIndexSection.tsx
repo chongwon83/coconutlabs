@@ -3,16 +3,19 @@
 import { Fragment, useState } from "react";
 import {
   V3_BUILDERS,
+  V3_TRUST,
   fmtTokensCompact,
   fmtCostShort,
   type ImportedEntry,
 } from "@/lib/data";
-import { VerifBadge, Avatar, Trend } from "@/components/primitives";
+import { VerifBadge, Avatar, Trend, Icon } from "@/components/primitives";
 import { Sparkline } from "@/components/Sparkline";
 
 type Filter = "all" | "provider" | "device" | "estimated" | "selfrep";
 
 type Tier = "verified" | "estimated" | "selfrep";
+
+type TrustIcon = "shield" | "lock" | "eye" | "code";
 
 interface BurnIndexSectionProps {
   imported?: ImportedEntry[];
@@ -254,6 +257,39 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
           VES = verified fixes ÷ AI cost (USD). Higher is better.
           Verification badges: Provider-synced &gt; Device-synced &gt; Estimated &gt; Self-reported.
         </p>
+
+        <div className="burn-trust">
+          <h3 className="burn-trust-title">
+            Built for builders who own their data.
+          </h3>
+          <p className="burn-trust-sub">
+            We track efficiency metrics — never your code, prompts, or secrets.
+            The collection spec is public and auditable.
+          </p>
+
+          <div className="trust-grid">
+            {V3_TRUST.map((item, i) => (
+              <div key={i} className="trust-item">
+                <div className="trust-icon">
+                  <Icon name={item.icon as TrustIcon} size={20} />
+                </div>
+                <div className="trust-body">
+                  <h4 className="trust-title">{item.title}</h4>
+                  <p className="trust-text">{item.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="trust-note">
+            <Icon name="shield" size={14} />
+            <span>
+              CoconutLabs never stores raw prompts, source code, or file paths.
+              Only aggregated efficiency signals leave your device.{" "}
+              <a href="#" className="trust-link">Read the full collection spec →</a>
+            </span>
+          </div>
+        </div>
       </div>
     </section>
   );

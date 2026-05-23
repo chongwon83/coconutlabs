@@ -21,13 +21,13 @@
 
   /* Accents */
   --young-coconut: #00D084;
-  --young-coconut-dark: #008C5A;
+  --young-coconut-dark: #0F766E;
   --young-coconut-soft: rgba(0, 208, 132, 0.10);
   --young-coconut-vivid: #16F2A5;
   --coconut-husk: #525252;
   --burn-warm: #525252;
-  --verified: #008C5A;
-  --verified-soft: rgba(0, 208, 132, 0.10);
+  --verified: #0F766E;
+  --verified-soft: rgba(15, 118, 110, 0.10);
   --warning: #B45309;
   --warning-soft: rgba(245, 158, 11, 0.08);
   --danger: #DC2626;
@@ -803,7 +803,33 @@ button { font: inherit; cursor: pointer; }
 /* ============================================================
    Burn Index leaderboard
    ============================================================ */
-#burn { background: var(--surface-muted); padding-top: 120px; }
+/* alt-BG contrast 강화 (#FAFAFA → #F5F5F5) + Hero↔Burn 경계 hairline divider */
+#burn {
+  background: #F5F5F5;
+  padding-top: 120px;
+  border-top: 1px solid var(--border);
+}
+
+/* Burn Index 하단 Trust subsection (Phase B 흡수) */
+.burn-trust {
+  margin-top: 56px;
+  padding-top: 40px;
+  border-top: 1px solid var(--border);
+}
+.burn-trust-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--fg);
+  margin: 0 0 8px;
+}
+.burn-trust-sub {
+  font-size: 14px;
+  color: var(--fg2);
+  line-height: 1.6;
+  margin: 0 0 28px;
+  max-width: 640px;
+}
 
 .lb-v3 {
   background: #FFFFFF;
@@ -1087,7 +1113,7 @@ button { font: inherit; cursor: pointer; }
 .drop-card .includes li::before {
   content: "";
   width: 14px; height: 14px; flex: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23008C5A' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3 8.5l3 3 7-7'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%230F766E' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3 8.5l3 3 7-7'/%3E%3C/svg%3E");
   background-size: contain;
   background-repeat: no-repeat;
 }
@@ -1100,11 +1126,8 @@ button { font: inherit; cursor: pointer; }
 .drop-card .price-meta { font-family: var(--font-mono); font-size: 11px; color: var(--fg3); }
 
 /* ============================================================
-   Trust & Safety
+   Trust grid (Phase B: integrated into Burn Index subsection)
    ============================================================ */
-#safety { background: var(--surface); }
-#safety .trust-item { background: var(--surface-muted); }
-
 .trust-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .trust-item {
   background: #FFFFFF;
@@ -1217,6 +1240,16 @@ button { font: inherit; cursor: pointer; }
   #burn { padding-top: 72px; }
   .section-title { font-size: 32px; }
   .nav-links { display: none; }
+  /* 안 2: mobile에서도 정체성 anchor 노출 (devil 시나리오 1 완화 보존).
+     375px 가용 폭 한계 → font 10px + 좌측 padding 축소 + border 제거 + ellipsis fallback. */
+  .nav-tagline {
+    font-size: 10px;
+    padding-left: 6px;
+    border-left: none;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .lb-v3 .lb-head, .lb-v3 .lb-row { grid-template-columns: 32px 1fr 100px 80px; gap: 10px; padding: 0 14px; }
   .lb-tools { display: none; }
 }
@@ -1681,10 +1714,15 @@ textarea.form-input {
 /* Nav v3 */
 .nav-v3 { position: sticky; top: 0; z-index: 30; background: #FFFFFF; border-bottom: 1px solid var(--border); }
 .nav-logo { font-weight: 600; font-size: 14px; color: var(--fg); letter-spacing: -0.01em; text-decoration: none; margin-right: 8px; }
+.nav-tagline {
+  font-size: 12px; color: var(--fg2); letter-spacing: -0.005em;
+  font-weight: 400; padding-left: 10px; border-left: 1px solid var(--border);
+  margin-right: 4px; white-space: nowrap;
+}
 .nav-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
-/* Hero v3 */
-.hero-v3 { padding: 72px 0 64px; background: #FFFFFF; overflow: hidden; }
+/* Hero v3 — compressed top padding for 안 2 above-fold fit (mobile 375x667) */
+.hero-v3 { padding: 48px 0 56px; background: #FFFFFF; overflow: hidden; }
 .hero-inner {
   max-width: var(--max-w);
   margin: 0 auto;

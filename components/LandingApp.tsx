@@ -17,7 +17,6 @@ import { StatusBar } from "@/components/StatusBar";
 import { Hero } from "@/components/Hero";
 import { Ticker } from "@/components/Ticker";
 import { BurnIndexSection } from "@/components/BurnIndexSection";
-import { TrustSection } from "@/components/TrustSection";
 import { Footer } from "@/components/Footer";
 import { Toast } from "@/components/Toast";
 import { JoinBurnIndexForm } from "@/components/forms/JoinBurnIndexForm";
@@ -132,14 +131,6 @@ export default function LandingApp() {
         {LegacySections && (
           <LegacySections
             slot="mid"
-            onJoin={() => setModal("join")}
-            onChallenge={() => setModal("challenge")}
-          />
-        )}
-        <TrustSection onJoin={() => setModal("join")} />
-        {LegacySections && (
-          <LegacySections
-            slot="final"
             onJoin={() => setModal("join")}
             onChallenge={() => setModal("challenge")}
           />

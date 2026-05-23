@@ -69,3 +69,6 @@ tools/usage-poc/dist/
 
 # harness runtime state (atomic state.json + 페이즈 로그, 휘발성)
 .harness/
+
+# /senior dispatch 명세 (휘발성 — decision-log에 영속 결정만 흡수)
+HANDOFF.md

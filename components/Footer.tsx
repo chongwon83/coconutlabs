@@ -17,7 +17,6 @@ export function Footer() {
           </div>
           <div className="footer-col">
             <span className="footer-col-head">Trust</span>
-            <a href="#safety" className="footer-link">Trust & Safety</a>
             <a href="#" className="footer-link">Collection Spec</a>
             <a href="#" className="footer-link">Privacy</a>
           </div>
