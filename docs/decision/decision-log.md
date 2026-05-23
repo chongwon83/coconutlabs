@@ -18,6 +18,36 @@ S0에서 작성, S10에서 회고 2줄 추가.
 
 ---
 
+### 2026-05-23 Above-fold + Sticky-header DOM invariant gate (Playwright, screenshot baseline deferred)
+
+- 문제: HYBRID lock 3 invariants(mobile 375 fold=H+sub+CTA / cta_bottom≤640 /
+  hero-right hidden ≤920px) + sticky-header nav wrap·overlap 0건은 모두 CSS
+  driven layout이라 vitest 단위 테스트로 검출 불가. "Drops"→"Workflow Drops"
+  14자 변경 + display:none 조건이 3번 사이클에 걸쳐 silent drift됐던 영역.
+- 버린 대안: (a) Playwright `toHaveScreenshot` baseline lock — codex Track 4
+  검토에서 "Linux CI vs macOS local font raster 차이가 first-green-baseline
+  안티패턴의 가장 큰 진입로"로 지적 / (b) 단위 컴포넌트 테스트 — CSS @media
+  query 적용 후 actual `display` value를 못 봄 / (c) E2E를 prod build로
+  돌려서 `next dev`와 분리 — DOM gate는 dev/prod 양쪽에서 결정적이므로 불필요
+- 핵심 트레이드오프: DOM gate만 lock하면 색·간격·typography 회귀를 못 잡지만,
+  HYBRID lock의 3 invariants는 모두 `display`/`boundingBox.height`/horizontal
+  rect 비교로 충분 검증 가능. baseline screenshot은 Linux Chromium font 환경
+  lock 후 next cycle에서 추가.
+- 선택 이유: 영구 invariant 3개를 다음 사이클에 미루지 말고 즉시 deterministic
+  gate로 lock(`e2e/hero-fold.spec.ts` 9 tests, ~9s). codex 6 corrections 반영
+  — fonts.ready/animation disable global(addInitScript) / 920 boundary 포함 /
+  nav-link rect/lineHeight 비교 폐기(`.nav-link` padding 6px 12px가
+  rect=lineHeight+12px로 false positive) → `scrollWidth ≤ clientWidth` +
+  nav-container right vs CTA left gap ≥ -1px.
+- 강한 증거: Track 1 실측 cta_bottom=467.19 → 임계 640까지 173px 헤드룸.
+  9 tests 첫 실행 100% pass(current main HEAD). Next 16 official Playwright
+  docs `node_modules/next/dist/docs/01-app/02-guides/testing/playwright.md`
+  L136-138 "production code로 돌리라" 권고는 screenshot baseline용이고 DOM
+  invariant gate에는 적용 안 됨(dev server에서도 동일 결과). 기존 ci.yml e2e
+  job L51 `npx playwright test`(필터 없음)이 본 spec 자동 픽업.
+
+---
+
 ### 2026-05-23 Turbopack root 상위 디렉토리 지정 (symlink guard 적용)
 
 - 문제: web-landing-mvp-4/node_modules가 sister web/로의 symlink. Next.js 16
