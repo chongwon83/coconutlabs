@@ -8,9 +8,9 @@ import {
   fmtCostShort,
   verifDisplayLabel,
   type ImportedEntry,
+  type VerifLevel,
 } from "@/lib/data";
-import { VerifBadge, Avatar, Trend, Icon } from "@/components/primitives";
-import { Sparkline } from "@/components/Sparkline";
+import { Avatar, Trend, Icon } from "@/components/primitives";
 
 type Filter = "all" | "verified" | "estimated" | "manual";
 
@@ -63,6 +63,18 @@ function verifTier(verif: string): Tier {
   if (verif === "Provider-synced" || verif === "Device-synced") return "verified";
   if (verif === "Estimated") return "estimated";
   return "selfrep";
+}
+
+// Short-form tier descriptor for the inline chip on imported handles. Distinct
+// from verifTier() — adds a non-color glyph (color-not-alone, WCAG) and a
+// chip-sized label, while the main grid keeps its full section headers.
+// Typed input mirrors the wire-format union so new VerifLevel literals force
+// a compile-time check here (Codex review C-1 hardening).
+function verifTierShort(verif: VerifLevel): { sym: string; label: string; cls: Tier } {
+  const tier = verifTier(verif);
+  if (tier === "verified") return { sym: "✓", label: "verified", cls: "verified" };
+  if (tier === "estimated") return { sym: "~", label: "estimated", cls: "estimated" };
+  return { sym: "·", label: "manual", cls: "selfrep" };
 }
 
 // Partition rows into the 3 tier buckets, preserving input order within each
@@ -144,13 +156,9 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
           <div className="lb-head">
             <span className="lb-col-rank">#</span>
             <span className="lb-col-builder">Builder</span>
-            <span className="lb-col-verif">Verification</span>
             <span className="lb-col-tokens">Tokens</span>
             <span className="lb-col-cost">Cost</span>
-            <span className="lb-col-fixes">Fixes</span>
-            <span className="lb-col-ves">VES</span>
             <span className="lb-col-trend">Trend</span>
-            <span className="lb-col-spark">Spark</span>
           </div>
 
           {TIER_ORDER.map((tier) => {
@@ -173,18 +181,10 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
                       <Avatar initials={b.avatar} size="sm" />
                       <span className="lb-handle">{b.handle}</span>
                     </span>
-                    <span className="lb-col-verif">
-                      <VerifBadge level={b.verif} />
-                    </span>
                     <span className="lb-col-tokens lb-mono">{b.tokens}</span>
                     <span className="lb-col-cost lb-mono">{b.cost}</span>
-                    <span className="lb-col-fixes lb-mono">{b.fixes}</span>
-                    <span className="lb-col-ves lb-ves">{b.ves}</span>
                     <span className="lb-col-trend">
                       <Trend dir={b.trend} value={b.trendVal} />
-                    </span>
-                    <span className="lb-col-spark">
-                      <Sparkline handle={b.handle} />
                     </span>
                   </div>
                 ))}
@@ -198,65 +198,62 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
             <h3 className="lb-imported-title">Your imports</h3>
             <p className="lb-imported-cap">
               Imported from your local Burn Summary — shared across every
-              browser. Verified rows sort to the top. Fixes &amp; VES populate
-              once your challenge submissions are verified.
+              browser. Verified rows sort to the top.
             </p>
             <div className="lb-v3">
               <div className="lb-head">
                 <span className="lb-col-rank">#</span>
                 <span className="lb-col-builder">Builder</span>
-                <span className="lb-col-verif">Verification</span>
                 <span className="lb-col-tokens">Tokens</span>
                 <span className="lb-col-cost">Cost</span>
-                <span className="lb-col-fixes">Fixes</span>
-                <span className="lb-col-ves">VES</span>
                 <span className="lb-col-trend">Trend</span>
-                <span className="lb-col-spark">Spark</span>
               </div>
 
-              {sortedImports.map((e) => (
-                <div
-                  key={e.handle}
-                  className={`lb-row lb-imported-row lb-row-${verifTier(e.verif)}`}
-                >
-                  <span className="lb-col-rank lb-rank">—</span>
-                  <span className="lb-col-builder">
-                    <Avatar initials={e.avatar} size="sm" />
-                    <span className="lb-imported-builder">
-                      <span className="lb-handle">{e.handle}</span>
-                      <span className="lb-imported-period">{periodLabel(e)}</span>
+              {sortedImports.map((e) => {
+                const chip = verifTierShort(e.verif);
+                return (
+                  <div
+                    key={e.handle}
+                    className={`lb-row lb-imported-row lb-row-${chip.cls}`}
+                  >
+                    <span className="lb-col-rank lb-rank">—</span>
+                    <span className="lb-col-builder">
+                      <Avatar initials={e.avatar} size="sm" />
+                      <span className="lb-imported-builder">
+                        <span className="lb-imported-handle-row">
+                          <span className="lb-handle">{e.handle}</span>
+                          <span
+                            className={`lb-imported-tier-chip lb-imported-tier-${chip.cls}`}
+                            aria-label={verifDisplayLabel(e.verif)}
+                          >
+                            <span className="lb-imported-tier-sym" aria-hidden="true">
+                              {chip.sym}
+                            </span>
+                            {chip.label}
+                          </span>
+                        </span>
+                        <span className="lb-imported-period">{periodLabel(e)}</span>
+                      </span>
                     </span>
-                  </span>
-                  <span className="lb-col-verif">
-                    <VerifBadge level={e.verif} />
-                  </span>
-                  <span className="lb-col-tokens lb-mono">
-                    {fmtTokensCompact(e.totalTokens)}
-                  </span>
-                  <span className="lb-col-cost lb-mono">
-                    {fmtCostShort(e.estimatedCostUsd)}
-                  </span>
-                  <span className="lb-col-fixes lb-mono">
-                    {e.fixes != null ? e.fixes.toLocaleString("en-US") : "—"}
-                  </span>
-                  <span className="lb-col-ves lb-ves">
-                    {e.ves != null ? e.ves.toFixed(1) : "—"}
-                  </span>
-                  <span className="lb-col-trend">
-                    {e.trendDir != null && e.trendPct != null ? (
-                      <Trend
-                        dir={e.trendDir}
-                        value={`${e.trendPct > 0 ? "+" : ""}${e.trendPct}%`}
-                      />
-                    ) : (
-                      "—"
-                    )}
-                  </span>
-                  <span className="lb-col-spark">
-                    <Sparkline handle={e.handle} series={e.trendSeries} />
-                  </span>
-                </div>
-              ))}
+                    <span className="lb-col-tokens lb-mono">
+                      {fmtTokensCompact(e.totalTokens)}
+                    </span>
+                    <span className="lb-col-cost lb-mono">
+                      {fmtCostShort(e.estimatedCostUsd)}
+                    </span>
+                    <span className="lb-col-trend">
+                      {e.trendDir != null && e.trendPct != null ? (
+                        <Trend
+                          dir={e.trendDir}
+                          value={`${e.trendPct > 0 ? "+" : ""}${e.trendPct}%`}
+                        />
+                      ) : (
+                        "—"
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
 
               {sortedImports.length === 0 && (
                 <p className="lb-imported-empty">
