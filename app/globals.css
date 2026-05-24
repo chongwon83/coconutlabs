@@ -1873,9 +1873,11 @@ textarea.form-input {
   margin: 0;
 }
 
-/* LB grid override for 9 columns */
+/* LB grid override — 5 columns: # | Builder | Tokens | Cost | Trend
+   (burn-5col-reduction 2026-05-24: VES/Verification/Fixes/Sparkline removed
+   from UI; backend fields preserved in lib/data.ts for API/storage contract.) */
 .lb-v3 .lb-head, .lb-v3 .lb-row {
-  grid-template-columns: 32px 1.4fr 140px 80px 80px 60px 70px 70px 70px;
+  grid-template-columns: 32px 1.4fr 80px 80px 70px;
   gap: 10px;
   padding: 0 16px;
 }
@@ -1890,10 +1892,52 @@ textarea.form-input {
 }
 .lb-filter:hover { background: var(--surface-muted); }
 .lb-filter-active { background: var(--fg); color: #FFFFFF; border-color: var(--fg); }
-.lb-col-rank, .lb-col-builder, .lb-col-verif, .lb-col-tokens, .lb-col-cost,
-.lb-col-fixes, .lb-col-ves, .lb-col-trend, .lb-col-spark { display: flex; align-items: center; min-width: 0; overflow: hidden; }
-.lb-ves { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--young-coconut); font-variant-numeric: tabular-nums; }
+.lb-col-rank, .lb-col-builder, .lb-col-tokens, .lb-col-cost,
+.lb-col-trend { display: flex; align-items: center; min-width: 0; overflow: hidden; }
 .lb-mono { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--fg2); }
+
+/* Imported builder cell: handle + inline tier chip on row 1, period on row 2.
+   Main-grid V3 rows omit the chip — tier section headers already classify them. */
+.lb-imported-handle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.lb-imported-tier-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: var(--r-badge);
+  background: var(--surface-muted);
+  color: var(--fg2);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.lb-imported-tier-sym {
+  font-size: 11px;
+  line-height: 1;
+}
+/* Tier-tinted chip backgrounds. Symbols (✓/~/·) carry the semantic in
+   addition to color so the chip is not color-only (WCAG 1.4.1). */
+.lb-imported-tier-chip.lb-imported-tier-verified {
+  background: color-mix(in srgb, var(--young-coconut-dark) 12%, transparent);
+  color: var(--young-coconut-dark);
+}
+.lb-imported-tier-chip.lb-imported-tier-estimated {
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+}
+.lb-imported-tier-chip.lb-imported-tier-selfrep {
+  background: var(--surface-muted);
+  color: var(--fg2);
+}
 
 /* Verification tiers — section dividers grouping rows by trust level.
    Tier heads are plain block children of .lb-v3; rows keep their own grid. */
@@ -2095,7 +2139,8 @@ textarea.form-input {
     grid-template-columns: 28px 1fr 100px 60px;
     gap: 8px; padding: 0 12px;
   }
-  .lb-col-tokens, .lb-col-fixes, .lb-col-trend, .lb-col-spark { display: none; }
+  /* Mobile drops Cost to keep the row readable; #|Builder|Tokens|Trend remain. */
+  .lb-col-cost { display: none; }
 }
 
 /* ============================================================
