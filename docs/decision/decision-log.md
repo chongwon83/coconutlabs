@@ -18,6 +18,49 @@ S0에서 작성, S10에서 회고 2줄 추가.
 
 ---
 
+### 2026-05-24 Burn Index leaderboard 9 → 5 컬럼 축소 + inline tier chip
+
+- 문제: 챌린지 UI 제거 후 Fixes/VES는 import에서 항상 0 (challenge store 닫
+  힘), Sparkline은 trendSeries 미주입 시 LCG 가짜 폴백, Verification 컬럼은
+  업로드 경로 하드코딩으로 4-union 중 2종만 산출. 9컬럼 중 3컬럼이 stale
+  data 가리킴. 정보 밀도 < 차지하는 컬럼 폭.
+- 버린 대안: (a) Fixes/VES 백엔드까지 제거 — BurnIndexPanel·API·storage가
+  의존, 다른 컴포넌트 깨짐 / (b) Verification 컬럼 유지 — 라벨 4종 중 2종만
+  나와도 정보가치 없음 / (c) Sparkline LCG fallback 유지 — 시각 노이즈 +
+  의미 없음 / (d) 라이트 fast-path로 처리 — 3축 위험 2/3(영향범위 +
+  관찰가능성) 충족이라 검증 분리 의무.
+- 핵심 트레이드오프: 백엔드 데이터 모델(V3_BUILDERS.fixes/ves,
+  computeVes, VerifLevel 4-union literals)은 storage·API 계약이라 0줄 수정
+  강제. UI 렌더에서만 빼서 wire format ↔ display label separation 패턴 적용.
+  visual baseline 3 PNG 새로 잡아야 함 (maxDiffPixelRatio 0.02 한도 초과
+  예상) → workflow_dispatch rebaseline 1회.
+- 선택 이유: 5컬럼(`# | Builder | Tokens | Cost | Trend`)이 정보 밀도 ↔
+  컬럼 폭 균형점. Imported 핸들 셀에 inline tier chip(✓/~/· + label)로
+  WCAG color-not-alone 보존, Task D 3계층 섹션 헤더는 메인 그리드에서 유지.
+  Codex C-1 hardening: `verifTierShort()` 입력 타입을 `VerifLevel`로 좁히고
+  `verifTier()` 결과를 derive해 새 union 추가 시 컴파일 차단.
+- 강한 증거: 6620c19 refactor + 90165e6 codex C-1 hardening + CI run
+  26363202448 visual baseline 생성 → 기존 commit 6620c19 baseline과 md5
+  3/3 일치(`08e928…`, `6ce1c6…`, `79c85d…`) 확인 → PR #16 3 job(test 34s/
+  e2e/visual) ✅ → squash merge `7c4ee6a`. Codex review blocking 0건,
+  Low 1건(C-1) 반영, False positive 1건(--warning #B45309 amber-700 —
+  codex가 #D97706로 오인식, contrast 5.0:1 AA 통과) 문서화.
+
+- 무엇이 잘 됐나: S3.5 design.md gate(인터페이스/데이터흐름/파일경계/불변조건
+  4섹션)가 S6 진입 차단 게이트로 작동 → BurnIndexSection 9→5 변경 시 lib/
+  data.ts·validateSummary.ts 무수정 invariant이 owner+codex 양쪽에서 자동
+  점검됨. Codex가 wire format(VerifLevel 4-union)과 display label(3-tier)
+  분리 안 깨졌는지 1차 검증 = 인간 owner 1패스로 못 잡을 영역. CI baseline
+  preservation(md5 match)으로 추가 rebaseline 사이클 1개 절감.
+- 다음엔 무엇을 바꿀까: design.md 4섹션에 "백엔드 0줄 수정 매트릭스"
+  필드를 추가해서 보존 대상 파일을 명시적 인벤토리로 굳히자(이번엔 plan
+  표로만 적시했는데, S6 중 1회 owner가 "lib/server/도 안 건드린다고
+  했나?" 재확인 필요했음). 또 codex review 결과의 False positive 1건(L1
+  --warning 색상)을 unverified.md에 1줄 spot check로 남기는 패턴을 표준
+  화 — Phase 2 Q4 권장과 정합.
+
+---
+
 ### 2026-05-24 Track 4 — Playwright visual regression baseline lock (3 viewport × CI Linux PNG)
 
 - 문제: 2026-05-23 DOM invariant gate(`hero-fold.spec.ts` 9 tests)는 layout/
