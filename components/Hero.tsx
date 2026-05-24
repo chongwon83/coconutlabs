@@ -22,12 +22,15 @@ function ProductShot({ tab }: { tab: HeroTab }) {
         </div>
         <div className="product-shot-rows" data-testid="product-shot-content" data-mask="dynamic">
           {[
-            { rank: 1, handle: "@shellcoder", ves: "201.7", cost: "$4.20" },
-            { rank: 2, handle: "@tinyshipper", ves: "197.8", cost: "$3.60" },
-            { rank: 3, handle: "@noor", ves: "195.5", cost: "$2.20" },
+            { rank: 1, handle: "@shellcoder", ves: "201.7", cost: "$4.20", delta: "↑1", deltaKind: "up" },
+            { rank: 2, handle: "@tinyshipper", ves: "197.8", cost: "$3.60", delta: "↓1", deltaKind: "down" },
+            { rank: 3, handle: "@noor", ves: "195.5", cost: "$2.20", delta: "—", deltaKind: "flat" },
+            { rank: 4, handle: "@nightowl", ves: "192.1", cost: "$3.80", delta: "↑2", deltaKind: "up" },
+            { rank: 5, handle: "@dgreen", ves: "189.4", cost: "$2.90", delta: "new", deltaKind: "new" },
           ].map((r) => (
             <div key={r.rank} className="product-shot-row">
               <span className="product-shot-rank">#{r.rank}</span>
+              <span className={`product-shot-delta product-shot-delta-${r.deltaKind}`}>{r.delta}</span>
               <span className="product-shot-handle">{r.handle}</span>
               <span className="product-shot-ves">{r.ves}</span>
               <span className="product-shot-cost">{r.cost}</span>
