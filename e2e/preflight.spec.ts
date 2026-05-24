@@ -73,8 +73,15 @@ test.describe("Preflight: baseline stability invariants (Track 4)", () => {
     // a glyph actually demands it, so an 'unloaded' entry is normal — that
     // weight just isn't on screen. The FOFT (Flash of Faux Text) hazard for
     // baselines is a font still in 'loading' after networkidle + fonts.ready:
-    // that's the one that swaps mid-screenshot. 'error' would also corrupt
-    // a baseline by locking the fallback raster.
+    // that's the one that swaps mid-screenshot, the only state that actually
+    // corrupts a baseline.
+    //
+    // next/font ALSO registers metric-equivalent "<Family> Fallback" FontFace
+    // entries (e.g. "Inter Fallback", "JetBrains Mono Fallback") whose sole
+    // job is to size-match the real font before it loads — they have no src
+    // descriptor pointing to a downloadable file. On CI Linux these report
+    // status="error" by design (never resolvable), but they DO NOT swap on
+    // screen and DO NOT corrupt baselines. Exempt them from the error check.
     await gotoStable(page);
     const fontStatuses = await page.evaluate(() =>
       [...document.fonts].map((f) => ({
@@ -84,7 +91,9 @@ test.describe("Preflight: baseline stability invariants (Track 4)", () => {
       }))
     );
     const inFlight = fontStatuses.filter(
-      (f) => f.status === "loading" || f.status === "error"
+      (f) =>
+        f.status === "loading" ||
+        (f.status === "error" && !/ Fallback$/.test(f.family))
     );
     expect(
       inFlight,
