@@ -8,6 +8,7 @@ import {
   fmtCostShort,
   verifDisplayLabel,
   type ImportedEntry,
+  type VerifLevel,
 } from "@/lib/data";
 import { Avatar, Trend, Icon } from "@/components/primitives";
 
@@ -67,11 +68,12 @@ function verifTier(verif: string): Tier {
 // Short-form tier descriptor for the inline chip on imported handles. Distinct
 // from verifTier() — adds a non-color glyph (color-not-alone, WCAG) and a
 // chip-sized label, while the main grid keeps its full section headers.
-function verifTierShort(verif: string): { sym: string; label: string; cls: Tier } {
-  if (verif === "Provider-synced" || verif === "Device-synced") {
-    return { sym: "✓", label: "verified", cls: "verified" };
-  }
-  if (verif === "Estimated") return { sym: "~", label: "estimated", cls: "estimated" };
+// Typed input mirrors the wire-format union so new VerifLevel literals force
+// a compile-time check here (Codex review C-1 hardening).
+function verifTierShort(verif: VerifLevel): { sym: string; label: string; cls: Tier } {
+  const tier = verifTier(verif);
+  if (tier === "verified") return { sym: "✓", label: "verified", cls: "verified" };
+  if (tier === "estimated") return { sym: "~", label: "estimated", cls: "estimated" };
   return { sym: "·", label: "manual", cls: "selfrep" };
 }
 
