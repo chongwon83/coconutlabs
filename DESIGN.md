@@ -273,5 +273,5 @@ itself is not rounded — it is a 56px bar pinned to the top of the viewport.
   default body color; `secondary` is fine for accents and large text.
 - Don't introduce a new badge for row-level trust — trust still uses the
   existing `VerifBadge`. Tiers group; badges label.
-- Don't let tier styling override the active-filter or top-rank row states.
+- Don't let tier styling override the top-rank row states.
 - Don't change row data or sort order within a tier — rows stay VES-ranked.
