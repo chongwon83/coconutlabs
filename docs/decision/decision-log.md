@@ -18,6 +18,59 @@ S0에서 작성, S10에서 회고 2줄 추가.
 
 ---
 
+### 2026-05-24 Track 4 — Playwright visual regression baseline lock (3 viewport × CI Linux PNG)
+
+- 문제: 2026-05-23 DOM invariant gate(`hero-fold.spec.ts` 9 tests)는 layout/
+  display는 잡지만 색·간격·typography/font raster·hero-right ProductShot 침범
+  같은 시각 회귀를 못 잡음. mobile-375 above-fold 침범과 desktop sticky-header
+  nav wrap을 PR 머지 전 자동 차단할 deterministic gate가 필요. 매 deploy 전
+  owner 수동 검수 부담 + 야간/주말 자동 머지 시 회귀 탐지 불가.
+- 버린 대안: (a) DOM invariant gate 확장(boundingBox 비교만)으로 시각 검출
+  대체 — typography/색 회귀를 영원히 못 잡음 / (b) 로컬 macOS PNG baseline
+  commit — first-green-baseline 안티패턴 + Linux CI raster diff로 100%
+  false positive / (c) Percy/Chromatic SaaS — 솔로 프로젝트에 비용/계정
+  오버헤드 과대 / (d) dev mode baseline — Turbopack content hash가 매 run
+  drift, 결정성 0.
+- 핵심 트레이드오프: baseline이 잘못 잡히면 "잘못된 상태가 정상으로 굳음"
+  (Risk 3축 ① 충족). 복구는 `git revert` + 재캡처. maxDiffPixelRatio 0.02
+  (codex 권장 시작값)로 시작해 6주 운영 후 0.01로 강화 검토. 동적 데이터
+  (VES/spend 카운트)는 `[data-mask="dynamic"]` mask로 통과, 본질 변경은 차단.
+- 선택 이유: `next build && next start` prod mode + CI Linux artifact baseline
+  + dedicated `playwright.config.visual.ts` 분리로 dev/prod 모드 conflation
+  제거. 3 step(A: config+8 invariants / B: 18 testid attach / C: baseline
+  lock + `visual-baseline-lock.yml` workflow_dispatch rebaseline 절차)으로
+  쪼개 각 step Codex 적대적 검토 1회씩 총 3회 통과. CI permanent guard
+  (`ci.yml` visual job)로 향후 PR 시각 회귀 자동 차단.
+- 강한 증거: 첫 CI Linux baseline 생성(run `26346826095`, artifact 다운로드
+  → `e2e/visual.spec.ts-snapshots/*-chromium-linux.png` 3개 commit `ff34678`)
+  → comparison mode CI run `26346958195` visual job ✅ 1m12s pass. INV-2
+  regression(`Inter Fallback`/`JetBrains Mono Fallback` status=`error`)
+  발견 → next/font 메트릭 매칭 Fallback FontFace는 `src` descriptor 없어
+  CI Linux에서 by-design `error` 상태(`fix` commit `df380f4`로 ` Fallback$`
+  family 제외) → CI run `26347081198` 3 job 모두 ✅ (test 34s / visual 59s
+  / e2e 86s). R1-R9 9/9 통과.
+
+[S10 회고]
+- 무엇이 잘 됐나: A/B/C 3 step 분리 후 각 step Codex 사전 적대적 검토 1회씩
+  (총 3회) 의무화한 게 정답. C-0 검토에서 "macOS local PNG commit 금지, CI
+  Linux artifact만 commit" 단호하게 lock한 덕에 first-green-baseline 함정
+  100% 회피. dedicated `playwright.config.visual.ts` + `testIgnore: []`로
+  base config의 `testIgnore: /visual\.spec\.ts/` 상속 끊어 dev/prod 모드
+  conflation 제거한 것도 결정적. workflow_dispatch rebaseline workflow를
+  C-6에서 폐기하지 않고 영구 보존한 덕에 향후 폰트 업그레이드/의도된 layout
+  변경 시 동일 절차(dispatch → artifact → commit) 반복 가능.
+- 다음엔 무엇을 바꿀까: ① Step A `10회 dry-run flake 검증`이 INV-2 next/font
+  Fallback `error` 상태를 못 잡음 — 로컬 macOS 환경에서만 검증해서 CI Linux
+  font subsystem 차이를 놓침. 다음 cycle부터 preflight 신규 invariant는
+  `act` 또는 임시 CI workflow_dispatch로 Linux runner에서 1회 smoke 의무.
+  ② maxDiffPixelRatio 0.02 → 0.01 강화 timing은 6주 운영 false-positive
+  카운트(`gh run list --workflow=CI --jq '[.[]|select(.conclusion=="failure")
+  ]|length'`) 기반 결정. ③ 시각 invariant axis 분리 원칙 유지 — layout/font
+  baseline은 visual.spec.ts, color/typography token regression은 별도 axis
+  (DESIGN.md lint 또는 vitest snapshot)로 분리해 통합 spec 금지.
+
+---
+
 ### 2026-05-23 Above-fold + Sticky-header DOM invariant gate (Playwright, screenshot baseline deferred)
 
 - 문제: HYBRID lock 3 invariants(mobile 375 fold=H+sub+CTA / cta_bottom≤640 /
