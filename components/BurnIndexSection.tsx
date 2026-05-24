@@ -33,7 +33,7 @@ const TIER_META: Record<Tier, { label: string; caption: string }> = {
   },
   selfrep: {
     label: "Manual entry",
-    caption: "Submitted by the builder, not yet confirmed.",
+    caption: "Methodology demo. Manual entry isn't shipped — these are seed rows showing how the tier renders.",
   },
 };
 
@@ -101,12 +101,12 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
           Who ships the most for the least?
         </h2>
         <p className="section-sub">
-          Ranked by VES — Verified Efficiency Score (verified fixes ÷ AI cost USD).
+          Ranked by VES — verified fixes divided by AI spend in USD.
           Lower spend, more fixes = higher rank.
         </p>
         <p className="burn-methodology-caption">
-          30-day window. Source-verified costs rank above estimates and manual
-          entries at the same VES.
+          30-day window. Today every real import is token-collected with estimated
+          cost; ties break by upload recency.
         </p>
 
         <div className="lb-v3">
@@ -223,7 +223,7 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
 
         <p className="section-note">
           VES = verified fixes ÷ AI cost (USD). Higher is better.
-          Trust order: {verifDisplayLabel("Provider-synced")} &gt;{" "}
+          Evidence order: {verifDisplayLabel("Provider-synced")} &gt;{" "}
           {verifDisplayLabel("Device-synced")} &gt;{" "}
           {verifDisplayLabel("Estimated")} &gt;{" "}
           {verifDisplayLabel("Self-reported")}.

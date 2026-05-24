@@ -107,10 +107,14 @@ yet. Trust collapses into the Burn Index container as a subsection directly
 beneath the leaderboard, preserving its content while removing the standalone
 Trust + Final CTA section that previously broke the single-message axis.
 
-The Burn Index section within this landing retains a **three-tier trust
+The Burn Index section within this landing retains a **three-tier evidence
 hierarchy** (Source-verified, Estimated, Manual entry) that groups leaderboard
 rows by measurement confidence. Tiers re-order existing rows; they do not
-change data, do not lose rows, and do not introduce a new badge.
+change data, do not lose rows, and do not introduce a new badge. The
+section-note renders the four wire literals as an **evidence order** rather
+than a trust order — display copy describes evidence depth, not absolute
+authority, since the same builder can appear under different tiers depending
+on the import method.
 
 Wire-format `VerifLevel` literals (`Provider-synced`, `Device-synced`,
 `Estimated`, `Self-reported`) are domain-neutral and collide with fitness
@@ -271,7 +275,7 @@ itself is not rounded — it is a 56px bar pinned to the top of the viewport.
   `#0F766E` passes WCAG AA Normal at 5.47:1 on `surface` at any size and
   removes the prior large-text-only constraint. `on-surface` remains the
   default body color; `secondary` is fine for accents and large text.
-- Don't introduce a new badge for row-level trust — trust still uses the
-  existing `VerifBadge`. Tiers group; badges label.
+- Don't introduce a new badge for row-level evidence — evidence still uses
+  the existing `VerifBadge`. Tiers group; badges label.
 - Don't let tier styling override the top-rank row states.
 - Don't change row data or sort order within a tier — rows stay VES-ranked.

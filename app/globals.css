@@ -1951,6 +1951,7 @@ textarea.form-input {
   font-size: 10.5px;
   color: var(--fg2);
   background: var(--surface-muted);
+  border: 1px solid var(--border);
   border-radius: var(--r-badge);
   padding: 1px 7px;
 }
