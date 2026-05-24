@@ -312,6 +312,22 @@ const VERIF_BY_RANK: VerifLevel[] = [
   "Provider-synced",
 ];
 
+// Wire-format VerifLevel literals double as labels in Apple Health/Strava etc.,
+// so a first-time visitor can read the leaderboard as a fitness tracker. Keep
+// the union as the persisted contract (validateSummary.ts:52, Redis,
+// localStorage) and route every UI render through this mapper so display copy
+// can shift without a storage migration.
+const VERIF_DISPLAY: Record<VerifLevel, string> = {
+  "Provider-synced": "API-verified",
+  "Device-synced": "CLI-verified",
+  Estimated: "Token-only estimate",
+  "Self-reported": "Manual entry",
+};
+
+export function verifDisplayLabel(level: VerifLevel): string {
+  return VERIF_DISPLAY[level];
+}
+
 export function aggregateVerifLevel(rows: BurnSummary[]): VerifLevel {
   if (rows.length === 0) return "Self-reported";
   let weakest = 3;

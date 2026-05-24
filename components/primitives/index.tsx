@@ -196,19 +196,22 @@ export function Badge({ kind = "accent", children, className = "" }: BadgeProps)
 
 // ── VerifBadge ────────────────────────────────────────────────────────────────
 
-import type { VerifLevel } from "@/lib/data";
+import { verifDisplayLabel, type VerifLevel } from "@/lib/data";
 
 interface VerifBadgeProps {
   level: VerifLevel;
 }
 
 export function VerifBadge({ level }: VerifBadgeProps) {
+  // CSS kind tracks the wire-format level (preserves Track 4 visual baseline);
+  // the rendered label routes through verifDisplayLabel so domain-neutral
+  // copy can never appear in the UI.
   const kind: BadgeKind =
     level === "Provider-synced" ? "provider"
     : level === "Device-synced" ? "device"
     : level === "Estimated" ? "estimated"
     : "selfrep";
-  return <Badge kind={kind}>{level}</Badge>;
+  return <Badge kind={kind}>{verifDisplayLabel(level)}</Badge>;
 }
 
 // ── Avatar ────────────────────────────────────────────────────────────────────

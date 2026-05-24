@@ -3,22 +3,22 @@
 const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
 
 const TICKER_ITEMS_FULL = [
-  "🏆 @shellcoder · VES 201.7 · Provider-synced",
-  "⚡ @tinyshipper · $3.60 / 712 fixes · Device-synced",
+  "🏆 @shellcoder · VES 201.7 · API-verified",
+  "⚡ @tinyshipper · $3.60 / 712 fixes · CLI-verified",
   "🔥 Challenge live: Fix a Lighthouse regression — $50 reward",
   "📦 New drop: Claude Code Review Loop by @tinyshipper",
   "✅ @noor · VES 195.5 · +2% this week",
   "💡 Workflow drop: Low-Cost Debugging — Free",
-  "🏆 @4ndres · 378 fixes · Provider-synced",
+  "🏆 @4ndres · 378 fixes · API-verified",
   "⚡ Week total: 2.4B tokens · $4,820 AI spend · 3,391 fixes",
 ];
 
 // Burn-only mode: VES leaderboard signals only (challenges/drops excluded).
 const TICKER_ITEMS_BURN = [
-  "🏆 @shellcoder · VES 201.7 · Provider-synced",
-  "⚡ @tinyshipper · $3.60 / 712 fixes · Device-synced",
+  "🏆 @shellcoder · VES 201.7 · API-verified",
+  "⚡ @tinyshipper · $3.60 / 712 fixes · CLI-verified",
   "✅ @noor · VES 195.5 · +2% this week",
-  "🏆 @4ndres · 378 fixes · Provider-synced",
+  "🏆 @4ndres · 378 fixes · API-verified",
   "⚡ Week total: 2.4B tokens · $4,820 AI spend · 3,391 fixes",
 ];
 

@@ -31,7 +31,7 @@ export function Footer() {
       <div className="footer-bottom">
         <span className="footer-copy">© 2026 CoconutLabs. All rights reserved.</span>
         <span className="footer-verif">
-          Verification levels: Provider-synced · Device-synced · Estimated · Self-reported
+          Verification levels: API-verified · CLI-verified · Token-only estimate · Manual entry
         </span>
       </div>
     </footer>

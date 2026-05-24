@@ -6,12 +6,13 @@ import {
   V3_TRUST,
   fmtTokensCompact,
   fmtCostShort,
+  verifDisplayLabel,
   type ImportedEntry,
 } from "@/lib/data";
 import { VerifBadge, Avatar, Trend, Icon } from "@/components/primitives";
 import { Sparkline } from "@/components/Sparkline";
 
-type Filter = "all" | "provider" | "device" | "estimated" | "selfrep";
+type Filter = "all" | "verified" | "estimated" | "manual";
 
 type Tier = "verified" | "estimated" | "selfrep";
 
@@ -25,15 +26,15 @@ const TIER_ORDER: Tier[] = ["verified", "estimated", "selfrep"];
 
 const TIER_META: Record<Tier, { label: string; caption: string }> = {
   verified: {
-    label: "Verified",
-    caption: "Provider or device-synced — measured at the source.",
+    label: "Source-verified",
+    caption: "Measured at the API or CLI — token counts come from the source.",
   },
   estimated: {
     label: "Estimated",
-    caption: "Derived from partial signals.",
+    caption: "Token counts only; cost derived from public model pricing.",
   },
   selfrep: {
-    label: "Self-reported",
+    label: "Manual entry",
     caption: "Submitted by the builder, not yet confirmed.",
   },
 };
@@ -42,12 +43,17 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   return <div className="section-eyebrow">{children}</div>;
 }
 
+// Filter buckets collapse the 4 wire-format levels into the 3-tier trust
+// hierarchy the methodology caption advertises (Source-verified ▸ Estimated ▸
+// Manual). Provider-synced + Device-synced both fold into "verified" so the UI
+// surfaces trust, not collection mechanism.
 function matchesFilter(verif: string, filter: Filter): boolean {
   if (filter === "all") return true;
-  if (filter === "provider") return verif === "Provider-synced";
-  if (filter === "device") return verif === "Device-synced";
+  if (filter === "verified") {
+    return verif === "Provider-synced" || verif === "Device-synced";
+  }
   if (filter === "estimated") return verif === "Estimated";
-  if (filter === "selfrep") return verif === "Self-reported";
+  if (filter === "manual") return verif === "Self-reported";
   return true;
 }
 
@@ -108,22 +114,30 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
           Lower spend, more fixes = higher rank.
         </p>
         <p className="burn-methodology-caption">
-          30-day rolling window · 3-tier trust hierarchy:
-          {" "}<strong>Verified</strong> (provider / device-synced) &gt;
-          {" "}<strong>Estimated</strong> &gt;
-          {" "}<strong>Self-reported</strong>.
+          30-day window. Source-verified costs rank above estimates and manual
+          entries at the same VES.
         </p>
 
         <div className="lb-filters">
-          {(["all", "provider", "device", "estimated", "selfrep"] as Filter[]).map((f) => (
-            <button
-              key={f}
-              className={`lb-filter${filter === f ? " lb-filter-active" : ""}`}
-              onClick={() => setFilter(f)}
-            >
-              {f === "all" ? "All" : f === "provider" ? "Provider-synced" : f === "device" ? "Device-synced" : f === "estimated" ? "Estimated" : "Self-reported"}
-            </button>
-          ))}
+          {(["all", "verified", "estimated", "manual"] as Filter[]).map((f) => {
+            const label =
+              f === "all" ? "All"
+              : f === "verified" ? "Source-verified"
+              : f === "estimated" ? "Estimated"
+              : "Manual";
+            const ariaLabel =
+              f === "verified" ? "Source-verified data sources" : undefined;
+            return (
+              <button
+                key={f}
+                className={`lb-filter${filter === f ? " lb-filter-active" : ""}`}
+                onClick={() => setFilter(f)}
+                aria-label={ariaLabel}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="lb-v3">
@@ -255,7 +269,10 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
 
         <p className="section-note">
           VES = verified fixes ÷ AI cost (USD). Higher is better.
-          Verification badges: Provider-synced &gt; Device-synced &gt; Estimated &gt; Self-reported.
+          Trust order: {verifDisplayLabel("Provider-synced")} &gt;{" "}
+          {verifDisplayLabel("Device-synced")} &gt;{" "}
+          {verifDisplayLabel("Estimated")} &gt;{" "}
+          {verifDisplayLabel("Self-reported")}.
         </p>
 
         <div className="burn-trust">

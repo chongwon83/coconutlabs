@@ -108,9 +108,17 @@ beneath the leaderboard, preserving its content while removing the standalone
 Trust + Final CTA section that previously broke the single-message axis.
 
 The Burn Index section within this landing retains a **three-tier trust
-hierarchy** (Verified, Estimated, Self-reported) that groups leaderboard rows
-by measurement confidence. Tiers re-order existing rows; they do not change
-data, do not lose rows, and do not introduce a new badge.
+hierarchy** (Source-verified, Estimated, Manual entry) that groups leaderboard
+rows by measurement confidence. Tiers re-order existing rows; they do not
+change data, do not lose rows, and do not introduce a new badge.
+
+Wire-format `VerifLevel` literals (`Provider-synced`, `Device-synced`,
+`Estimated`, `Self-reported`) are domain-neutral and collide with fitness
+trackers when rendered raw. The UI routes every render through
+`verifDisplayLabel()` so display copy (`API-verified`, `CLI-verified`,
+`Token-only estimate`, `Manual entry`) stays token-tracking-specific while
+storage (Redis, localStorage, validateSummary) keeps the original union
+unchanged — no migration on label revisions.
 
 ## Colors
 
@@ -233,9 +241,10 @@ itself is not rounded — it is a 56px bar pinned to the top of the viewport.
 - **tier-caption-row** — the one-line explanation row under a tier header.
 - **tier-count-amber** — the small muted chip showing how many rows are in
   the estimated tier; uses `tertiary` to match the tier color.
-- **tier-verified-accent** — the 2px left-edge accent strip on Verified-tier
-  rows. Uses `secondary` (the only place on the page where a small green
-  surface is acceptable, because it carries no text).
+- **tier-verified-accent** — the 2px left-edge accent strip on Source-verified
+  tier rows. Uses `secondary` (the only place on the page where a small green
+  surface is acceptable, because it carries no text). CSS variable name keeps
+  the wire-format `verified` token; only the user-facing label shifts.
 
 ## Do's and Don'ts
 
@@ -246,7 +255,7 @@ itself is not rounded — it is a 56px bar pinned to the top of the viewport.
   and the embedded Trust subsection, and `spacing.2xl` (120px) only for
   Hero → Burn Index.
 - Do enforce one `section-heading` size across every non-Hero section.
-- Do keep tier order fixed inside Burn Index: Verified, Estimated, Self-reported.
+- Do keep tier order fixed inside Burn Index: Source-verified, Estimated, Manual entry.
 - Do hide a tier header entirely when its filtered row count is zero.
 - Do keep the primary waitlist CTA in the Hero only; the Sticky Header
   carries a ghost secondary CTA so the page has one unambiguous 1차 action

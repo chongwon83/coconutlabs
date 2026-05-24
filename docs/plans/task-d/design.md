@@ -21,6 +21,11 @@ function verifTier(verif: string): Tier
 - `Estimated` → `"estimated"`
 - 그 외(`Self-reported` 포함) → `"selfrep"`
 - 순수 함수 — 부수효과 없음. 미지 문자열은 `"selfrep"`로 폴백(안전쪽).
+- **Tier 키(`"verified"`/`"estimated"`/`"selfrep"`)는 CSS·내부 분류용 라벨**.
+  사용자 노출 카피는 `TIER_META[tier].label`(Source-verified/Estimated/Manual
+  entry)과 `verifDisplayLabel(VerifLevel)`(API-verified/CLI-verified/Token-only
+  estimate/Manual entry)을 통해 분리됨 — wire format(`VerifLevel`)은
+  Redis/localStorage 영속 계약이라 무변경, 디스플레이 카피만 렌더 시점에 매핑.
 
 ### 신규: `TIER_META` — 계층별 표시 메타 상수
 
@@ -31,9 +36,9 @@ const TIER_META: Record<Tier, { label: string; caption: string }>
 
 | tier | label | caption |
 |------|-------|---------|
-| `verified` | "Verified" | "Provider or device-synced — measured at the source." |
-| `estimated` | "Estimated" | "Derived from partial signals." |
-| `selfrep` | "Self-reported" | "Submitted by the builder, not yet confirmed." |
+| `verified` | "Source-verified" | "Measured at the API or CLI — token counts come from the source." |
+| `estimated` | "Estimated" | "Token counts only; cost derived from public model pricing." |
+| `selfrep` | "Manual entry" | "Submitted by the builder, not yet confirmed." |
 
 ### 신규: `groupByTier(rows)` — bucket 분류 헬퍼
 
