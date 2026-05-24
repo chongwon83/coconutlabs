@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import {
   V3_BUILDERS,
   V3_TRUST,
@@ -11,8 +11,6 @@ import {
   type VerifLevel,
 } from "@/lib/data";
 import { Avatar, Trend, Icon } from "@/components/primitives";
-
-type Filter = "all" | "verified" | "estimated" | "manual";
 
 type Tier = "verified" | "estimated" | "selfrep";
 
@@ -41,20 +39,6 @@ const TIER_META: Record<Tier, { label: string; caption: string }> = {
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return <div className="section-eyebrow">{children}</div>;
-}
-
-// Filter buckets collapse the 4 wire-format levels into the 3-tier trust
-// hierarchy the methodology caption advertises (Source-verified ▸ Estimated ▸
-// Manual). Provider-synced + Device-synced both fold into "verified" so the UI
-// surfaces trust, not collection mechanism.
-function matchesFilter(verif: string, filter: Filter): boolean {
-  if (filter === "all") return true;
-  if (filter === "verified") {
-    return verif === "Provider-synced" || verif === "Device-synced";
-  }
-  if (filter === "estimated") return verif === "Estimated";
-  if (filter === "manual") return verif === "Self-reported";
-  return true;
 }
 
 // Map a verification level to its trust tier. Unknown strings fall back to
@@ -99,16 +83,11 @@ function periodLabel(entry: ImportedEntry): string {
 }
 
 export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
-  const [filter, setFilter] = useState<Filter>("all");
-
-  const filtered = V3_BUILDERS.filter((b) => matchesFilter(b.verif, filter));
-  const filteredImports = imported.filter((e) => matchesFilter(e.verif, filter));
-
-  const grouped = groupByTier(filtered);
+  const grouped = groupByTier(V3_BUILDERS);
 
   // Imported block stays a single grid — tier-sort only (verified first),
   // no sub-headers. Array.sort is stable, so VES order holds within a tier.
-  const sortedImports = [...filteredImports].sort(
+  const sortedImports = [...imported].sort(
     (a, b) =>
       TIER_ORDER.indexOf(verifTier(a.verif)) -
       TIER_ORDER.indexOf(verifTier(b.verif)),
@@ -129,28 +108,6 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
           30-day window. Source-verified costs rank above estimates and manual
           entries at the same VES.
         </p>
-
-        <div className="lb-filters">
-          {(["all", "verified", "estimated", "manual"] as Filter[]).map((f) => {
-            const label =
-              f === "all" ? "All"
-              : f === "verified" ? "Source-verified"
-              : f === "estimated" ? "Estimated"
-              : "Manual";
-            const ariaLabel =
-              f === "verified" ? "Source-verified data sources" : undefined;
-            return (
-              <button
-                key={f}
-                className={`lb-filter${filter === f ? " lb-filter-active" : ""}`}
-                onClick={() => setFilter(f)}
-                aria-label={ariaLabel}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
 
         <div className="lb-v3">
           <div className="lb-head">
@@ -257,7 +214,7 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
 
               {sortedImports.length === 0 && (
                 <p className="lb-imported-empty">
-                  No imports match this filter.
+                  No imports yet.
                 </p>
               )}
             </div>
