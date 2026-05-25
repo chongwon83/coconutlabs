@@ -99,9 +99,19 @@ async function visibleHandles(page: Page): Promise<string[]> {
   return await page.locator(".lb-row .lb-handle").allTextContents();
 }
 
-// Header button locator — aria-label is `${col.label} 기준 정렬` per L155.
+// Header button locator — aria-label is `${col.label} 기준 정렬`. Click target.
 function sortButton(page: Page, label: "Builder" | "Tokens" | "Cost" | "Trend") {
   return page.getByRole("button", { name: `${label} 기준 정렬` });
+}
+
+// WAI-ARIA: `aria-sort` is valid only on a `columnheader`/`rowheader`, not on
+// a bare <button>. BurnIndexSection wraps each sort button in a
+// `<div role="columnheader">` and hangs aria-sort on the wrapper — assert via
+// the columnheader, not the button. Locator is parent of sortButton.
+function sortHeader(page: Page, label: "Builder" | "Tokens" | "Cost" | "Trend") {
+  return page
+    .locator('[role="columnheader"]')
+    .filter({ has: sortButton(page, label) });
 }
 
 test.describe("BurnIndex leaderboard column sort", () => {
@@ -115,24 +125,24 @@ test.describe("BurnIndex leaderboard column sort", () => {
 
   test("default order is totalTokens desc", async ({ page }) => {
     expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
-    await expect(sortButton(page, "Tokens")).toHaveAttribute("aria-sort", "descending");
+    await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "descending");
     // The other three columns report aria-sort="none" until clicked.
-    await expect(sortButton(page, "Builder")).toHaveAttribute("aria-sort", "none");
-    await expect(sortButton(page, "Cost")).toHaveAttribute("aria-sort", "none");
-    await expect(sortButton(page, "Trend")).toHaveAttribute("aria-sort", "none");
+    await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "none");
+    await expect(sortHeader(page, "Cost")).toHaveAttribute("aria-sort", "none");
+    await expect(sortHeader(page, "Trend")).toHaveAttribute("aria-sort", "none");
   });
 
   test("clicking Builder sorts handle asc, click again flips to desc", async ({ page }) => {
     await sortButton(page, "Builder").click();
     expect(await visibleHandles(page)).toEqual(["@alice", "@bob", "@carol"]);
-    await expect(sortButton(page, "Builder")).toHaveAttribute("aria-sort", "ascending");
+    await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "ascending");
     // Previously-active column drops back to "none" — only one column owns
     // the sort state at a time.
-    await expect(sortButton(page, "Tokens")).toHaveAttribute("aria-sort", "none");
+    await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "none");
 
     await sortButton(page, "Builder").click();
     expect(await visibleHandles(page)).toEqual(["@carol", "@bob", "@alice"]);
-    await expect(sortButton(page, "Builder")).toHaveAttribute("aria-sort", "descending");
+    await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "descending");
   });
 
   test("switching to Cost resets dir to numeric default (desc)", async ({ page }) => {
@@ -141,12 +151,12 @@ test.describe("BurnIndex leaderboard column sort", () => {
     // for numeric columns), not inherit "desc" by accident from prior state.
     await sortButton(page, "Builder").click();
     await sortButton(page, "Builder").click();
-    await expect(sortButton(page, "Builder")).toHaveAttribute("aria-sort", "descending");
+    await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "descending");
 
     await sortButton(page, "Cost").click();
     expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
-    await expect(sortButton(page, "Cost")).toHaveAttribute("aria-sort", "descending");
-    await expect(sortButton(page, "Builder")).toHaveAttribute("aria-sort", "none");
+    await expect(sortHeader(page, "Cost")).toHaveAttribute("aria-sort", "descending");
+    await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "none");
   });
 
   test("switching to Builder from a numeric column resets dir to handle default (asc)", async ({
@@ -156,31 +166,31 @@ test.describe("BurnIndex leaderboard column sort", () => {
     // (handle's type-default), not inherit "desc" from the prior column.
     await sortButton(page, "Builder").click();
     expect(await visibleHandles(page)).toEqual(["@alice", "@bob", "@carol"]);
-    await expect(sortButton(page, "Builder")).toHaveAttribute("aria-sort", "ascending");
+    await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "ascending");
   });
 
   test("Trend desc puts the nullish-trend row at the bottom", async ({ page }) => {
     await sortButton(page, "Trend").click();
     // alice +15, carol -5, bob null. Numeric desc: 15 > -5, null sinks.
     expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
-    await expect(sortButton(page, "Trend")).toHaveAttribute("aria-sort", "descending");
+    await expect(sortHeader(page, "Trend")).toHaveAttribute("aria-sort", "descending");
 
     // Flip to asc — null still sinks (this is the regression we care about:
     // a naive comparator would float null to the top under asc).
     await sortButton(page, "Trend").click();
     expect(await visibleHandles(page)).toEqual(["@carol", "@alice", "@bob"]);
-    await expect(sortButton(page, "Trend")).toHaveAttribute("aria-sort", "ascending");
+    await expect(sortHeader(page, "Trend")).toHaveAttribute("aria-sort", "ascending");
   });
 
   test("Tokens header click pattern: same-key flips, fresh column resets", async ({ page }) => {
     // Tokens is the initial sort (desc) — clicking it flips to asc.
     await sortButton(page, "Tokens").click();
     expect(await visibleHandles(page)).toEqual(["@bob", "@carol", "@alice"]);
-    await expect(sortButton(page, "Tokens")).toHaveAttribute("aria-sort", "ascending");
+    await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "ascending");
 
     // Click Tokens again — flips back to desc.
     await sortButton(page, "Tokens").click();
     expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
-    await expect(sortButton(page, "Tokens")).toHaveAttribute("aria-sort", "descending");
+    await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "descending");
   });
 });

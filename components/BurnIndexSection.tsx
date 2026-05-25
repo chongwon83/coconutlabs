@@ -141,24 +141,29 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
         </div>
 
         <div className="lb-v3">
-          <div className="lb-head">
-            <span className="lb-col-rank">#</span>
+          <div className="lb-head" role="row">
+            <span className="lb-col-rank" role="columnheader">#</span>
             {SORT_COLS.map((col) => {
               const active = sortKey === col.key;
               return (
-                <button
+                <div
                   key={col.key}
-                  type="button"
-                  className={`${col.cls} lb-sort-btn${active ? " lb-sort-btn-active" : ""}`}
-                  onClick={() => toggle(col.key)}
+                  role="columnheader"
                   aria-sort={ariaSort(col.key)}
-                  aria-label={`${col.label} 기준 정렬`}
+                  className={col.cls}
                 >
-                  <span>{col.label}</span>
-                  <span className="lb-sort-arrow" aria-hidden="true">
-                    {sortArrow(active, sortDir)}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    className={`lb-sort-btn${active ? " lb-sort-btn-active" : ""}`}
+                    onClick={() => toggle(col.key)}
+                    aria-label={`${col.label} 기준 정렬`}
+                  >
+                    <span>{col.label}</span>
+                    <span className="lb-sort-arrow" aria-hidden="true">
+                      {sortArrow(active, sortDir)}
+                    </span>
+                  </button>
+                </div>
               );
             })}
           </div>
