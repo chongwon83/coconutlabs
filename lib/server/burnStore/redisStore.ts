@@ -86,6 +86,11 @@ function projectEntry(e: ImportedEntry): ImportedEntry {
     since: e.since,
     until: e.until,
     importedAt: e.importedAt,
+    // Defensive `?? []`: an ImportedEntry built before A.1 added the field
+    // (e.g. a test fixture that omitted it, or an in-memory object during a
+    // mid-deploy upsert) lands here without toolsUsed. The persisted shape
+    // must always carry the array so readEntries hydration is a no-op.
+    toolsUsed: e.toolsUsed ?? [],
   };
   if (e.fixes !== undefined) stored.fixes = e.fixes;
   if (e.ves !== undefined) stored.ves = e.ves;
@@ -93,6 +98,15 @@ function projectEntry(e: ImportedEntry): ImportedEntry {
   if (e.trendPct !== undefined) stored.trendPct = e.trendPct;
   if (e.trendSeries !== undefined) stored.trendSeries = e.trendSeries;
   return stored;
+}
+
+// Hydrate one entry read from Redis. The JSON blob may predate A.1 (no
+// toolsUsed field), so coerce a missing value to `[]` before the entry hits
+// the UI — every consumer (BurnIndexSection filter tabs, route.ts join) calls
+// `.includes()` on this and would crash on undefined.
+function hydrateEntry(e: ImportedEntry): ImportedEntry {
+  if (Array.isArray(e.toolsUsed)) return e;
+  return { ...e, toolsUsed: [] };
 }
 
 // Same defence for ChallengeRecord — rebuild the 7 declared fields so no extra
@@ -123,7 +137,7 @@ export class RedisBurnStore implements BurnStore {
       LEADERBOARD_KEY,
     );
     if (map == null) return [];
-    return Object.values(map).sort(byImportedAtDesc);
+    return Object.values(map).map(hydrateEntry).sort(byImportedAtDesc);
   }
 
   // Upsert one card by handle AND, for a weekly import, record its history

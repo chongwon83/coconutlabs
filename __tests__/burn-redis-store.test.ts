@@ -62,6 +62,7 @@ const VALID_ENTRY: ImportedEntry = {
   since: "2026-05-11T00:00:00Z",
   until: "2026-05-18T00:00:00Z",
   importedAt: "2026-05-20T12:00:00Z",
+  toolsUsed: ["claude-code"],
   fixes: 5,
   ves: 11.9,
   trendDir: "up",
@@ -142,10 +143,10 @@ describe("RedisBurnStore.upsertEntry — atomic Lua EVAL contract", () => {
     const entryJson = argv[1] as string;
     const stored = JSON.parse(entryJson);
 
-    // Allowed: 9 required + 5 optional = 14 known keys
+    // Allowed: 10 required (incl. toolsUsed from A.1) + 5 optional = 15 known keys
     const allowed = new Set([
       "handle", "avatar", "verif", "totalTokens", "estimatedCostUsd",
-      "period", "since", "until", "importedAt",
+      "period", "since", "until", "importedAt", "toolsUsed",
       "fixes", "ves", "trendDir", "trendPct", "trendSeries",
     ]);
     for (const key of Object.keys(stored)) {
@@ -185,6 +186,7 @@ describe("RedisBurnStore.upsertEntry — atomic Lua EVAL contract", () => {
       since: null,
       until: null,
       importedAt: "2026-05-20T12:00:00Z",
+      toolsUsed: [],
     };
     await store.upsertEntry(minimal);
     const evalCall = stub.calls.find((c) => c.method === "eval")!;

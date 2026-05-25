@@ -42,9 +42,18 @@ async function readArray<T>(filePath: string): Promise<T[]> {
   }
 }
 
+// JSON blobs written before A.1 added toolsUsed will deserialize without the
+// field — coerce to `[]` before the entry reaches any consumer that calls
+// `.includes()` on it (BurnIndexSection filter tabs, route.ts join).
+function hydrateEntry(e: ImportedEntry): ImportedEntry {
+  if (Array.isArray(e.toolsUsed)) return e;
+  return { ...e, toolsUsed: [] };
+}
+
 export class FileBurnStore implements BurnStore {
   async readEntries(): Promise<ImportedEntry[]> {
-    return readArray<ImportedEntry>(STORE_PATH);
+    const rows = await readArray<ImportedEntry>(STORE_PATH);
+    return rows.map(hydrateEntry);
   }
 
   async readHistory(): Promise<ImportHistoryPoint[]> {
@@ -67,7 +76,7 @@ export class FileBurnStore implements BurnStore {
   // upsert (both idempotent by handle).
   async upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
     return withLock(STORE_PATH, async () => {
-      const prev = await readArray<ImportedEntry>(STORE_PATH);
+      const prev = (await readArray<ImportedEntry>(STORE_PATH)).map(hydrateEntry);
       const next = [entry, ...prev.filter((e) => e.handle !== entry.handle)];
       next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
       await this.#recordHistory(entry);

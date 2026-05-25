@@ -267,6 +267,11 @@ export interface ImportedEntry {
   since: string | null;
   until: string | null;
   importedAt: string;
+  // Distinct tools that contributed rows to this aggregate, derived from
+  // BurnSummary.tool. Non-optional with `[]` allowed so the filter tabs in
+  // BurnIndexSection always have an array to read. Stored entries written
+  // before this field existed hydrate to `[]` defensively (see burnStore/*).
+  toolsUsed: ("claude-code" | "codex")[];
   fixes?: number;
   ves?: number;
   // trend, filled by the /api/burnindex GET from each handle's weekly import
@@ -348,6 +353,12 @@ export function buildImportedEntry(
   env: BurnSummaryEnvelope,
   handle: string,
 ): ImportedEntry {
+  // Unique tools that produced rows in this envelope. Sorted for stable
+  // serialization (Set iteration order is insertion-based; sort gives
+  // deterministic JSON output for snapshot tests + Redis blob comparison).
+  const toolsUsed = Array.from(
+    new Set(env.rows.map((r) => r.tool)),
+  ).sort() as ("claude-code" | "codex")[];
   return {
     handle,
     avatar: avatarFor(handle),
@@ -358,6 +369,7 @@ export function buildImportedEntry(
     since: env.periodWindow.since,
     until: env.periodWindow.until,
     importedAt: new Date().toISOString(),
+    toolsUsed,
   };
 }
 
