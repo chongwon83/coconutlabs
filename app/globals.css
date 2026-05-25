@@ -2238,3 +2238,54 @@ textarea.form-input {
   margin: 8px 0;
   line-height: 1.4;
 }
+
+/* === Upload Success Card (A.12 — pre-merge UX hardening) === */
+.upload-success-card {
+  margin-top: 16px;
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--surface-elevated, #fff);
+  border: 1px solid var(--young-coconut, #00D084);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.upload-success-card:focus-visible {
+  outline: 3px solid var(--young-coconut, #00D084);
+  outline-offset: 2px;
+}
+.upload-success-card__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #0A0A0A);
+}
+.upload-success-card__handle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary, #525252);
+  font-family: var(--font-mono);
+}
+.upload-success-card__cta {
+  align-self: stretch;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--young-coconut, #00D084);
+  color: #0A0A0A;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+.upload-success-card__cta:hover {
+  filter: brightness(1.05);
+}
+.upload-success-card__cta:focus-visible {
+  outline: 3px solid #0A0A0A;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .upload-success-card {
+    transition: none;
+  }
+}

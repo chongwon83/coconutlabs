@@ -99,6 +99,25 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
   const abortCountRef = useRef<number>(0);
   const [uploadTimeBucket, setUploadTimeBucket] = useState<DurationBucket | null>(null);
   const [showSurvey, setShowSurvey] = useState(false);
+  // A.12: persistent success state — survives the upload handler's `finally`
+  // block so the success card stays visible after POST 2xx (gated strictly on
+  // response.ok). Cleared in catch so failures restore the CTA + error path.
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successHandle, setSuccessHandle] = useState("");
+  const successCardRef = useRef<HTMLDivElement>(null);
+
+  // A.12: scroll success card into the modal viewport + move focus to the
+  // status region so screen readers announce it. `block:'nearest'` keeps the
+  // scroll inside `.modal-content` rather than jumping the whole page.
+  useEffect(() => {
+    if (!showSuccess || !successCardRef.current) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    successCardRef.current.scrollIntoView({
+      block: "nearest",
+      behavior: reduce ? "instant" : "smooth",
+    });
+    successCardRef.current.focus();
+  }, [showSuccess]);
 
   // Load persisted salt and handles from IndexedDB on mount (FSA path only).
   useEffect(() => {
@@ -239,7 +258,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
       setFsaError("Enter a handle to join the Burn Index.");
       return;
     }
-    if (!fsaEnvelope || fsaSubmitting) return;
+    if (!fsaEnvelope || fsaSubmitting || showSuccess) return;
     setFsaError("");
     setFsaSubmitting(true);
     try {
@@ -265,13 +284,15 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
       const bucket = durationTimerRef.current?.() ?? "0-1m";
       sendTelemetryEvent(makeAutoDetectCompletedEvent(bucket, "upload_accepted"));
       if (data.entries) onImport?.(data.entries);
-      // Show post-upload survey before calling onSuccess.
       setUploadTimeBucket(bucket);
       setShowSurvey(true);
+      setSuccessHandle(trimmed.replace(/^@+/, ""));
+      setShowSuccess(true);
     } catch {
       const bucket = durationTimerRef.current?.() ?? "0-1m";
       sendTelemetryEvent(makeAutoDetectFailedEvent(bucket, "upload_failed", "upload"));
       setFsaError("Could not reach the server. Check your connection and retry.");
+      setShowSuccess(false);
     } finally {
       setFsaSubmitting(false);
     }
@@ -336,7 +357,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
       setError("Enter a handle to join the Burn Index.");
       return;
     }
-    if (!envelope || submitting) return;
+    if (!envelope || submitting || showSuccess) return;
     setError("");
     setSubmitting(true);
     try {
@@ -364,9 +385,11 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
         return;
       }
       if (data.entries) onImport?.(data.entries);
-      onSuccess?.(`Burn Summary validated — ${trimmed} added to the Burn Index.`);
+      setSuccessHandle(trimmed.replace(/^@+/, ""));
+      setShowSuccess(true);
     } catch {
       setError("Could not reach the server. Check your connection and retry.");
+      setShowSuccess(false);
     } finally {
       setSubmitting(false);
     }
@@ -377,13 +400,36 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
   // Show post-upload survey after a successful FSA upload.
   if (autoDetect && showSurvey && uploadTimeBucket) {
     return (
-      <PostUploadSurvey
-        setupTimeBucket={uploadTimeBucket}
-        onDone={() => {
-          setShowSurvey(false);
-          onSuccess?.(`Burn Summary validated — ${fsaHandle.trim()} added to the Burn Index.`);
-        }}
-      />
+      <>
+        {showSuccess && (
+          <div
+            ref={successCardRef}
+            tabIndex={-1}
+            role="status"
+            aria-live="polite"
+            className="upload-success-card"
+          >
+            <h3 className="upload-success-card__title">리더보드에 추가되었어요</h3>
+            <p className="upload-success-card__handle">@{successHandle}</p>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.hash = "#burn";
+              }}
+              className="upload-success-card__cta"
+            >
+              리더보드 보기
+            </button>
+          </div>
+        )}
+        <PostUploadSurvey
+          setupTimeBucket={uploadTimeBucket}
+          onDone={() => {
+            setShowSurvey(false);
+            onSuccess?.(`Burn Summary validated — ${fsaHandle.trim()} added to the Burn Index.`);
+          }}
+        />
+      </>
     );
   }
 
@@ -491,23 +537,48 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
               />
             </div>
 
-            <Button
-              variant="primary"
-              size="lg"
-              type="button"
-              onClick={handleFsaUpload}
-              disabled={fsaSubmitting}
-            >
-              {fsaSubmitting ? "Uploading…" : "Upload to leaderboard"}
-            </Button>
+            {showSuccess ? (
+              <div
+                ref={successCardRef}
+                tabIndex={-1}
+                role="status"
+                aria-live="polite"
+                className="upload-success-card"
+              >
+                <h3 className="upload-success-card__title">리더보드에 추가되었어요</h3>
+                <p className="upload-success-card__handle">@{successHandle}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.hash = "#burn";
+                  }}
+                  className="upload-success-card__cta"
+                >
+                  리더보드 보기
+                </button>
+              </div>
+            ) : (
+              <Button
+                variant="primary"
+                size="lg"
+                type="button"
+                onClick={handleFsaUpload}
+                disabled={fsaSubmitting || showSuccess}
+                aria-busy={fsaSubmitting}
+              >
+                {fsaSubmitting ? "Uploading…" : "Upload to leaderboard"}
+              </Button>
+            )}
 
-            <button
-              type="button"
-              className="form-link"
-              onClick={() => { setFsaEnvelope(null); setFsaError(""); }}
-            >
-              Scan again
-            </button>
+            {!showSuccess && (
+              <button
+                type="button"
+                className="form-link"
+                onClick={() => { setFsaEnvelope(null); setFsaError(""); }}
+              >
+                Scan again
+              </button>
+            )}
           </>
         )}
 
@@ -585,27 +656,52 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
           />
         </div>
         {error && <p className="form-error">{error}</p>}
-        <Button
-          variant="primary"
-          size="lg"
-          type="button"
-          onClick={handleConfirm}
-          disabled={submitting}
-        >
-          {submitting ? "Adding…" : "Add to Burn Index"}
-        </Button>
-        <button
-          type="button"
-          className="form-link"
-          onClick={() => {
-            setEnvelope(null);
-            setRaw("");
-            setFileName("");
-            setError("");
-          }}
-        >
-          Import a different file
-        </button>
+        {showSuccess ? (
+          <div
+            ref={successCardRef}
+            tabIndex={-1}
+            role="status"
+            aria-live="polite"
+            className="upload-success-card"
+          >
+            <h3 className="upload-success-card__title">리더보드에 추가되었어요</h3>
+            <p className="upload-success-card__handle">@{successHandle}</p>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.hash = "#burn";
+              }}
+              className="upload-success-card__cta"
+            >
+              리더보드 보기
+            </button>
+          </div>
+        ) : (
+          <>
+            <Button
+              variant="primary"
+              size="lg"
+              type="button"
+              onClick={handleConfirm}
+              disabled={submitting || showSuccess}
+              aria-busy={submitting}
+            >
+              {submitting ? "Adding…" : "Add to Burn Index"}
+            </Button>
+            <button
+              type="button"
+              className="form-link"
+              onClick={() => {
+                setEnvelope(null);
+                setRaw("");
+                setFileName("");
+                setError("");
+              }}
+            >
+              Import a different file
+            </button>
+          </>
+        )}
       </div>
     );
   }
