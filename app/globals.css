@@ -1928,53 +1928,88 @@ textarea.form-input {
   color: var(--fg2);
 }
 
-/* Verification tiers — section dividers grouping rows by trust level.
-   Tier heads are plain block children of .lb-v3; rows keep their own grid. */
-.lb-tier-head {
-  background: #FFFFFF;
-  border-top: 1px solid var(--border);
-  padding: 10px 18px 8px;
-}
-.lb-v3 .lb-head + .lb-tier-head { border-top: 0; }
-.lb-v3 .lb-row + .lb-tier-head { padding-top: 22px; }
-.lb-tier-headrow { display: flex; align-items: center; gap: 8px; }
-.lb-tier-label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg2);
-}
-.lb-tier-count {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg2);
+/* Tool filter tabs — All / Claude Code / Codex (Track A 2026-05-25).
+   Replaces the tier dividers + V3_BUILDERS mock grid; the contest now reads
+   as one inclusive leaderboard segmented by tool. Pressed state uses the
+   locked CTA palette (--young-coconut on #0A0A0A) so filter affordance and
+   CTA share one visual language. */
+.lb-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 20px 0 12px;
+  padding: 4px;
   background: var(--surface-muted);
   border: 1px solid var(--border);
-  border-radius: var(--r-badge);
-  padding: 1px 7px;
+  border-radius: 999px;
 }
-.lb-tier-caption {
-  font-size: 12px;
-  line-height: 1.5;
+.lb-filter {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 6px 14px;
+  height: 30px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--fg2);
-  margin: 3px 0 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
 }
-/* Descending color temperature: coconut green → amber → neutral grey. */
-.lb-tier-verified .lb-tier-label { color: var(--young-coconut-dark); }
-.lb-tier-estimated .lb-tier-label { color: var(--warning); }
-.lb-tier-selfrep .lb-tier-label { color: var(--fg2); }
-/* Verified rows keep a 2px accent bar; lower tiers recede. */
-.lb-row-verified { position: relative; }
-.lb-row-verified::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 2px;
+.lb-filter:hover { color: var(--fg); }
+.lb-filter[aria-pressed="true"] {
   background: var(--young-coconut);
+  color: #0A0A0A;
+  font-weight: 600;
 }
-.lb-row-selfrep .lb-handle { color: var(--fg2); }
+
+/* Sortable column headers — buttons inside .lb-head cell. Reset native button
+   chrome; inherit the uppercase mono header type from .lb-head. Active column
+   uses --young-coconut-dark to mirror filter affordance without competing. */
+.lb-sort-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+}
+.lb-sort-btn:hover { color: var(--fg2); }
+.lb-sort-btn-active { color: var(--young-coconut-dark); }
+.lb-sort-arrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg3);
+  font-variant-numeric: tabular-nums;
+}
+.lb-sort-btn-active .lb-sort-arrow { color: var(--young-coconut-dark); }
+
+/* Empty state — no imports yet OR filter excludes everything. Inline link
+   back to #hero keeps the user one click from the upload CTA. */
+.lb-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--fg2);
+  line-height: 1.55;
+}
+.lb-empty-link {
+  color: var(--young-coconut-dark);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 500;
+}
+.lb-empty-link:hover { color: var(--fg); }
 
 /* Sparkline */
 .sparkline { display: block; flex: none; }
@@ -2202,4 +2237,55 @@ textarea.form-input {
   border-radius: var(--r-card);
   margin: 8px 0;
   line-height: 1.4;
+}
+
+/* === Upload Success Card (A.12 — pre-merge UX hardening) === */
+.upload-success-card {
+  margin-top: 16px;
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--surface-elevated, #fff);
+  border: 1px solid var(--young-coconut, #00D084);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.upload-success-card:focus-visible {
+  outline: 3px solid var(--young-coconut, #00D084);
+  outline-offset: 2px;
+}
+.upload-success-card__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #0A0A0A);
+}
+.upload-success-card__handle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary, #525252);
+  font-family: var(--font-mono);
+}
+.upload-success-card__cta {
+  align-self: stretch;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--young-coconut, #00D084);
+  color: #0A0A0A;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+.upload-success-card__cta:hover {
+  filter: brightness(1.05);
+}
+.upload-success-card__cta:focus-visible {
+  outline: 3px solid #0A0A0A;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .upload-success-card {
+    transition: none;
+  }
 }

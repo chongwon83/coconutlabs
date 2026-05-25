@@ -23,13 +23,21 @@ import type {
 
 const KEEP_PER_HANDLE = 12;
 
+// Mirrors fileStore.hydrateEntry — tests that seed legacy-shaped entries
+// (toolsUsed missing) must not crash the filter path at BurnIndexSection.tsx
+// `e.toolsUsed.includes(filter)`. Three-store defensive contract.
+function hydrateEntry(e: ImportedEntry): ImportedEntry {
+  if (Array.isArray(e.toolsUsed)) return e;
+  return { ...e, toolsUsed: [] };
+}
+
 export class MemoryBurnStore implements BurnStore {
   #entries: ImportedEntry[] = [];
   #history: ImportHistoryPoint[] = [];
   #challenges: ChallengeRecord[] = [];
 
   async readEntries(): Promise<ImportedEntry[]> {
-    return [...this.#entries];
+    return this.#entries.map(hydrateEntry);
   }
 
   async readHistory(): Promise<ImportHistoryPoint[]> {
@@ -41,9 +49,11 @@ export class MemoryBurnStore implements BurnStore {
   }
 
   async upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
-    const next = [entry, ...this.#entries.filter((e) => e.handle !== entry.handle)];
+    const hydrated = hydrateEntry(entry);
+    const prev = this.#entries.map(hydrateEntry);
+    const next = [hydrated, ...prev.filter((e) => e.handle !== hydrated.handle)];
     next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
-    this.#recordHistory(entry);
+    this.#recordHistory(hydrated);
     this.#entries = next;
     return [...next];
   }
