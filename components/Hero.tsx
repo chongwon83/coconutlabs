@@ -126,7 +126,7 @@ export function Hero({ onJoin, onChallenge }: HeroProps) {
             <span className="hero-chip">+ more</span>
           </div>
           <div className="hero-actions" data-testid="hero-cta-group">
-            <Button variant="primary" size="lg" onClick={onJoin} data-testid="hero-cta-primary">
+            <Button variant="primary" size="xl" onClick={onJoin} data-testid="hero-cta-primary">
               Join Burn Index
             </Button>
             {SHOW_LEGACY && (
