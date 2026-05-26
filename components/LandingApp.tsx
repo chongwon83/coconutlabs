@@ -12,7 +12,6 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import useSWR from "swr";
 import { Nav } from "@/components/Nav";
 import { StatusBar } from "@/components/StatusBar";
 import { Hero, type HeroStats } from "@/components/Hero";
@@ -103,29 +102,45 @@ export default function LandingApp() {
   // 사용자가 한 번 닫으면 같은 세션의 auto-detect 재오픈을 차단 (Invariant #6).
   const userClosedRef = useRef<boolean>(false);
 
-  // The leaderboard is live now: SWR polls the server every 30s, keeping the
-  // last good payload visible if one refresh fails. A first-load failure falls
-  // back to [] so the page still renders the empty state instead of crashing.
-  const { data: imported = [], mutate: mutateImported } = useSWR(
-    "/api/burnindex",
-    fetchBurnIndexEntries,
-    {
-      fallbackData: [],
-      refreshInterval: BURN_INDEX_REFRESH_MS,
-      revalidateOnFocus: false,
-      shouldRetryOnError: false,
-    },
-  );
-  const { data: stats = EMPTY_BURN_INDEX_STATS, mutate: mutateStats } = useSWR(
-    "/api/burnindex/stats",
-    fetchBurnIndexStats,
-    {
-      fallbackData: EMPTY_BURN_INDEX_STATS,
-      refreshInterval: BURN_INDEX_REFRESH_MS,
-      revalidateOnFocus: false,
-      shouldRetryOnError: false,
-    },
-  );
+  // useSWR was silently failing to fire its initial fetch on this Next.js 16 +
+  // React 19 build (see decision-log 2026-05-26). Plain useEffect+setInterval
+  // polling is enough — we only need 30s refresh and an immediate mutate path
+  // for POST responses. Errors keep the previous payload so a one-off refresh
+  // failure does not blank the leaderboard.
+  const [imported, setImported] = useState<ImportedEntry[]>([]);
+  const [stats, setStats] = useState<HeroStats>(EMPTY_BURN_INDEX_STATS);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refresh = async () => {
+      try {
+        const [entries, nextStats] = await Promise.all([
+          fetchBurnIndexEntries("/api/burnindex"),
+          fetchBurnIndexStats("/api/burnindex/stats"),
+        ]);
+        if (cancelled) return;
+        setImported(entries);
+        setStats(nextStats);
+      } catch {
+        // Swallow — leaderboard keeps last good payload, next tick retries.
+      }
+    };
+
+    void refresh();
+    const id = window.setInterval(refresh, BURN_INDEX_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const mutateImported = useCallback((entries: ImportedEntry[]) => {
+    setImported(entries);
+  }, []);
+  const mutateStats = useCallback((next: HeroStats) => {
+    setStats(next);
+  }, []);
 
   // 모든 modal close 경로가 거치는 단일 path — latch set + setModal(null) 결합.
   const closeModal = useCallback(() => {
@@ -146,11 +161,11 @@ export default function LandingApp() {
   }, []);
 
   // The POST response carries the full server-sorted list — dedupe and
-  // ordering are the store's job, so update SWR's cache immediately and let
+  // ordering are the store's job, so update local state immediately and let
   // the next 30s poll reconcile with the shared server state.
   const handleImport = useCallback((entries: ImportedEntry[]) => {
-    void mutateImported(entries, { revalidate: false });
-    void mutateStats(statsFromEntries(entries), { revalidate: false });
+    mutateImported(entries);
+    mutateStats(statsFromEntries(entries));
   }, [mutateImported, mutateStats]);
 
   return (
