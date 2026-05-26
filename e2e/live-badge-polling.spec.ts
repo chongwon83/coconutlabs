@@ -5,6 +5,7 @@
 // entries via SWR in Track B. These tests lock that browser seam:
 //   1. /api/burnindex is polled after the 30s refresh interval.
 //   2. A failed refresh keeps the last good leaderboard rows visible.
+//   3. /api/burnindex/stats drives the Hero stat bar with the same cadence.
 //
 // SECURITY: GET-only route stubs. No collector token is issued, no POST path is
 // exercised, and no real BurnStore state is touched.
@@ -35,6 +36,24 @@ const POLLED_ENTRY: ImportedEntry = {
   toolsUsed: ["codex"],
 };
 
+interface StatsPayload {
+  builderCount: number;
+  totalTokens: number;
+  totalCost: number;
+}
+
+const INITIAL_STATS: StatsPayload = {
+  builderCount: 2,
+  totalTokens: 2_400_000,
+  totalCost: 4_820,
+};
+
+const POLLED_STATS: StatsPayload = {
+  builderCount: 3,
+  totalTokens: 980_000,
+  totalCost: 12,
+};
+
 async function installLeaderboardStub(
   page: Page,
   nextPayload: () => { status: number; entries?: ImportedEntry[] },
@@ -51,6 +70,23 @@ async function installLeaderboardStub(
       status: payload.status,
       contentType: "application/json",
       body: JSON.stringify({ entries: payload.entries ?? [] }),
+    });
+  });
+  return { count: () => requests };
+}
+
+async function installStatsStub(
+  page: Page,
+  nextPayload: () => { status: number; stats?: StatsPayload },
+): Promise<{ count: () => number }> {
+  let requests = 0;
+  await page.route("**/api/burnindex/stats", async (route) => {
+    requests += 1;
+    const payload = nextPayload();
+    await route.fulfill({
+      status: payload.status,
+      contentType: "application/json",
+      body: JSON.stringify(payload.stats ?? {}),
     });
   });
   return { count: () => requests };
@@ -107,5 +143,66 @@ test.describe("Burn Index live polling", () => {
     );
     expect(await visibleHandles(page)).toEqual(["@initial"]);
     await expect(page.locator(".lb-empty")).toHaveCount(0);
+  });
+
+  test("renders and polls the Hero stat bar from /api/burnindex/stats", async ({
+    page,
+  }) => {
+    await installLeaderboardStub(page, () => ({
+      status: 200,
+      entries: [INITIAL_ENTRY],
+    }));
+    let servePolled = false;
+    const stub = await installStatsStub(page, () => ({
+      status: 200,
+      stats: servePolled ? POLLED_STATS : INITIAL_STATS,
+    }));
+
+    await page.goto("/");
+    await expect(page.getByTestId("hero-stat-builders")).toHaveText("2 builders");
+    await expect(page.getByTestId("hero-stat-tokens")).toHaveText("2.4M tokens");
+    await expect(page.getByTestId("hero-stat-spend")).toHaveText("$4,820 spent");
+
+    const initialRequestCount = stub.count();
+    servePolled = true;
+    await page.clock.runFor(30_000);
+
+    await expect.poll(() => stub.count(), { timeout: 5_000 }).toBeGreaterThan(
+      initialRequestCount,
+    );
+    await expect(page.getByTestId("hero-stat-builders")).toHaveText("3 builders");
+    await expect(page.getByTestId("hero-stat-tokens")).toHaveText("980K tokens");
+    await expect(page.getByTestId("hero-stat-spend")).toHaveText("$12 spent");
+  });
+
+  test("keeps the previous Hero stats visible when a stats refresh fails", async ({
+    page,
+  }) => {
+    await installLeaderboardStub(page, () => ({
+      status: 200,
+      entries: [INITIAL_ENTRY],
+    }));
+    let failRefresh = false;
+    const stub = await installStatsStub(page, () => (
+      failRefresh
+        ? { status: 500 }
+        : { status: 200, stats: INITIAL_STATS }
+    ));
+
+    await page.goto("/");
+    await expect(page.getByTestId("hero-stat-builders")).toHaveText("2 builders");
+    await expect(page.getByTestId("hero-stat-tokens")).toHaveText("2.4M tokens");
+    await expect(page.getByTestId("hero-stat-spend")).toHaveText("$4,820 spent");
+
+    const initialRequestCount = stub.count();
+    failRefresh = true;
+    await page.clock.runFor(30_000);
+
+    await expect.poll(() => stub.count(), { timeout: 5_000 }).toBeGreaterThan(
+      initialRequestCount,
+    );
+    await expect(page.getByTestId("hero-stat-builders")).toHaveText("2 builders");
+    await expect(page.getByTestId("hero-stat-tokens")).toHaveText("2.4M tokens");
+    await expect(page.getByTestId("hero-stat-spend")).toHaveText("$4,820 spent");
   });
 });
