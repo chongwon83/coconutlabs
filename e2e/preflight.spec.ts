@@ -149,13 +149,15 @@ test.describe("Preflight: baseline stability invariants (Track 4)", () => {
   // 1280x720 viewport) caused Turbopack to emit a CSS chunk hash that the
   // mobile context's HTML still references but no longer matches the
   // current rules. reload() forces the page to re-request the current
-  // chunk URL, which Next.js resolves to the up-to-date CSS.
+  // chunk URL, which Next.js resolves to the up-to-date CSS. Do not wait for
+  // networkidle on the reload: live SWR polling keeps dev-mode network
+  // quiescence from being a reliable readiness signal.
 
   test.describe("INV-5a: .hero-right display:none at mobile (375x667)", () => {
     test.use({ viewport: { width: 375, height: 667 } });
     test("hero-right hidden", async ({ page }) => {
       await gotoStable(page);
-      await page.reload({ waitUntil: "networkidle" });
+      await page.reload({ waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready);
       await expect(
         page.locator(".hero-right"),
@@ -168,7 +170,7 @@ test.describe("Preflight: baseline stability invariants (Track 4)", () => {
     test.use({ viewport: { width: 1280, height: 800 } });
     test("hero-right visible", async ({ page }) => {
       await gotoStable(page);
-      await page.reload({ waitUntil: "networkidle" });
+      await page.reload({ waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready);
       await expect(
         page.locator(".hero-right"),
