@@ -23,7 +23,9 @@ import { fetchCollectorToken } from "@/lib/client/burn/token";
 
 interface JoinBurnIndexFormProps {
   onSuccess?: (msg: string) => void;
-  onImport?: (entries: ImportedEntry[]) => void;
+  // B.4 MAJOR #1: optional second arg lifts success handle to the page so the
+  // banner survives modal close. Single-arg callers still work.
+  onImport?: (entries: ImportedEntry[], handle?: string) => void;
 }
 
 // The quickstart commands rendered in Step 1. `git clone` uses
@@ -283,7 +285,8 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
       }
       const bucket = durationTimerRef.current?.() ?? "0-1m";
       sendTelemetryEvent(makeAutoDetectCompletedEvent(bucket, "upload_accepted"));
-      if (data.entries) onImport?.(data.entries);
+      // B.4 MAJOR #1: pass trimmed handle so page-level banner survives modal close.
+      if (data.entries) onImport?.(data.entries, trimmed);
       setUploadTimeBucket(bucket);
       setShowSurvey(true);
       setSuccessHandle(trimmed.replace(/^@+/, ""));
@@ -384,7 +387,8 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
         setError(data.error ?? "Could not add to the Burn Index. Try again.");
         return;
       }
-      if (data.entries) onImport?.(data.entries);
+      // B.4 MAJOR #1: pass trimmed handle so page-level banner survives modal close.
+      if (data.entries) onImport?.(data.entries, trimmed);
       setSuccessHandle(trimmed.replace(/^@+/, ""));
       setShowSuccess(true);
     } catch {
