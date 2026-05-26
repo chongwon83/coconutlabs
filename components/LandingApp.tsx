@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import useSWR from "swr";
 import { Nav } from "@/components/Nav";
 import { StatusBar } from "@/components/StatusBar";
 import { Hero } from "@/components/Hero";
@@ -34,6 +35,15 @@ const LegacySections = SHOW_LEGACY
   : null;
 
 type ModalKind = "join" | "challenge" | null;
+
+const BURN_INDEX_REFRESH_MS = 30_000;
+
+async function fetchBurnIndexEntries(url: string): Promise<ImportedEntry[]> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Could not load Burn Index.");
+  const data: { entries?: ImportedEntry[] } = await res.json().catch(() => ({}));
+  return Array.isArray(data.entries) ? data.entries : [];
+}
 
 // useSearchParams은 production build에서 Suspense boundary 의무 (Next.js 16.2.6
 // docs L179). 자식 컴포넌트로 분리해 CSR bailout 범위를 listener만으로 제한.
@@ -62,27 +72,22 @@ function AutoDetectListener({
 export default function LandingApp() {
   const [toast, setToast] = useState({ visible: false, message: "" });
   const [modal, setModal] = useState<ModalKind>(null);
-  const [imported, setImported] = useState<ImportedEntry[]>([]);
   // 사용자가 한 번 닫으면 같은 세션의 auto-detect 재오픈을 차단 (Invariant #6).
   const userClosedRef = useRef<boolean>(false);
 
-  // The leaderboard lives on the server now. Fetch it once on mount — every
-  // browser hitting this server sees the same imports (incognito included).
-  // A failed fetch leaves the list empty rather than breaking the page.
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/burnindex")
-      .then((res) => (res.ok ? res.json() : { entries: [] }))
-      .then((data: { entries?: ImportedEntry[] }) => {
-        if (!cancelled && Array.isArray(data.entries)) setImported(data.entries);
-      })
-      .catch(() => {
-        // Server unreachable — render with an empty leaderboard.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // The leaderboard is live now: SWR polls the server every 30s, keeping the
+  // last good payload visible if one refresh fails. A first-load failure falls
+  // back to [] so the page still renders the empty state instead of crashing.
+  const { data: imported = [], mutate: mutateImported } = useSWR(
+    "/api/burnindex",
+    fetchBurnIndexEntries,
+    {
+      fallbackData: [],
+      refreshInterval: BURN_INDEX_REFRESH_MS,
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+    },
+  );
 
   // 모든 modal close 경로가 거치는 단일 path — latch set + setModal(null) 결합.
   const closeModal = useCallback(() => {
@@ -103,10 +108,11 @@ export default function LandingApp() {
   }, []);
 
   // The POST response carries the full server-sorted list — dedupe and
-  // ordering are the store's job, so the client just adopts it wholesale.
+  // ordering are the store's job, so update SWR's cache immediately and let
+  // the next 30s poll reconcile with the shared server state.
   const handleImport = useCallback((entries: ImportedEntry[]) => {
-    setImported(entries);
-  }, []);
+    void mutateImported(entries, { revalidate: false });
+  }, [mutateImported]);
 
   return (
     <>
