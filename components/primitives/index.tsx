@@ -136,7 +136,7 @@ export function Icon({ name, size = 16, className = "" }: IconProps) {
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "link";
-  size?: "lg" | "sm";
+  size?: "xl" | "lg" | "sm";
   children: React.ReactNode;
 }
 
@@ -152,7 +152,7 @@ export function Button({
     : variant === "secondary" ? "btn-secondary"
     : variant === "ghost" ? "btn-ghost"
     : "btn-link";
-  const s = size === "lg" ? "btn-lg" : "";
+  const s = size === "xl" ? "btn-xl" : size === "lg" ? "btn-lg" : "";
   return (
     <button className={`${base} ${v} ${s} ${className}`.trim()} {...props}>
       {children}
