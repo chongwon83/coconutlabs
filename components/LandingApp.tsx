@@ -104,27 +104,33 @@ export default function LandingApp() {
 
   // useSWR was silently failing to fire its initial fetch on this Next.js 16 +
   // React 19 build (see decision-log 2026-05-26). Plain useEffect+setInterval
-  // polling replaces it. Two non-obvious details:
+  // polling replaces it. Three non-obvious details:
   //   1. entries/stats refresh independently — a stats outage must not blank
   //      a working leaderboard.
-  //   2. mutateImported bumps a write-version so a late-arriving poll cannot
+  //   2. mutateImported bumps writeVersionRef so a late-arriving poll cannot
   //      overwrite the rows the POST response just installed.
+  //   3. refreshSeqRef is monotonic per refresh tick — if poll N+1 starts
+  //      before poll N has responded, poll N's stale response is dropped.
   const [imported, setImported] = useState<ImportedEntry[]>([]);
   const [stats, setStats] = useState<HeroStats>(EMPTY_BURN_INDEX_STATS);
   const writeVersionRef = useRef(0);
+  const refreshSeqRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
 
     const refresh = async () => {
+      const seq = ++refreshSeqRef.current;
       const versionAtStart = writeVersionRef.current;
       const applyEntries = (entries: ImportedEntry[]) => {
         if (cancelled) return;
+        if (seq !== refreshSeqRef.current) return;
         if (writeVersionRef.current !== versionAtStart) return;
         setImported(entries);
       };
       const applyStats = (next: HeroStats) => {
         if (cancelled) return;
+        if (seq !== refreshSeqRef.current) return;
         setStats(next);
       };
 
@@ -191,6 +197,7 @@ export default function LandingApp() {
         <Hero
           onJoin={() => setModal("join")}
           stats={stats}
+          entries={imported}
           {...(SHOW_LEGACY ? { onChallenge: () => setModal("challenge") } : {})}
         />
         <Ticker size={SHOW_LEGACY ? "default" : "compact"} />

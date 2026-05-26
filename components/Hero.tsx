@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Badge } from "@/components/primitives";
-import { fmtCostShort, fmtTokensCompact } from "@/lib/data";
+import { fmtCostShort, fmtTokensCompact, type ImportedEntry } from "@/lib/data";
 
 const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
 
@@ -18,6 +18,7 @@ interface HeroProps {
   onJoin?: () => void;
   onChallenge?: () => void;
   stats?: HeroStats;
+  entries?: ImportedEntry[];
 }
 
 const EMPTY_HERO_STATS: HeroStats = {
@@ -26,8 +27,31 @@ const EMPTY_HERO_STATS: HeroStats = {
   totalCost: 0,
 };
 
-function ProductShot({ tab }: { tab: HeroTab }) {
+const PRODUCT_SHOT_BURN_ROWS = 5;
+
+// The leaderboard table on this same page sorts by totalTokens desc by default
+// (BurnIndexSection). Mirror that here so the ProductShot #1 row is always the
+// same handle the leaderboard #1 row shows — otherwise the two widgets disagree.
+function byTotalTokensDesc(a: ImportedEntry, b: ImportedEntry): number {
+  return b.totalTokens - a.totalTokens;
+}
+
+function deltaKindFor(entry: ImportedEntry): "up" | "down" | "flat" | "new" {
+  if (entry.trendDir === "up") return "up";
+  if (entry.trendDir === "down") return "down";
+  if (entry.trendDir === "flat") return "flat";
+  return "new";
+}
+
+function deltaTextFor(entry: ImportedEntry): string {
+  if (entry.trendDir == null || entry.trendPct == null) return "new";
+  const sign = entry.trendPct > 0 ? "+" : "";
+  return `${sign}${entry.trendPct}%`;
+}
+
+function ProductShot({ tab, entries }: { tab: HeroTab; entries: ImportedEntry[] }) {
   if (tab === "burn") {
+    const top = [...entries].sort(byTotalTokensDesc).slice(0, PRODUCT_SHOT_BURN_ROWS);
     return (
       <div className="product-shot product-shot-burn">
         <div className="product-shot-header" data-testid="product-shot-header">
@@ -35,21 +59,27 @@ function ProductShot({ tab }: { tab: HeroTab }) {
           <span className="product-shot-dot" />
         </div>
         <div className="product-shot-rows" data-testid="product-shot-content" data-mask="dynamic">
-          {[
-            { rank: 1, handle: "@shellcoder", ves: "201.7", cost: "$4.20", delta: "↑1", deltaKind: "up" },
-            { rank: 2, handle: "@tinyshipper", ves: "197.8", cost: "$3.60", delta: "↓1", deltaKind: "down" },
-            { rank: 3, handle: "@noor", ves: "195.5", cost: "$2.20", delta: "—", deltaKind: "flat" },
-            { rank: 4, handle: "@nightowl", ves: "192.1", cost: "$3.80", delta: "↑2", deltaKind: "up" },
-            { rank: 5, handle: "@dgreen", ves: "189.4", cost: "$2.90", delta: "new", deltaKind: "new" },
-          ].map((r) => (
-            <div key={r.rank} className="product-shot-row">
-              <span className="product-shot-rank">#{r.rank}</span>
-              <span className={`product-shot-delta product-shot-delta-${r.deltaKind}`}>{r.delta}</span>
-              <span className="product-shot-handle">{r.handle}</span>
-              <span className="product-shot-ves">{r.ves}</span>
-              <span className="product-shot-cost">{r.cost}</span>
+          {top.length === 0 ? (
+            <div className="product-shot-empty" data-testid="product-shot-empty">
+              Be the first to import. Join Burn Index to claim #1.
             </div>
-          ))}
+          ) : (
+            top.map((entry, idx) => {
+              const rank = idx + 1;
+              const kind = deltaKindFor(entry);
+              return (
+                <div key={entry.handle} className="product-shot-row">
+                  <span className="product-shot-rank">#{rank}</span>
+                  <span className={`product-shot-delta product-shot-delta-${kind}`}>
+                    {deltaTextFor(entry)}
+                  </span>
+                  <span className="product-shot-handle">{entry.handle}</span>
+                  <span className="product-shot-ves">{fmtTokensCompact(entry.totalTokens)}</span>
+                  <span className="product-shot-cost">{fmtCostShort(entry.estimatedCostUsd)}</span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     );
@@ -99,6 +129,13 @@ function HeroSecondaryCard({ stats = EMPTY_HERO_STATS }: { stats?: HeroStats }) 
 
   return (
     <div className="hero-secondary-card" data-testid="hero-secondary-card" data-mask="dynamic">
+      <div className="hero-secondary-header" data-testid="hero-secondary-header">
+        <span className="hero-secondary-header-label">Community weekly total</span>
+        <span className="hero-secondary-header-live">
+          <span className="hero-secondary-header-dot" aria-hidden="true" />
+          Live
+        </span>
+      </div>
       <div className="hero-secondary-row">
         <span className="hero-secondary-label">Builders</span>
         <span className="hero-secondary-value accent" data-testid="hero-stat-builders">
@@ -117,13 +154,17 @@ function HeroSecondaryCard({ stats = EMPTY_HERO_STATS }: { stats?: HeroStats }) 
           {fmtCostShort(stats.totalCost)} spent
         </span>
       </div>
+      <div className="hero-secondary-footnote" data-testid="hero-secondary-footnote">
+        Latest weekly upload per handle
+      </div>
     </div>
   );
 }
 
-export function Hero({ onJoin, onChallenge, stats }: HeroProps) {
+export function Hero({ onJoin, onChallenge, stats, entries }: HeroProps) {
   const [tab, setTab] = useState<HeroTab>("burn");
   const activeTab: HeroTab = SHOW_LEGACY ? tab : "burn";
+  const burnEntries = entries ?? [];
 
   return (
     <section className="hero-v3" id="hero" data-testid="hero-section">
@@ -145,8 +186,6 @@ export function Hero({ onJoin, onChallenge, stats }: HeroProps) {
           <div className="hero-chips" data-testid="hero-chips">
             <span className="hero-chip">Claude Code</span>
             <span className="hero-chip">Codex</span>
-            <span className="hero-chip">Cursor</span>
-            <span className="hero-chip">+ more</span>
           </div>
           <div className="hero-actions" data-testid="hero-cta-group">
             <Button variant="primary" size="xl" onClick={onJoin} data-testid="hero-cta-primary">
@@ -175,7 +214,7 @@ export function Hero({ onJoin, onChallenge, stats }: HeroProps) {
               ))}
             </div>
           )}
-          <ProductShot tab={activeTab} />
+          <ProductShot tab={activeTab} entries={burnEntries} />
         </div>
       </div>
     </section>

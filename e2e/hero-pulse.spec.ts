@@ -69,6 +69,31 @@ test.describe("B.5 Hero pulse + reduced-motion gates", () => {
     expect(animationName).toBe("none");
   });
 
+  test("default: .hero-secondary-header-dot has hero-secondary-pulse animation", async ({
+    page,
+  }) => {
+    await awaitFonts(page);
+    const dot = page.locator(".hero-secondary-header-dot");
+    await expect(dot).toBeVisible();
+    const animationName = await dot.evaluate(
+      (el) => window.getComputedStyle(el).animationName,
+    );
+    expect(animationName).toBe("hero-secondary-pulse");
+  });
+
+  test("reduced-motion: .hero-secondary-header-dot animation frozen", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await awaitFonts(page);
+    const dot = page.locator(".hero-secondary-header-dot");
+    await expect(dot).toBeVisible();
+    const animationName = await dot.evaluate(
+      (el) => window.getComputedStyle(el).animationName,
+    );
+    expect(animationName).toBe("none");
+  });
+
   test("reduced-motion: .ticker-track animation frozen (B.4 debt closed)", async ({
     page,
   }) => {

@@ -373,8 +373,9 @@ export function buildImportedEntry(
   };
 }
 
-// Compact token count: 1.2M / 340K / 980 — for the dense leaderboard grid.
+// Compact token count: 2.6B / 1.2M / 340K / 980 — for the dense leaderboard grid.
 export function fmtTokensCompact(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
   return String(n);
