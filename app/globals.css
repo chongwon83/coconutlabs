@@ -203,6 +203,11 @@ button { font: inherit; cursor: pointer; }
   70%  { box-shadow: 0 0 0 6px rgba(0, 208, 132, 0); }
   100% { box-shadow: 0 0 0 0 rgba(0, 208, 132, 0); }
 }
+@keyframes pulseDot {
+  0%   { transform: scale(1);    opacity: 1; }
+  50%  { transform: scale(1.35); opacity: 0.65; }
+  100% { transform: scale(1);    opacity: 1; }
+}
 .statusbar .divider { width: 1px; height: 14px; background: var(--border); }
 .statusbar .item { display: inline-flex; align-items: center; gap: 6px; }
 .statusbar .item .label { color: var(--fg3); }
@@ -1779,7 +1784,11 @@ textarea.form-input {
   background: var(--surface-muted);
 }
 .product-shot-label { font-size: 12px; font-weight: 500; color: var(--fg2); font-family: var(--font-mono); }
-.product-shot-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--young-coconut); }
+.product-shot-dot {
+  width: 7px; height: 7px; border-radius: 999px;
+  background: var(--young-coconut);
+  animation: pulseDot 2s var(--ease) infinite;
+}
 .product-shot-rows { padding: 8px 0; }
 .product-shot-row {
   display: grid; grid-template-columns: 24px 32px 1fr 60px 60px;
@@ -2390,5 +2399,34 @@ textarea.form-input {
 @media (prefers-reduced-motion: reduce) {
   .upload-success-banner {
     transition: none;
+  }
+}
+
+/* ============================================================
+   B.5 — Global reduced-motion gate for infinite animations.
+   Disables Hero dot pulse + leaderboard/ticker carriers when
+   the user requests reduced motion. Does NOT disable transitions
+   globally (that breaks form focus rings — explicit rejection
+   in B.4). Component-local blocks above (.upload-success-card
+   L2289, .upload-success-banner L2399) remain intact.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .product-shot-dot,
+  .statusbar .live .pulse,
+  .product-chrome .right .pulse,
+  .ticker-inner,
+  .ticker-track,
+  .lb-v3-foot .left .pulse,
+  .activity-feed .af-head .pulse {
+    animation: none !important;
+  }
+  /* Ticker carriers start offscreen via padding-left:100% and rely on the
+     ticker keyframe to scroll content into view. Without the animation,
+     content sits permanently offscreen — worse than the original debt.
+     Static-layout override keeps the first items visible (codex 2026-05-26). */
+  .ticker-inner,
+  .ticker-track {
+    padding-left: 0 !important;
+    transform: none !important;
   }
 }
