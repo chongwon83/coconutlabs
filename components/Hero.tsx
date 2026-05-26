@@ -2,15 +2,29 @@
 
 import { useState } from "react";
 import { Button, Badge } from "@/components/primitives";
+import { fmtCostShort, fmtTokensCompact } from "@/lib/data";
 
 const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
 
 type HeroTab = "burn" | "challenge" | "drops";
 
+export interface HeroStats {
+  builderCount: number;
+  totalTokens: number;
+  totalCost: number;
+}
+
 interface HeroProps {
   onJoin?: () => void;
   onChallenge?: () => void;
+  stats?: HeroStats;
 }
+
+const EMPTY_HERO_STATS: HeroStats = {
+  builderCount: 0,
+  totalTokens: 0,
+  totalCost: 0,
+};
 
 function ProductShot({ tab }: { tab: HeroTab }) {
   if (tab === "burn") {
@@ -79,26 +93,35 @@ function ProductShot({ tab }: { tab: HeroTab }) {
   );
 }
 
-function HeroSecondaryCard() {
+function HeroSecondaryCard({ stats = EMPTY_HERO_STATS }: { stats?: HeroStats }) {
+  const builderValue =
+    stats.builderCount === 0 ? "Be first" : `${stats.builderCount} builders`;
+
   return (
     <div className="hero-secondary-card" data-testid="hero-secondary-card" data-mask="dynamic">
       <div className="hero-secondary-row">
-        <span className="hero-secondary-label">Top VES</span>
-        <span className="hero-secondary-value accent">201.7</span>
+        <span className="hero-secondary-label">Builders</span>
+        <span className="hero-secondary-value accent" data-testid="hero-stat-builders">
+          {builderValue}
+        </span>
       </div>
       <div className="hero-secondary-row">
-        <span className="hero-secondary-label">Week fixes</span>
-        <span className="hero-secondary-value">3,391</span>
+        <span className="hero-secondary-label">Tokens collected</span>
+        <span className="hero-secondary-value" data-testid="hero-stat-tokens">
+          {fmtTokensCompact(stats.totalTokens)} tokens
+        </span>
       </div>
       <div className="hero-secondary-row">
         <span className="hero-secondary-label">AI spend</span>
-        <span className="hero-secondary-value">$4,820</span>
+        <span className="hero-secondary-value" data-testid="hero-stat-spend">
+          {fmtCostShort(stats.totalCost)} spent
+        </span>
       </div>
     </div>
   );
 }
 
-export function Hero({ onJoin, onChallenge }: HeroProps) {
+export function Hero({ onJoin, onChallenge, stats }: HeroProps) {
   const [tab, setTab] = useState<HeroTab>("burn");
   const activeTab: HeroTab = SHOW_LEGACY ? tab : "burn";
 
@@ -135,7 +158,7 @@ export function Hero({ onJoin, onChallenge }: HeroProps) {
               </Button>
             )}
           </div>
-          <HeroSecondaryCard />
+          <HeroSecondaryCard stats={stats} />
         </div>
 
         <div className="hero-right" data-testid="hero-right">

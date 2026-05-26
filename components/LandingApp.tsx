@@ -15,7 +15,7 @@ import dynamic from "next/dynamic";
 import useSWR from "swr";
 import { Nav } from "@/components/Nav";
 import { StatusBar } from "@/components/StatusBar";
-import { Hero } from "@/components/Hero";
+import { Hero, type HeroStats } from "@/components/Hero";
 import { Ticker } from "@/components/Ticker";
 import { BurnIndexSection } from "@/components/BurnIndexSection";
 import { Footer } from "@/components/Footer";
@@ -38,11 +38,39 @@ type ModalKind = "join" | "challenge" | null;
 
 const BURN_INDEX_REFRESH_MS = 30_000;
 
+const EMPTY_BURN_INDEX_STATS: HeroStats = {
+  builderCount: 0,
+  totalTokens: 0,
+  totalCost: 0,
+};
+
 async function fetchBurnIndexEntries(url: string): Promise<ImportedEntry[]> {
   const res = await fetch(url);
   if (!res.ok) throw new Error("Could not load Burn Index.");
   const data: { entries?: ImportedEntry[] } = await res.json().catch(() => ({}));
   return Array.isArray(data.entries) ? data.entries : [];
+}
+
+function statsFromEntries(entries: ImportedEntry[]): HeroStats {
+  return {
+    builderCount: entries.length,
+    totalTokens: entries.reduce((sum, entry) => sum + entry.totalTokens, 0),
+    totalCost: entries.reduce((sum, entry) => sum + entry.estimatedCostUsd, 0),
+  };
+}
+
+async function fetchBurnIndexStats(url: string): Promise<HeroStats> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Could not load Burn Index stats.");
+  const data: Partial<HeroStats> = await res.json().catch(() => ({}));
+  return {
+    builderCount:
+      typeof data.builderCount === "number" ? data.builderCount : 0,
+    totalTokens:
+      typeof data.totalTokens === "number" ? data.totalTokens : 0,
+    totalCost:
+      typeof data.totalCost === "number" ? data.totalCost : 0,
+  };
 }
 
 // useSearchParams은 production build에서 Suspense boundary 의무 (Next.js 16.2.6
@@ -88,6 +116,16 @@ export default function LandingApp() {
       shouldRetryOnError: false,
     },
   );
+  const { data: stats = EMPTY_BURN_INDEX_STATS, mutate: mutateStats } = useSWR(
+    "/api/burnindex/stats",
+    fetchBurnIndexStats,
+    {
+      fallbackData: EMPTY_BURN_INDEX_STATS,
+      refreshInterval: BURN_INDEX_REFRESH_MS,
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+    },
+  );
 
   // 모든 modal close 경로가 거치는 단일 path — latch set + setModal(null) 결합.
   const closeModal = useCallback(() => {
@@ -112,7 +150,8 @@ export default function LandingApp() {
   // the next 30s poll reconcile with the shared server state.
   const handleImport = useCallback((entries: ImportedEntry[]) => {
     void mutateImported(entries, { revalidate: false });
-  }, [mutateImported]);
+    void mutateStats(statsFromEntries(entries), { revalidate: false });
+  }, [mutateImported, mutateStats]);
 
   return (
     <>
@@ -130,6 +169,7 @@ export default function LandingApp() {
       <main>
         <Hero
           onJoin={() => setModal("join")}
+          stats={stats}
           {...(SHOW_LEGACY ? { onChallenge: () => setModal("challenge") } : {})}
         />
         <Ticker size={SHOW_LEGACY ? "default" : "compact"} />
