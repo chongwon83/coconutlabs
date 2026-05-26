@@ -140,13 +140,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
 }
 
-export function Button({
-  variant = "primary",
-  size = "sm",
-  children,
-  className = "",
-  ...props
-}: ButtonProps) {
+// forwardRef so callers can attach a ref for scrollIntoView / focus. Existing
+// no-ref callers are unaffected.
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = "primary", size = "sm", children, className = "", ...props },
+  ref,
+) {
   const base = "btn";
   const v = variant === "primary" ? "btn-primary"
     : variant === "secondary" ? "btn-secondary"
@@ -154,11 +153,11 @@ export function Button({
     : "btn-link";
   const s = size === "xl" ? "btn-xl" : size === "lg" ? "btn-lg" : "";
   return (
-    <button className={`${base} ${v} ${s} ${className}`.trim()} {...props}>
+    <button ref={ref} className={`${base} ${v} ${s} ${className}`.trim()} {...props}>
       {children}
     </button>
   );
-}
+});
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 

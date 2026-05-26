@@ -23,9 +23,11 @@ import { fetchCollectorToken } from "@/lib/client/burn/token";
 
 interface JoinBurnIndexFormProps {
   onSuccess?: (msg: string) => void;
-  // B.4 MAJOR #1: optional second arg lifts success handle to the page so the
-  // banner survives modal close. Single-arg callers still work.
   onImport?: (entries: ImportedEntry[], handle?: string) => void;
+  // Closes the host modal. Wired from LandingApp so the in-modal "리더보드
+  // 보기" CTA can unmount the overlay before scrolling to #burn — without
+  // this, the modal sat on top of the leaderboard the user just asked to see.
+  onClose?: () => void;
 }
 
 // The quickstart commands rendered in Step 1. `git clone` uses
@@ -47,7 +49,7 @@ const QUICKSTART_COMMANDS = [
 // validated client-side for an instant preview, then POSTed to the server —
 // which re-validates (the real trust boundary) and stores it so the
 // leaderboard is shared across every browser.
-export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProps) {
+export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnIndexFormProps) {
   // Phase 1 state
   const [handle, setHandle] = useState("");
   const [raw, setRaw] = useState("");
@@ -107,6 +109,52 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
   const [showSuccess, setShowSuccess] = useState(false);
   const [successHandle, setSuccessHandle] = useState("");
   const successCardRef = useRef<HTMLDivElement>(null);
+
+  // Scroll target for the Upload CTA. Scan completes off-screen on shorter
+  // modal viewports — without this, the user lands on the preview card and
+  // doesn't see the button that takes them forward. Effect fires once per
+  // envelope transition (null → object); "Scan again" resets the latch.
+  const uploadCtaRef = useRef<HTMLButtonElement>(null);
+  const hasScrolledForEnvelopeRef = useRef(false);
+  useEffect(() => {
+    if (!fsaEnvelope) {
+      hasScrolledForEnvelopeRef.current = false;
+      return;
+    }
+    if (hasScrolledForEnvelopeRef.current) return;
+    if (!uploadCtaRef.current) return;
+    hasScrolledForEnvelopeRef.current = true;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    uploadCtaRef.current.scrollIntoView({
+      block: "nearest",
+      behavior: reduce ? "instant" : "smooth",
+    });
+  }, [fsaEnvelope]);
+
+  // Single source of truth for the 3 "리더보드 보기" CTAs in the success cards.
+  // Order matters: close the modal first so React unmounts the overlay (which
+  // owns body scroll lock), then on the next frame replace the hash and scroll
+  // explicitly. replaceState is used instead of `location.hash =` because the
+  // latter triggers the browser's native anchor jump that fights with our
+  // smooth scroll. The hash itself is kept so the URL still reflects state for
+  // sharing/back-button. prefers-reduced-motion downgrades to "instant".
+  const goToLeaderboard = () => {
+    onClose?.();
+    requestAnimationFrame(() => {
+      if (typeof window !== "undefined") {
+        history.replaceState(null, "", "#burn");
+      }
+      const reduce =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document
+        .getElementById("burn")
+        ?.scrollIntoView({
+          block: "start",
+          behavior: reduce ? "instant" : "smooth",
+        });
+    });
+  };
 
   // A.12: scroll success card into the modal viewport + move focus to the
   // status region so screen readers announce it. `block:'nearest'` keeps the
@@ -417,9 +465,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
             <p className="upload-success-card__handle">@{successHandle}</p>
             <button
               type="button"
-              onClick={() => {
-                window.location.hash = "#burn";
-              }}
+              onClick={goToLeaderboard}
               className="upload-success-card__cta"
             >
               리더보드 보기
@@ -553,9 +599,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
                 <p className="upload-success-card__handle">@{successHandle}</p>
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.hash = "#burn";
-                  }}
+                  onClick={goToLeaderboard}
                   className="upload-success-card__cta"
                 >
                   리더보드 보기
@@ -563,6 +607,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
               </div>
             ) : (
               <Button
+                ref={uploadCtaRef}
                 variant="primary"
                 size="lg"
                 type="button"
@@ -672,9 +717,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport }: JoinBurnIndexFormProp
             <p className="upload-success-card__handle">@{successHandle}</p>
             <button
               type="button"
-              onClick={() => {
-                window.location.hash = "#burn";
-              }}
+              onClick={goToLeaderboard}
               className="upload-success-card__cta"
             >
               리더보드 보기

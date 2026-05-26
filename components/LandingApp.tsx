@@ -22,7 +22,6 @@ import { Footer } from "@/components/Footer";
 import { Toast } from "@/components/Toast";
 import { JoinBurnIndexForm } from "@/components/forms/JoinBurnIndexForm";
 import { ChallengeInviteForm } from "@/components/forms/ChallengeInviteForm";
-import { UploadSuccessBanner } from "@/components/UploadSuccessBanner";
 import type { ImportedEntry } from "@/lib/data";
 
 const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
@@ -101,9 +100,6 @@ function AutoDetectListener({
 export default function LandingApp() {
   const [toast, setToast] = useState({ visible: false, message: "" });
   const [modal, setModal] = useState<ModalKind>(null);
-  // B.4 MAJOR #1 lift-up: success state lives at page level so the banner
-  // survives modal unmount. Cleared by dismiss button or CTA click.
-  const [lastSuccess, setLastSuccess] = useState<{ handle: string } | null>(null);
   // 사용자가 한 번 닫으면 같은 세션의 auto-detect 재오픈을 차단 (Invariant #6).
   const userClosedRef = useRef<boolean>(false);
 
@@ -152,15 +148,9 @@ export default function LandingApp() {
   // The POST response carries the full server-sorted list — dedupe and
   // ordering are the store's job, so update SWR's cache immediately and let
   // the next 30s poll reconcile with the shared server state.
-  // B.4 MAJOR #1: optional `handle` parameter lifts success state to the page
-  // so the banner survives modal unmount. Backward-compatible — existing
-  // single-arg callers still work; second arg is opt-in.
-  const handleImport = useCallback((entries: ImportedEntry[], handle?: string) => {
+  const handleImport = useCallback((entries: ImportedEntry[]) => {
     void mutateImported(entries, { revalidate: false });
     void mutateStats(statsFromEntries(entries), { revalidate: false });
-    if (handle) {
-      setLastSuccess({ handle });
-    }
   }, [mutateImported, mutateStats]);
 
   return (
@@ -176,12 +166,6 @@ export default function LandingApp() {
       <Nav
         onJoin={() => setModal("join")}
       />
-      {modal === null && lastSuccess && (
-        <UploadSuccessBanner
-          handle={lastSuccess.handle}
-          onDismiss={() => setLastSuccess(null)}
-        />
-      )}
       <main>
         <Hero
           onJoin={() => setModal("join")}
@@ -220,7 +204,11 @@ export default function LandingApp() {
               ×
             </button>
             {modal === "join" ? (
-              <JoinBurnIndexForm onSuccess={showToast} onImport={handleImport} />
+              <JoinBurnIndexForm
+                onSuccess={showToast}
+                onImport={handleImport}
+                onClose={closeModal}
+              />
             ) : (
               <ChallengeInviteForm onSuccess={showToast} />
             )}

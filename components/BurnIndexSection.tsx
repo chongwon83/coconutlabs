@@ -222,7 +222,20 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
                   로 첫 데이터를 제출해주세요.
                 </>
               ) : (
-                <>이 도구 사용자는 아직 없어요.</>
+                <>
+                  이 탭에는 결과가 없어요.{" "}
+                  <button
+                    type="button"
+                    onClick={() => setFilter("all")}
+                    className="lb-empty-link lb-empty-link--button"
+                  >
+                    All 탭
+                  </button>
+                  에서 전체 기록을 확인해보세요.
+                  <div className="lb-empty-hint">
+                    본인 entry가 보이지 않으면, 데이터를 다시 가져오면 도구 태그가 새로 잡힐 수 있어요.
+                  </div>
+                </>
               )}
             </div>
           )}
