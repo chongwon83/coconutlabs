@@ -104,27 +104,32 @@ export default function LandingApp() {
 
   // useSWR was silently failing to fire its initial fetch on this Next.js 16 +
   // React 19 build (see decision-log 2026-05-26). Plain useEffect+setInterval
-  // polling is enough — we only need 30s refresh and an immediate mutate path
-  // for POST responses. Errors keep the previous payload so a one-off refresh
-  // failure does not blank the leaderboard.
+  // polling replaces it. Two non-obvious details:
+  //   1. entries/stats refresh independently — a stats outage must not blank
+  //      a working leaderboard.
+  //   2. mutateImported bumps a write-version so a late-arriving poll cannot
+  //      overwrite the rows the POST response just installed.
   const [imported, setImported] = useState<ImportedEntry[]>([]);
   const [stats, setStats] = useState<HeroStats>(EMPTY_BURN_INDEX_STATS);
+  const writeVersionRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
 
     const refresh = async () => {
-      try {
-        const [entries, nextStats] = await Promise.all([
-          fetchBurnIndexEntries("/api/burnindex"),
-          fetchBurnIndexStats("/api/burnindex/stats"),
-        ]);
+      const versionAtStart = writeVersionRef.current;
+      const applyEntries = (entries: ImportedEntry[]) => {
         if (cancelled) return;
+        if (writeVersionRef.current !== versionAtStart) return;
         setImported(entries);
-        setStats(nextStats);
-      } catch {
-        // Swallow — leaderboard keeps last good payload, next tick retries.
-      }
+      };
+      const applyStats = (next: HeroStats) => {
+        if (cancelled) return;
+        setStats(next);
+      };
+
+      void fetchBurnIndexEntries("/api/burnindex").then(applyEntries, () => {});
+      void fetchBurnIndexStats("/api/burnindex/stats").then(applyStats, () => {});
     };
 
     void refresh();
@@ -136,6 +141,7 @@ export default function LandingApp() {
   }, []);
 
   const mutateImported = useCallback((entries: ImportedEntry[]) => {
+    writeVersionRef.current += 1;
     setImported(entries);
   }, []);
   const mutateStats = useCallback((next: HeroStats) => {
