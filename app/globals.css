@@ -1763,7 +1763,7 @@ textarea.form-input {
 .hero-tab:hover { color: var(--fg); }
 .hero-tab-active { color: var(--fg); border-bottom-color: var(--young-coconut); }
 
-/* ProductShot internals */
+/* ProductShot internals — col-header */
 .product-shot {
   border: 1px solid var(--border); border-radius: var(--r-card);
   overflow: hidden; background: #FFFFFF;
@@ -1779,6 +1779,21 @@ textarea.form-input {
   background: var(--young-coconut);
   animation: pulseDot var(--dur-pulse) var(--ease) infinite;
 }
+.product-shot-col-header {
+  display: grid;
+  grid-template-columns: 24px 32px 1fr 60px 60px;
+  gap: 8px;
+  padding: 8px 16px 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--fg3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--divider);
+}
+.product-shot-col-header span:nth-child(4),
+.product-shot-col-header span:nth-child(5) { text-align: right; }
 .product-shot-rows { padding: 8px 0; }
 .product-shot-row {
   display: grid; grid-template-columns: 24px 32px 1fr 60px 60px;

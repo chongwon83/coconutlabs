@@ -58,6 +58,13 @@ function ProductShot({ tab, entries }: { tab: HeroTab; entries: ImportedEntry[] 
           <span className="product-shot-label">Burn Index · Live</span>
           <span className="product-shot-dot" />
         </div>
+        <div className="product-shot-col-header" aria-hidden="true">
+          <span>#</span>
+          <span>Δ</span>
+          <span>Builder</span>
+          <span>Tokens</span>
+          <span>API cost</span>
+        </div>
         <div className="product-shot-rows" data-testid="product-shot-content" data-mask="dynamic">
           {top.length === 0 ? (
             <div className="product-shot-empty" data-testid="product-shot-empty">
