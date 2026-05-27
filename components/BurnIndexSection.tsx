@@ -20,6 +20,7 @@ import {
   fmtCostShort,
   verifDisplayLabel,
   type ImportedEntry,
+  type ImportedEntryBreakdown,
   type VerifLevel,
 } from "@/lib/data";
 import { Avatar, Button, Trend, Icon } from "@/components/primitives";
@@ -42,16 +43,6 @@ const FILTERS: { key: ToolFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "claude-code", label: "Claude Code" },
   { key: "codex", label: "Codex" },
-];
-
-// Column → CSS class + visible label + i18n aria-label for the header button.
-// `handle` is the only column that sorts ascending by default (A→Z reads
-// naturally); the numeric columns default to descending (biggest first).
-const SORT_COLS: { key: SortKey; cls: string; label: string }[] = [
-  { key: "handle", cls: "lb-col-builder", label: "Builder" },
-  { key: "totalTokens", cls: "lb-col-tokens", label: "Tokens" },
-  { key: "estimatedCostUsd", cls: "lb-col-cost", label: "API cost" },
-  { key: "trendPct", cls: "lb-col-trend", label: "Trend" },
 ];
 
 interface BurnIndexSectionProps {
@@ -91,6 +82,50 @@ function periodLabel(entry: ImportedEntry): string {
 function sortArrow(active: boolean, dir: SortDir): string {
   if (!active) return "—";
   return dir === "asc" ? "↑" : "↓";
+}
+
+// Per-tool slice: extract tokens/cost for a specific tool filter from breakdown.
+// NaN signals "no breakdown data" (legacy entry without breakdown field) → renders "—".
+function sliceForFilter(
+  e: ImportedEntry,
+  f: ToolFilter,
+): { tokens: number; costUsd: number } {
+  if (f === "all") return { tokens: e.totalTokens, costUsd: e.estimatedCostUsd };
+  const slices = (e.breakdown ?? []).filter((b) => b.tool === f);
+  if (slices.length === 0) return { tokens: NaN, costUsd: NaN };
+  return {
+    tokens: slices.reduce((acc, b) => acc + b.totalTokens, 0),
+    costUsd: slices.reduce((acc, b) => acc + b.estimatedCostUsd, 0),
+  };
+}
+
+function shortenModelName(model: string): string {
+  if (model.includes("opus-4-7")) return "opus 4.7";
+  if (model.includes("opus-4-5")) return "opus 4.5";
+  if (model.includes("sonnet-4-6")) return "sonnet 4.6";
+  if (model.includes("sonnet-4-5")) return "sonnet 4.5";
+  if (model.includes("haiku-4-5")) return "haiku 4.5";
+  if (model.includes("gpt-5.5") || model.includes("gpt-5-codex")) return "gpt-5.5";
+  if (model.includes("codex-mini")) return "codex-mini";
+  return model;
+}
+
+// Top-N model chips by cost share; overflow appended as "+N" chip (pct=0).
+function topModelsChips(
+  breakdown: ImportedEntryBreakdown[],
+  max = 2,
+): { label: string; pct: number }[] {
+  if (breakdown.length === 0) return [];
+  const total = breakdown.reduce((acc, b) => acc + b.estimatedCostUsd, 0);
+  if (total === 0) return [];
+  const sorted = [...breakdown].sort((a, b) => b.estimatedCostUsd - a.estimatedCostUsd);
+  const top = sorted.slice(0, max).map((b) => ({
+    label: shortenModelName(b.model),
+    pct: Math.round((b.estimatedCostUsd / total) * 100),
+  }));
+  const remaining = sorted.length - max;
+  if (remaining > 0) top.push({ label: `+${remaining}`, pct: 0 });
+  return top;
 }
 
 export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProps) {
@@ -149,33 +184,37 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
         <div className="lb-v3">
           <div className="lb-head" role="row">
             <span className="lb-col-rank" role="columnheader">#</span>
-            {SORT_COLS.map((col) => {
-              const active = sortKey === col.key;
-              return (
-                <div
-                  key={col.key}
-                  role="columnheader"
-                  aria-sort={ariaSort(col.key)}
-                  className={col.cls}
-                >
-                  <button
-                    type="button"
-                    className={`lb-sort-btn${active ? " lb-sort-btn-active" : ""}`}
-                    onClick={() => toggle(col.key)}
-                    aria-label={`Sort by ${col.label}`}
-                  >
-                    <span>{col.label}</span>
-                    <span className="lb-sort-arrow" aria-hidden="true">
-                      {sortArrow(active, sortDir)}
-                    </span>
-                  </button>
-                </div>
-              );
-            })}
+            <div role="columnheader" aria-sort={ariaSort("handle")} className="lb-col-builder">
+              <button type="button" className={`lb-sort-btn${sortKey === "handle" ? " lb-sort-btn-active" : ""}`} onClick={() => toggle("handle")} aria-label="Sort by Builder">
+                <span>Builder</span>
+                <span className="lb-sort-arrow" aria-hidden="true">{sortArrow(sortKey === "handle", sortDir)}</span>
+              </button>
+            </div>
+            <div role="columnheader" aria-sort={ariaSort("totalTokens")} className="lb-col-tokens">
+              <button type="button" className={`lb-sort-btn${sortKey === "totalTokens" ? " lb-sort-btn-active" : ""}`} onClick={() => toggle("totalTokens")} aria-label="Sort by Tokens">
+                <span>Tokens</span>
+                <span className="lb-sort-arrow" aria-hidden="true">{sortArrow(sortKey === "totalTokens", sortDir)}</span>
+              </button>
+            </div>
+            <div role="columnheader" aria-sort={ariaSort("estimatedCostUsd")} className="lb-col-cost">
+              <button type="button" className={`lb-sort-btn${sortKey === "estimatedCostUsd" ? " lb-sort-btn-active" : ""}`} onClick={() => toggle("estimatedCostUsd")} aria-label="Sort by API cost">
+                <span>API cost</span>
+                <span className="lb-sort-arrow" aria-hidden="true">{sortArrow(sortKey === "estimatedCostUsd", sortDir)}</span>
+              </button>
+            </div>
+            <span role="columnheader" className="lb-col-models">Models</span>
+            <div role="columnheader" aria-sort={ariaSort("trendPct")} className="lb-col-trend">
+              <button type="button" className={`lb-sort-btn${sortKey === "trendPct" ? " lb-sort-btn-active" : ""}`} onClick={() => toggle("trendPct")} aria-label="Sort by Trend">
+                <span>Trend</span>
+                <span className="lb-sort-arrow" aria-hidden="true">{sortArrow(sortKey === "trendPct", sortDir)}</span>
+              </button>
+            </div>
           </div>
 
           {sorted.map((e, i) => {
             const chip = verifTierShort(e.verif);
+            const { tokens, costUsd } = sliceForFilter(e, filter);
+            const modelChips = topModelsChips(e.breakdown ?? [], 2);
             return (
               <div key={e.handle} className="lb-row lb-imported-row">
                 <span className="lb-col-rank lb-rank">{i + 1}</span>
@@ -198,10 +237,17 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
                   </span>
                 </span>
                 <span className="lb-col-tokens lb-mono">
-                  {fmtTokensCompact(e.totalTokens)}
+                  {Number.isNaN(tokens) ? "—" : fmtTokensCompact(tokens)}
                 </span>
                 <span className="lb-col-cost lb-mono">
-                  {fmtCostShort(e.estimatedCostUsd)}
+                  {Number.isNaN(costUsd) ? "—" : fmtCostShort(costUsd)}
+                </span>
+                <span className="lb-col-models">
+                  {modelChips.map((c) => (
+                    <span key={c.label} className="lb-model-chip">
+                      {c.label}{c.pct > 0 ? ` · ${c.pct}%` : ""}
+                    </span>
+                  ))}
                 </span>
                 <span className="lb-col-trend">
                   {e.trendDir != null && e.trendPct != null ? (

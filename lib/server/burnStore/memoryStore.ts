@@ -23,12 +23,17 @@ import type {
 
 const KEEP_PER_HANDLE = 12;
 
-// Mirrors fileStore.hydrateEntry — tests that seed legacy-shaped entries
-// (toolsUsed missing) must not crash the filter path at BurnIndexSection.tsx
-// `e.toolsUsed.includes(filter)`. Three-store defensive contract.
+// Mirrors fileStore.hydrateEntry — legacy entries missing toolsUsed/breakdown
+// must not crash BurnIndexSection filter or model chip paths. Three-store
+// defensive contract; add new fields here in lockstep with fileStore and
+// redisStore when ImportedEntry gains required fields.
 function hydrateEntry(e: ImportedEntry): ImportedEntry {
-  if (Array.isArray(e.toolsUsed)) return e;
-  return { ...e, toolsUsed: [] };
+  if (Array.isArray(e.toolsUsed) && Array.isArray(e.breakdown)) return e;
+  return {
+    ...e,
+    toolsUsed: Array.isArray(e.toolsUsed) ? e.toolsUsed : [],
+    breakdown: Array.isArray(e.breakdown) ? e.breakdown : [],
+  };
 }
 
 export class MemoryBurnStore implements BurnStore {

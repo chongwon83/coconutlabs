@@ -36,6 +36,7 @@ const BASE_ENTRY: Omit<ImportedEntry, "toolsUsed" | "handle"> = {
   since: "2026-05-18T00:00:00Z",
   until: "2026-05-25T00:00:00Z",
   importedAt: "2026-05-25T12:00:00Z",
+  breakdown: [],
 };
 
 function entry(

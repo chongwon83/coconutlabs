@@ -37,6 +37,7 @@ const SEED: ImportedEntry[] = [
     until: "2026-05-25T00:00:00Z",
     importedAt: "2026-05-25T10:00:00Z",
     toolsUsed: ["claude-code"],
+    breakdown: [],
     trendDir: "up",
     trendPct: 15,
   },
@@ -51,6 +52,7 @@ const SEED: ImportedEntry[] = [
     until: "2026-05-25T00:00:00Z",
     importedAt: "2026-05-25T11:00:00Z",
     toolsUsed: ["codex"],
+    breakdown: [],
   },
   {
     handle: "@carol",
@@ -63,6 +65,7 @@ const SEED: ImportedEntry[] = [
     until: "2026-05-25T00:00:00Z",
     importedAt: "2026-05-25T12:00:00Z",
     toolsUsed: ["claude-code", "codex"],
+    breakdown: [],
     trendDir: "down",
     trendPct: -5,
   },

@@ -248,6 +248,17 @@ export interface BurnSummaryEnvelope {
   grandTotal: { totalTokens: number; estimatedCostUsd: number };
 }
 
+// Per-tool×model breakdown inside an ImportedEntry. Allows the leaderboard to
+// slice token/cost by tool filter (claude-code vs codex) and display model
+// proportion chips. Entries imported before this field existed hydrate to `[]`
+// (see burnStore/* lazy migration) and render "—" in filtered views.
+export interface ImportedEntryBreakdown {
+  tool: "claude-code" | "codex";
+  model: string;
+  totalTokens: number;
+  estimatedCostUsd: number;
+}
+
 // A builder card derived from an imported envelope. The envelope only carries
 // tokens/cost/period, so `fixes`/`ves` are absent at import time — the
 // /api/burnindex GET fills them in by joining verified challenge submissions
@@ -268,6 +279,10 @@ export interface ImportedEntry {
   // BurnIndexSection always have an array to read. Stored entries written
   // before this field existed hydrate to `[]` defensively (see burnStore/*).
   toolsUsed: ("claude-code" | "codex")[];
+  // Per-tool×model breakdown. Default `[]` for backward-compatible entries.
+  // Populated from BurnSummary.rows so the leaderboard can slice tokens/cost
+  // per tool filter and show model proportion chips (see BurnIndexSection).
+  breakdown: ImportedEntryBreakdown[];
   fixes?: number;
   ves?: number;
   // trend, filled by the /api/burnindex GET from each handle's weekly import
@@ -344,6 +359,39 @@ function avatarFor(handle: string): string {
   return (name.slice(0, 2) || "??").toUpperCase();
 }
 
+// Group rows by tool×model and aggregate tokens + cost. Token sum uses all 5
+// tokenCount sub-fields (matches validateSummary.ts TOKEN_COUNT_KEYS and the
+// grandTotal.totalTokens contract), so per-breakdown sums add up to the
+// entry's totalTokens when summed across all groups.
+function aggregateBreakdown(rows: BurnSummary[]): ImportedEntryBreakdown[] {
+  const map = new Map<string, ImportedEntryBreakdown>();
+  for (const r of rows) {
+    const key = `${r.tool}::${r.model}`;
+    const tc = r.tokenCount;
+    const tokens =
+      tc.input +
+      tc.output +
+      (tc.cacheRead ?? 0) +
+      (tc.cacheWrite ?? 0) +
+      (tc.cachedInput ?? 0);
+    const prev = map.get(key);
+    if (prev) {
+      prev.totalTokens += tokens;
+      prev.estimatedCostUsd += r.estimatedCostUsd;
+    } else {
+      map.set(key, {
+        tool: r.tool,
+        model: r.model,
+        totalTokens: tokens,
+        estimatedCostUsd: r.estimatedCostUsd,
+      });
+    }
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => b.estimatedCostUsd - a.estimatedCostUsd,
+  );
+}
+
 // Collapse a validated envelope into a single leaderboard card.
 export function buildImportedEntry(
   env: BurnSummaryEnvelope,
@@ -366,6 +414,7 @@ export function buildImportedEntry(
     until: env.periodWindow.until,
     importedAt: new Date().toISOString(),
     toolsUsed,
+    breakdown: aggregateBreakdown(env.rows),
   };
 }
 

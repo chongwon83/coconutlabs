@@ -37,6 +37,7 @@ const VALID_ENTRY: ImportedEntry = {
   until: "2026-05-18T00:00:00Z",
   importedAt: "2026-05-20T12:00:00Z",
   toolsUsed: ["claude-code"],
+  breakdown: [],
 };
 
 const VALID_CHALLENGE: ChallengeRecord = {

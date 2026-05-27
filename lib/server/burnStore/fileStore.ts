@@ -42,12 +42,15 @@ async function readArray<T>(filePath: string): Promise<T[]> {
   }
 }
 
-// JSON blobs written before A.1 added toolsUsed will deserialize without the
-// field — coerce to `[]` before the entry reaches any consumer that calls
-// `.includes()` on it (BurnIndexSection filter tabs, route.ts join).
+// JSON blobs written before A.1 (toolsUsed) or B (breakdown) will deserialize
+// without the respective field — coerce to `[]` before any consumer reads it.
 function hydrateEntry(e: ImportedEntry): ImportedEntry {
-  if (Array.isArray(e.toolsUsed)) return e;
-  return { ...e, toolsUsed: [] };
+  if (Array.isArray(e.toolsUsed) && Array.isArray(e.breakdown)) return e;
+  return {
+    ...e,
+    toolsUsed: Array.isArray(e.toolsUsed) ? e.toolsUsed : [],
+    breakdown: Array.isArray(e.breakdown) ? e.breakdown : [],
+  };
 }
 
 export class FileBurnStore implements BurnStore {

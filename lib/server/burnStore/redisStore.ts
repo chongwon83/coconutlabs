@@ -86,11 +86,11 @@ function projectEntry(e: ImportedEntry): ImportedEntry {
     since: e.since,
     until: e.until,
     importedAt: e.importedAt,
-    // Defensive `?? []`: an ImportedEntry built before A.1 added the field
-    // (e.g. a test fixture that omitted it, or an in-memory object during a
-    // mid-deploy upsert) lands here without toolsUsed. The persisted shape
-    // must always carry the array so readEntries hydration is a no-op.
+    // Defensive `?? []`: an ImportedEntry built before A.1 (toolsUsed) or the
+    // B cycle (breakdown) added the field lands here without it. The persisted
+    // shape must always carry the arrays so readEntries hydration is a no-op.
     toolsUsed: e.toolsUsed ?? [],
+    breakdown: e.breakdown ?? [],
   };
   if (e.fixes !== undefined) stored.fixes = e.fixes;
   if (e.ves !== undefined) stored.ves = e.ves;
@@ -100,13 +100,16 @@ function projectEntry(e: ImportedEntry): ImportedEntry {
   return stored;
 }
 
-// Hydrate one entry read from Redis. The JSON blob may predate A.1 (no
-// toolsUsed field), so coerce a missing value to `[]` before the entry hits
-// the UI — every consumer (BurnIndexSection filter tabs, route.ts join) calls
-// `.includes()` on this and would crash on undefined.
+// Hydrate one entry read from Redis. Blobs may predate A.1 (no toolsUsed) or
+// the B cycle (no breakdown). Coerce both missing values to `[]` before the
+// entry hits any UI consumer or filter path.
 function hydrateEntry(e: ImportedEntry): ImportedEntry {
-  if (Array.isArray(e.toolsUsed)) return e;
-  return { ...e, toolsUsed: [] };
+  if (Array.isArray(e.toolsUsed) && Array.isArray(e.breakdown)) return e;
+  return {
+    ...e,
+    toolsUsed: Array.isArray(e.toolsUsed) ? e.toolsUsed : [],
+    breakdown: Array.isArray(e.breakdown) ? e.breakdown : [],
+  };
 }
 
 // Same defence for ChallengeRecord — rebuild the 7 declared fields so no extra
