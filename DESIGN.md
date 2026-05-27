@@ -213,6 +213,81 @@ Tier headers and count chips use `rounded.sm` (4px). The leaderboard card,
 hero CTA, and trust-grid items all use `rounded.md` (8px). The Sticky Header
 itself is not rounded — it is a 56px bar pinned to the top of the viewport.
 
+## Motion
+
+Motion tokens live in `app/globals.css :root` as CSS custom properties (the
+google-labs DESIGN.md YAML spec does not support motion keys; this section is
+the contract).
+
+**Duration scale** — four durations covering all current and planned motion:
+
+- `--dur-fast` (120ms) — hover/focus state transitions on interactive elements
+  (buttons, links, form inputs). Fast enough to feel instant.
+- `--dur-base` (200ms) — short entrance/exit animations (banner, modal) and
+  any transform that needs to read as "movement," not "flicker." Toast
+  entrance is still on an inline `0.2s` literal and will fold into this
+  token in a follow-up sweep (see Don'ts).
+- `--dur-slow` (400ms) — reserved for orchestrated multi-step transitions
+  (e.g., form step fades, leaderboard reorder). No current usage in B.6;
+  declared so future motion lands on a named scale instead of a magic number.
+- `--dur-pulse` (2s) — the **single shared cycle for the pulse family**:
+  `pulseGreen` (statusbar live indicator), `pulse` (verification pulses),
+  and `pulseDot` (Hero product-shot signal). One duration so the page reads
+  as one heartbeat rather than competing tempos.
+
+**Easing** — two curves for the pulse family, kept distinct because the two
+sub-families animate different properties:
+
+- `--ease` (`cubic-bezier(0.22, 1, 0.36, 1)`) — soft-out curve for
+  transform/opacity pulses (`pulseDot` on `.product-shot-dot`). Lands gently,
+  matches the brand's "measured" tone better than browser-default `ease-out`.
+- `--ease-out` (`ease-out`) — browser-native `ease-out` for box-shadow ring
+  pulses (`pulseGreen` and the three `.pulse` ring sites). Preserved as a
+  named token to make the difference from `--ease` explicit; the ring pattern
+  reads more naturally with the standard `ease-out` curve.
+
+When introducing new motion, default to `--ease`. Use `--ease-out` only for
+box-shadow ring-pulse–style patterns. Add a new ease token only when a
+documented case calls for a different curve.
+
+**Pulse amplitude** — the `pulseDot` peak deviation, named so a future
+`pulseRow` (SWR-driven leaderboard row refresh) or `pulseBanner` can share
+the same intensity envelope:
+
+- `--pulse-scale-peak` (1.35) — the multiplicative scale at the 50%
+  keyframe. 35% growth reads as "alive" without crossing into "distracting."
+- `--pulse-opacity-dip` (0.65) — the opacity at the 50% keyframe. Pairs
+  with the scale increase so the peak feels lighter, not heavier — the
+  visual equivalent of an inhale.
+
+**Reduced motion** — every infinite animation in the pulse family is gated
+by the global `@media (prefers-reduced-motion: reduce)` block at
+`globals.css` EOF, which sets `animation: none !important`. The ticker
+carrier (`.ticker-inner`, `.ticker-track`) additionally overrides
+`padding-left: 0; transform: none` because the marquee pattern starts
+content offscreen by default (TIL: `docs/til/2026-05-26-ticker-offscreen-start-trap.md`).
+
+**Do's**:
+- Do introduce new pulse-style motion by reusing `--dur-pulse`,
+  `--pulse-scale-peak`, `--pulse-opacity-dip`. New keyframes get a new
+  `@keyframes` name (so e2e can pin them) but share the existing tokens.
+- Do route new transform/opacity motion through `var(--ease)`; route new
+  box-shadow ring pulses through `var(--ease-out)`. Add a new ease token
+  only when a documented case calls for a different curve.
+- Do gate every new infinite animation in the reduced-motion block.
+
+**Don'ts**:
+- Don't reintroduce `2s` as an inline duration. It is `--dur-pulse` now.
+- Don't reintroduce `ease-out` or `cubic-bezier(...)` as an inline easing.
+  Use `var(--ease-out)` for ring pulses and `var(--ease)` for transform/opacity
+  motion.
+- Don't fork the pulse amplitude (`1.35` / `0.65` literals). If a new pulse
+  needs a different intensity, name it (`--pulse-scale-peak-soft` etc.) and
+  document why here.
+- Don't tokenize ticker `60s` or toast-in `0.2s` opportunistically — those
+  belong to a separate motion sub-system (carriers / entrances) and get
+  their own token names in a follow-up sweep.
+
 ## Components
 
 - **sticky-header** — the 56px pinned top bar. Holds the wordmark and the
