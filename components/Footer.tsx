@@ -12,19 +12,6 @@ export function Footer() {
           <div className="footer-col">
             <span className="footer-col-head">Product</span>
             <a href="#burn" className="footer-link">Burn Index</a>
-            <a href="#challenge" className="footer-link">Challenges</a>
-            <a href="#drops" className="footer-link">Workflow Drops</a>
-          </div>
-          <div className="footer-col">
-            <span className="footer-col-head">Trust</span>
-            <a href="#" className="footer-link">Collection Spec</a>
-            <a href="#" className="footer-link">Privacy</a>
-          </div>
-          <div className="footer-col">
-            <span className="footer-col-head">Company</span>
-            <a href="#" className="footer-link">About</a>
-            <a href="#" className="footer-link">Blog</a>
-            <a href="#" className="footer-link">Contact</a>
           </div>
         </div>
       </div>
