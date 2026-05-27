@@ -16,6 +16,7 @@ on:
     branches: ["**"]
   pull_request:
     branches: ["**"]
+  workflow_dispatch:        # outage-recovery manual override
 
 jobs:
   security:
