@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Button, Badge } from "@/components/primitives";
-import { fmtCostShort, fmtTokensCompact, type ImportedEntry } from "@/lib/data";
+import { fmtCostShort, fmtTokensCompact, representativeWeek, type ImportedEntry } from "@/lib/data";
+import { WeekRangePill } from "@/components/WeekRangePill";
 
 const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
 
@@ -56,7 +57,10 @@ function ProductShot({ tab, entries }: { tab: HeroTab; entries: ImportedEntry[] 
       <div className="product-shot product-shot-burn">
         <div className="product-shot-header" data-testid="product-shot-header">
           <span className="product-shot-label">Burn Index · Live</span>
-          <span className="product-shot-dot" />
+          <span className="product-shot-header-end">
+            <WeekRangePill range={representativeWeek(entries)} variant="hero" className="product-shot-week" />
+            <span className="product-shot-dot" />
+          </span>
         </div>
         <div className="product-shot-col-header" aria-hidden="true">
           <span>#</span>
@@ -132,9 +136,10 @@ function ProductShot({ tab, entries }: { tab: HeroTab; entries: ImportedEntry[] 
   );
 }
 
-function HeroSecondaryCard({ stats = EMPTY_HERO_STATS }: { stats?: HeroStats }) {
+function HeroSecondaryCard({ stats = EMPTY_HERO_STATS, entries = [] }: { stats?: HeroStats; entries?: ImportedEntry[] }) {
   const builderValue =
     stats.builderCount === 0 ? "Be first" : `${stats.builderCount} builders`;
+  const weekRange = representativeWeek(entries);
 
   return (
     <div className="hero-secondary-card" data-testid="hero-secondary-card">
@@ -164,7 +169,7 @@ function HeroSecondaryCard({ stats = EMPTY_HERO_STATS }: { stats?: HeroStats }) 
         </span>
       </div>
       <div className="hero-secondary-footnote" data-testid="hero-secondary-footnote">
-        Latest weekly upload per handle
+        {weekRange ? <WeekRangePill range={weekRange} variant="hero" /> : "Latest weekly upload per handle"}
       </div>
     </div>
   );
@@ -206,7 +211,7 @@ export function Hero({ onJoin, onChallenge, stats, entries }: HeroProps) {
               </Button>
             )}
           </div>
-          <HeroSecondaryCard stats={stats} />
+          <HeroSecondaryCard stats={stats} entries={burnEntries} />
         </div>
 
         <div className="hero-right" data-testid="hero-right">

@@ -94,6 +94,11 @@ components:
     backgroundColor: "{colors.secondary}"
     padding: "{spacing.sm}"
     rounded: "{rounded.sm}"
+  week-range-pill:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.neutral}"
+    padding: "{spacing.sm}"
+    rounded: "{rounded.sm}"
 ---
 
 ## Overview

@@ -431,6 +431,28 @@ export function fmtCostShort(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
+// Pick the entry whose `since` is the most recent and return its [since, until)
+// window. Guarantees a valid pair from real data — never synthesizes a range.
+// Returns null when no weekly entry exists; callers must hide UI in that case.
+export function representativeWeek(
+  entries: ImportedEntry[],
+): { since: string; until: string } | null {
+  const weekly = entries.filter(
+    (e) => e.period === "week" && e.since && e.until,
+  );
+  if (weekly.length === 0) return null;
+  const latest = weekly.reduce((a, b) => (a.since! > b.since! ? a : b));
+  return { since: latest.since!, until: latest.until! };
+}
+
+// Convert an ISO-8601 UTC Z timestamp to YYYY-MM-DD KST for tooltip text.
+// Pure stdlib: shift +9h then slice; no DST in Korea.
+export function utcIsoToKstDay(iso: string): string {
+  const utcMs = Date.parse(iso);
+  const kst = new Date(utcMs + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
 // Deterministic sparkline seed — LCG with handle as seed
 export function sparkFor(handle: string): number[] {
   let seed = 0;

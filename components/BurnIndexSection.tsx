@@ -19,10 +19,12 @@ import {
   fmtTokensCompact,
   fmtCostShort,
   verifDisplayLabel,
+  representativeWeek,
   type ImportedEntry,
   type ImportedEntryBreakdown,
   type VerifLevel,
 } from "@/lib/data";
+import { WeekRangePill } from "@/components/WeekRangePill";
 import { Avatar, Button, Trend, Icon } from "@/components/primitives";
 import {
   useColumnSort,
@@ -180,6 +182,9 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
         <p className="section-sub">
           CLI-verified imports only. Sort any column; filter by your tool.
         </p>
+        <div className="burn-week-badge">
+          <WeekRangePill range={representativeWeek(imported)} variant="section" />
+        </div>
         <p className="burn-methodology-caption">
           Ranked from real imports. Default: most tokens first. Ties break by
           upload recency.
