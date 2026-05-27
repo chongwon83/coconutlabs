@@ -45,11 +45,7 @@ export interface NavLink {
   href: string;
 }
 
-export const V3_NAV: NavLink[] = [
-  { label: "Burn Index", href: "#burn" },
-  { label: "Challenges", href: "#challenge" },
-  { label: "Workflow Drops", href: "#drops" },
-];
+export const V3_NAV: NavLink[] = [];
 
 // Single source of truth for the collector repo URL — referenced from
 // JoinBurnIndexForm Step 1 ("View collector source ↗") and the quickstart
