@@ -99,9 +99,9 @@ async function visibleHandles(page: Page): Promise<string[]> {
   return await page.locator(".lb-row .lb-handle").allTextContents();
 }
 
-// Header button locator — aria-label is `${col.label} 기준 정렬`. Click target.
+// Header button locator — aria-label is `Sort by ${col.label}`. Click target.
 function sortButton(page: Page, label: "Builder" | "Tokens" | "Cost" | "Trend") {
-  return page.getByRole("button", { name: `${label} 기준 정렬` });
+  return page.getByRole("button", { name: `Sort by ${label}` });
 }
 
 // WAI-ARIA: `aria-sort` is valid only on a `columnheader`/`rowheader`, not on
