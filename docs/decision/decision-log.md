@@ -733,3 +733,18 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 강한 증거: (1) localhost verify — chips=["Claude Code","Codex"], ProductShot 5 rows 라이브, 우측 dot animationName=`hero-secondary-pulse`, footnote="Latest weekly upload per handle"(deduped 표현 제거). (2) vitest 22 files 271 tests 전부 통과(+4 신규 `fmtTokensCompact` B-unit case). (3) e2e `hero-pulse.spec.ts` 6 tests 통과(+2 신규 `.hero-secondary-header-dot` default/reduced-motion). (4) tsc --noEmit clean. (5) Codex 검토 verbatim: "request small changes before shipping" — 3 finding 모두 명시 위치(`globals.css:2368`, `LandingApp.tsx:119`, `Hero.tsx:157`)로 self-fix 가능.
 
 [S10 회고 — 다음 사이클에서 작성]
+
+
+---
+
+### 2026-05-27 BurnIndexSection Cost→API cost 통일 + Hero 빈 상태 outcome-led copy
+
+- 문제: (1) 같은 화면에서 동일 메트릭(API 호출 USD)이 hero 미니 리더보드 col-header `API cost`와 BurnIndexSection 컬럼 헤더 `Cost`로 두 이름 공존 — 첫 방문자 혼란 가능. (2) 미니 리더보드 빈 상태 copy `"Be the first to import. Join Burn Index to claim #1."` 은 CTA 중복(좌측 hero-actions primary 버튼이 단독 책임) + product shot(미리보기 데모) 역할과 불일치.
+- 버린 대안: (a) BurnIndexSection 라벨을 `"Cost (USD)"`로 확장 — hero는 `"API cost"`, 미러 없이 verbose만 더해짐 / (b) 미니 리더보드 빈 상태에 inline CTA 버튼 추가 — hero-actions와 CTA 2중화, product shot 정체성 훼손 / (c) 이번 사이클 별도 commit 2개 — 변경 영역 동일(hero + leaderboard), rebaseline 2회 분리는 베이스라인 노이즈 2배만 추가.
+- 핵심 트레이드오프: `SORT_COLS` label 1글자 변경이 `burn-index-sort.spec.ts` 5 call site union literal lockstep을 강제 — tsc는 통과해도 Playwright RED 위험. 빈 상태 `<br />` 2줄은 `.product-shot-empty` padding 영역에서 ~22px 증가하나 ProductShot 컨테이너 높이 이내로 hero 외부 영향 0.
+- 선택 이유: Task A(SORT_COLS label) + Task B(빈 상태 copy) **단일 commit + 단일 workflow_dispatch rebaseline**. 5 call site grep 검증으로 lockstep 완결 확인. section-note `"AI cost (USD)"`는 methodology footnote(별도 컨텍스트)로 OOS. mobile-375에서 `.lb-col-cost { display:none }` 그대로 — 모바일 영향 0.
+- 강한 증거: (1) `grep '"Cost"' e2e/burn-index-sort.spec.ts` → 0 hits, `grep '"Cost"' components/BurnIndexSection.tsx` → 0 hits. (2) `tsc --noEmit` exit 0. (3) Hero.tsx `"use client"` 확인 → `<br />` hydration mismatch 위험 없음. (4) `aria-label="Sort by API cost"` — Playwright getByRole name 공백 포함 exact match 확인. (5) Linux workflow_dispatch baseline PNG 갱신(mobile-375만 변경, desktop-921/1280은 sticky-header clip 영역이라 불변). (6) localhost dev server 직접 확인 — owner happy path 통과.
+
+[S10 회고]
+- 무엇이 잘 됐나: 5 call site lockstep을 grep 0 hit + tsc clean으로 이중 검증해 Playwright silent miss 방지. 단일 commit + 단일 rebaseline 전략이 beraseline 노이즈를 최소화했고, mobile/desktop 영향 분리 분석이 Linux runner 1회로 충분함을 확인했다.
+- 다음엔 무엇을 바꿀까: 라벨 통일 작업처럼 같은 단어가 여러 파일에 흩어진 경우, 변경 전 `grep -rn '"Cost"' components/ e2e/` 스캔을 plan에 명시해 누락 call site를 설계 단계에서 발견하는 습관 필요.
