@@ -36,9 +36,9 @@ jobs:
   generate-baseline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
@@ -55,7 +55,7 @@ jobs:
         run: npx playwright test --config=playwright.config.visual.ts --update-snapshots
 
       - name: Upload baseline artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: visual-baseline
           path: e2e/visual.spec.ts-snapshots/
