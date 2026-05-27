@@ -1,6 +1,6 @@
 // useColumnSort.ts — generic column-sort state for the Burn Index leaderboard.
 //
-// Owner asked for "토큰 많이 쓴 순" as default and clickable column headers.
+// Owner specified "highest token usage" as the default sort with clickable column headers.
 // This hook owns sort state + the comparator; BurnIndexSection only wires the
 // button onClick to toggle() and reads ariaSort(key) for screen-reader hints.
 //

@@ -24,8 +24,8 @@ import { fetchCollectorToken } from "@/lib/client/burn/token";
 interface JoinBurnIndexFormProps {
   onSuccess?: (msg: string) => void;
   onImport?: (entries: ImportedEntry[], handle?: string) => void;
-  // Closes the host modal. Wired from LandingApp so the in-modal "리더보드
-  // 보기" CTA can unmount the overlay before scrolling to #burn — without
+  // Closes the host modal. Wired from LandingApp so the in-modal "View Leaderboard"
+  // CTA can unmount the overlay before scrolling to #burn — without
   // this, the modal sat on top of the leaderboard the user just asked to see.
   onClose?: () => void;
 }
@@ -131,7 +131,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
     });
   }, [fsaEnvelope]);
 
-  // Single source of truth for the 3 "리더보드 보기" CTAs in the success cards.
+  // Single source of truth for the 3 "View Leaderboard" CTAs in the success cards.
   // Order matters: close the modal first so React unmounts the overlay (which
   // owns body scroll lock), then on the next frame replace the hash and scroll
   // explicitly. replaceState is used instead of `location.hash =` because the
@@ -461,14 +461,14 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
             aria-live="polite"
             className="upload-success-card"
           >
-            <h3 className="upload-success-card__title">리더보드에 추가되었어요</h3>
+            <h3 className="upload-success-card__title">You're on the Leaderboard!</h3>
             <p className="upload-success-card__handle">@{successHandle}</p>
             <button
               type="button"
               onClick={goToLeaderboard}
               className="upload-success-card__cta"
             >
-              리더보드 보기
+              View Leaderboard
             </button>
           </div>
         )}
@@ -595,14 +595,14 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
                 aria-live="polite"
                 className="upload-success-card"
               >
-                <h3 className="upload-success-card__title">리더보드에 추가되었어요</h3>
+                <h3 className="upload-success-card__title">You're on the Leaderboard!</h3>
                 <p className="upload-success-card__handle">@{successHandle}</p>
                 <button
                   type="button"
                   onClick={goToLeaderboard}
                   className="upload-success-card__cta"
                 >
-                  리더보드 보기
+                  View Leaderboard
                 </button>
               </div>
             ) : (
@@ -713,14 +713,14 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
             aria-live="polite"
             className="upload-success-card"
           >
-            <h3 className="upload-success-card__title">리더보드에 추가되었어요</h3>
+            <h3 className="upload-success-card__title">You're on the Leaderboard!</h3>
             <p className="upload-success-card__handle">@{successHandle}</p>
             <button
               type="button"
               onClick={goToLeaderboard}
               className="upload-success-card__cta"
             >
-              리더보드 보기
+              View Leaderboard
             </button>
           </div>
         ) : (

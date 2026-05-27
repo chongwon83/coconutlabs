@@ -2,7 +2,7 @@
 //
 // PR Track A (2026-05-25) replaced the V3_BUILDERS mock grid + tier sub-headers
 // + sibling "Your imports" block with ONE unified grid driven by real imports.
-// useColumnSort owns sort state (default "토큰 많이 쓴 순"); a 3-tab filter
+// useColumnSort owns sort state (default: highest token usage); a 3-tab filter
 // (All / Claude Code / Codex) groups by toolsUsed so the leaderboard reads as
 // an inclusive cross-tool contest. Empty store → inline CTA back to the hero
 // so the section never renders a dead grid.
@@ -32,7 +32,7 @@ import {
 type Tier = "verified" | "estimated" | "selfrep";
 type TrustIcon = "shield" | "lock" | "eye" | "code";
 
-// Owner intent: "claude+codex 경쟁 = 통합 경쟁" — entries that used both tools
+// Owner intent: "claude+codex rivalry = unified contest" — entries that used both tools
 // surface under each single-tool filter, so the contest reads as inclusive.
 // Entries with an empty toolsUsed (legacy imports pre-A.1) only appear under
 // "All" — single-tool filters require an explicit tool tag.

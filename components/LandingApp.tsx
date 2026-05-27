@@ -72,8 +72,8 @@ async function fetchBurnIndexStats(url: string): Promise<HeroStats> {
   };
 }
 
-// useSearchParams은 production build에서 Suspense boundary 의무 (Next.js 16.2.6
-// docs L179). 자식 컴포넌트로 분리해 CSR bailout 범위를 listener만으로 제한.
+// useSearchParams requires a Suspense boundary in production builds (Next.js 16.2.6
+// docs L179). Extracted to a child component so CSR bailout scope is limited to the listener only.
 function AutoDetectListener({
   modal,
   setModal,
@@ -99,7 +99,7 @@ function AutoDetectListener({
 export default function LandingApp() {
   const [toast, setToast] = useState({ visible: false, message: "" });
   const [modal, setModal] = useState<ModalKind>(null);
-  // 사용자가 한 번 닫으면 같은 세션의 auto-detect 재오픈을 차단 (Invariant #6).
+  // Once the user dismisses the modal, prevent auto-detect from reopening it in the same session (Invariant #6).
   const userClosedRef = useRef<boolean>(false);
 
   // useSWR was silently failing to fire its initial fetch on this Next.js 16 +
@@ -154,7 +154,7 @@ export default function LandingApp() {
     setStats(next);
   }, []);
 
-  // 모든 modal close 경로가 거치는 단일 path — latch set + setModal(null) 결합.
+  // Single path through which all modal close routes pass — sets the latch and calls setModal(null) together.
   const closeModal = useCallback(() => {
     userClosedRef.current = true;
     setModal(null);
