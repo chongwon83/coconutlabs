@@ -126,7 +126,7 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
           upload recency.
         </p>
 
-        <div className="lb-filters" role="group" aria-label="도구 필터">
+        <div className="lb-filters" role="group" aria-label="Tool filter">
           {FILTERS.map((f) => (
             <button
               key={f.key}
@@ -156,7 +156,7 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
                     type="button"
                     className={`lb-sort-btn${active ? " lb-sort-btn-active" : ""}`}
                     onClick={() => toggle(col.key)}
-                    aria-label={`${col.label} 기준 정렬`}
+                    aria-label={`Sort by ${col.label}`}
                   >
                     <span>{col.label}</span>
                     <span className="lb-sort-arrow" aria-hidden="true">
@@ -215,25 +215,25 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
             <div className="lb-empty">
               {imported.length === 0 ? (
                 <>
-                  아직 데이터가 없어요.{" "}
+                  No data yet.{" "}
                   <a href="#hero" className="lb-empty-link">
                     Join Burn Index
                   </a>
-                  로 첫 데이터를 제출해주세요.
+                  {" "}to submit your first entry.
                 </>
               ) : (
                 <>
-                  이 탭에는 결과가 없어요.{" "}
+                  No results in this tab.{" "}
                   <button
                     type="button"
                     onClick={() => setFilter("all")}
                     className="lb-empty-link lb-empty-link--button"
                   >
-                    All 탭
+                    All tab
                   </button>
-                  에서 전체 기록을 확인해보세요.
+                  {" "}has the full record.
                   <div className="lb-empty-hint">
-                    본인 entry가 보이지 않으면, 데이터를 다시 가져오면 도구 태그가 새로 잡힐 수 있어요.
+                    If your entry is not visible, try re-importing — it may re-tag your tools.
                   </div>
                 </>
               )}

@@ -14,8 +14,8 @@
 //   @carol  toolsUsed=[claude-code, codex]     (200k — appears under BOTH single filters)
 //
 // Empty-state branch: a second seed (only claude-code rows) → clicking Codex
-// triggers the "이 도구 사용자는 아직 없어요" copy at L220 — distinct from
-// the truly-empty-store copy at L213 ("Join Burn Index"). Both branches
+// triggers the "No results in this tab" copy — distinct from
+// the truly-empty-store copy ("No data yet. Join Burn Index …"). Both branches
 // matter because the second one would regress to the first if someone
 // short-circuits `imported.length === 0` upstream.
 //
@@ -69,8 +69,8 @@ const SEED: ImportedEntry[] = [
 ];
 
 // Single-tool seed for the empty-state branch. Two claude-code rows, no
-// codex anywhere — Codex tab MUST render the "이 도구 사용자" copy, not
-// the "Join Burn Index" copy (which is store-empty only).
+// codex anywhere — Codex tab MUST render the "No results in this tab" copy,
+// not the "No data yet. Join Burn Index …" copy (which is store-empty only).
 const CLAUDE_ONLY_SEED: ImportedEntry[] = [
   { ...SEED[0] }, // @alice, claude-code only
   {
@@ -102,7 +102,7 @@ async function visibleHandles(page: Page): Promise<string[]> {
   return await page.locator(".lb-row .lb-handle").allTextContents();
 }
 
-// Filter buttons are inside the role="group" aria-label="도구 필터" wrapper
+// Filter buttons are inside the role="group" aria-label="Tool filter" wrapper
 // at L129. getByRole("button", { name }) matches the visible text since
 // these buttons have no separate aria-label — the label IS the text node.
 function filterButton(page: Page, label: "All" | "Claude Code" | "Codex") {
@@ -177,7 +177,7 @@ test.describe("BurnIndex leaderboard tool filter", () => {
 
     const empty = page.locator(".lb-empty");
     await expect(empty).toBeVisible();
-    await expect(empty).toContainText("이 도구 사용자는 아직 없어요");
+    await expect(empty).toContainText("No results in this tab");
     // CRITICAL: the store-empty CTA ("Join Burn Index") MUST NOT appear
     // here — that copy is reserved for `imported.length === 0`. A bug
     // collapsing these two branches would mislead users into thinking
