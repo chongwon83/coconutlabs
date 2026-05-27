@@ -1975,11 +1975,18 @@ textarea.form-input {
    as one inclusive leaderboard segmented by tool. Pressed state uses the
    locked CTA palette (--young-coconut on #0A0A0A) so filter affordance and
    CTA share one visual language. */
+.lb-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 20px 0 12px;
+  flex-wrap: wrap;
+}
 .lb-filters {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 20px 0 12px;
   padding: 4px;
   background: var(--surface-muted);
   border: 1px solid var(--border);

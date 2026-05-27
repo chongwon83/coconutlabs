@@ -22,7 +22,7 @@ import {
   type ImportedEntry,
   type VerifLevel,
 } from "@/lib/data";
-import { Avatar, Trend, Icon } from "@/components/primitives";
+import { Avatar, Button, Trend, Icon } from "@/components/primitives";
 import {
   useColumnSort,
   type SortKey,
@@ -56,6 +56,7 @@ const SORT_COLS: { key: SortKey; cls: string; label: string }[] = [
 
 interface BurnIndexSectionProps {
   imported?: ImportedEntry[];
+  onJoin: () => void;
 }
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
@@ -92,7 +93,7 @@ function sortArrow(active: boolean, dir: SortDir): string {
   return dir === "asc" ? "↑" : "↓";
 }
 
-export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
+export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProps) {
   const [filter, setFilter] = useState<ToolFilter>("all");
 
   // Apply tool filter BEFORE sort — sort always reflects the visible set so
@@ -126,18 +127,23 @@ export function BurnIndexSection({ imported = [] }: BurnIndexSectionProps) {
           upload recency.
         </p>
 
-        <div className="lb-filters" role="group" aria-label="Tool filter">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              className="lb-filter"
-              aria-pressed={filter === f.key}
-              onClick={() => setFilter(f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="lb-toolbar">
+          <div className="lb-filters" role="group" aria-label="Tool filter">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                className="lb-filter"
+                aria-pressed={filter === f.key}
+                onClick={() => setFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <Button variant="primary" size="lg" onClick={onJoin} data-testid="burn-cta-toolbar">
+            Join Burn Index
+          </Button>
         </div>
 
         <div className="lb-v3">
