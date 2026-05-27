@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "backup_ts": "20260527T005523Z",
+  "backup_dir": "tasks/hero-3issue-fix/work-e-backup-20260527T005523Z",
+  "target_base_names": [
+    "contract-1779201784594-month",
+    "contract-1779201784594-dedup",
+    "contract-1779201784594-trend",
+    "contract-1779201784594-single"
+  ],
+  "detected_handles": {
+    "contract-1779201784594-month": "contract-1779201784594-month",
+    "contract-1779201784594-dedup": "contract-1779201784594-dedup",
+    "contract-1779201784594-trend": "contract-1779201784594-trend",
+    "contract-1779201784594-single": "contract-1779201784594-single"
+  },
+  "leaderboard_field_count": 5,
+  "chongwon83_in_leaderboard": true,
+  "abort_reason": "",
+  "files": {
+    "hist-contract-1779201784594-month": {
+      "path": "hist-contract-1779201784594-month.json",
+      "handle": "contract-1779201784594-month",
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "week_count": 0
+    },
+    "hist-contract-1779201784594-dedup": {
+      "path": "hist-contract-1779201784594-dedup.json",
+      "handle": "contract-1779201784594-dedup",
+      "sha256": "09c5928d53b238636dc5e04960993cb7b537cc7ded2c0f69cd2f9734a7276447",
+      "week_count": 2
+    },
+    "hist-contract-1779201784594-trend": {
+      "path": "hist-contract-1779201784594-trend.json",
+      "handle": "contract-1779201784594-trend",
+      "sha256": "3af25a8fda37586c83d00bc1584d062a355bb27b486329a316e9731bc9b03ed8",
+      "week_count": 3
+    },
+    "hist-contract-1779201784594-single": {
+      "path": "hist-contract-1779201784594-single.json",
+      "handle": "contract-1779201784594-single",
+      "sha256": "24acf7de15660a307e4962ae08db7d45d1745ef67d7c5fd7cd0247ce075d51b7",
+      "week_count": 1
+    },
+    "challenges": {
+      "path": "challenges.json",
+      "sha256": "916919cfe9af1c32ebeb4f1d42dc087a634a64ad20c12be166bb479cbda19394",
+      "total_count": 1,
+      "matches_per_handle": {
+        "contract-1779201784594-month": 0,
+        "contract-1779201784594-dedup": 0,
+        "contract-1779201784594-trend": 0,
+        "contract-1779201784594-single": 0
+      }
+    },
+    "leaderboard": {
+      "path": "leaderboard.json",
+      "sha256": "6de4fb301f8364b371e934575c9c46331dc1772f4d988204528e8d90f20fcc93"
+    }
+  }
+}

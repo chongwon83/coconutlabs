@@ -1,0 +1,14 @@
+=== burn:leaderboard fields (count=1) ===
+  @chongwon83
+
+@chongwon83 present: true
+  target contract-1779201784594-month: ABSENT ✅
+    hist hlen: 0 ✅
+  target contract-1779201784594-dedup: ABSENT ✅
+    hist hlen: 0 ✅
+  target contract-1779201784594-trend: ABSENT ✅
+    hist hlen: 0 ✅
+  target contract-1779201784594-single: ABSENT ✅
+    hist hlen: 0 ✅
+
+burn:challenges llen: 1

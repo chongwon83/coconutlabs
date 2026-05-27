@@ -1,0 +1,15 @@
+===== dry-run attempt: contract-1779201784594-trend (no-prefix as detected) =====
+Error: --handle must match /^@[a-zA-Z0-9_-]+$/ (got "contract-1779201784594-trend"). Wildcards forbidden.
+
+Usage:
+  node scripts/cleanup-test-handle.mjs --handle <@name> [--apply] [--force]
+
+Performs a full purge of one handle from Upstash Redis:
+  1. HDEL burn:leaderboard <handle>
+  2. DEL  burn:hist:<handle>
+  3. LREM burn:challenges 0 <each-matching-row>
+
+Env required: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+Default: dry-run (no writes). Pass --apply to commit.
+Non-test handles require --force (guards against typos).
+exit=1

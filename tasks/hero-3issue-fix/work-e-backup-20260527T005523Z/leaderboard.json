@@ -1,0 +1,60 @@
+{
+  "@chongwon83": {
+    "handle": "@chongwon83",
+    "avatar": "CH",
+    "verif": "Device-synced",
+    "totalTokens": 2636986544,
+    "estimatedCostUsd": 3767.4347,
+    "period": "week",
+    "since": "2026-05-18T00:00:00Z",
+    "until": "2026-05-25T00:00:00Z",
+    "importedAt": "2026-05-26T14:15:56.576Z",
+    "toolsUsed": [
+      "claude-code"
+    ]
+  },
+  "contract-1779201784594-dedup": {
+    "handle": "contract-1779201784594-dedup",
+    "avatar": "CO",
+    "verif": "Device-synced",
+    "totalTokens": 300,
+    "estimatedCostUsd": 3,
+    "period": "week",
+    "since": "2026-01-12T00:00:00Z",
+    "until": "2026-01-19T00:00:00Z",
+    "importedAt": "2026-05-19T14:43:09.588Z"
+  },
+  "contract-1779201784594-month": {
+    "handle": "contract-1779201784594-month",
+    "avatar": "CO",
+    "verif": "Device-synced",
+    "totalTokens": 500,
+    "estimatedCostUsd": 5,
+    "period": "month",
+    "since": "2026-01-01T00:00:00Z",
+    "until": "2026-02-01T00:00:00Z",
+    "importedAt": "2026-05-19T14:43:12.534Z"
+  },
+  "contract-1779201784594-single": {
+    "handle": "contract-1779201784594-single",
+    "avatar": "CO",
+    "verif": "Device-synced",
+    "totalTokens": 100,
+    "estimatedCostUsd": 1,
+    "period": "week",
+    "since": "2026-01-05T00:00:00Z",
+    "until": "2026-01-12T00:00:00Z",
+    "importedAt": "2026-05-19T14:43:11.169Z"
+  },
+  "contract-1779201784594-trend": {
+    "handle": "contract-1779201784594-trend",
+    "avatar": "CO",
+    "verif": "Device-synced",
+    "totalTokens": 300,
+    "estimatedCostUsd": 3,
+    "period": "week",
+    "since": "2026-01-19T00:00:00Z",
+    "until": "2026-01-26T00:00:00Z",
+    "importedAt": "2026-05-19T14:43:07.485Z"
+  }
+}

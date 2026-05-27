@@ -1,0 +1,103 @@
+[env] loaded 26 variables from .env.local.prod
+[env] url=model-opossum-130447.upstash.io  token=gQAA***  (token redacted)
+[backup] manifest sha256 OK (05af0e1a...), schema_version=1
+[before] @chongwon83 present=true, targets present=4/4, challenge matches=0
+
+[apply] sequential HDEL/DEL/LREM for 4 targets...
+  ✓ HDEL burn:leaderboard contract-1779201784594-month → removed=1
+  - DEL  burn:hist:contract-1779201784594-month skipped (hlen=0)
+  ✓ HDEL burn:leaderboard contract-1779201784594-dedup → removed=1
+  ✓ DEL  burn:hist:contract-1779201784594-dedup → removed=1
+  ✓ HDEL burn:leaderboard contract-1779201784594-trend → removed=1
+  ✓ DEL  burn:hist:contract-1779201784594-trend → removed=1
+  ✓ HDEL burn:leaderboard contract-1779201784594-single → removed=1
+  ✓ DEL  burn:hist:contract-1779201784594-single → removed=1
+  - LREM burn:challenges skipped (live=0 matches, audited noop)
+{
+  "schema": "work-e-purge-apply-report/1",
+  "completed_at": "2026-05-27T01:24:20.298Z",
+  "plan_id": "05af0e1a893d5fdda7544372e374228c10910e98d67d8f17e0a10636b5ab85eb",
+  "ops": [
+    {
+      "op": "HDEL",
+      "key": "burn:leaderboard",
+      "field": "contract-1779201784594-month",
+      "removed": 1
+    },
+    {
+      "op": "DEL",
+      "key": "burn:hist:contract-1779201784594-month",
+      "removed": 0,
+      "skipped_reason": "hlen=0 in BEFORE readback"
+    },
+    {
+      "op": "HDEL",
+      "key": "burn:leaderboard",
+      "field": "contract-1779201784594-dedup",
+      "removed": 1
+    },
+    {
+      "op": "DEL",
+      "key": "burn:hist:contract-1779201784594-dedup",
+      "removed": 1
+    },
+    {
+      "op": "HDEL",
+      "key": "burn:leaderboard",
+      "field": "contract-1779201784594-trend",
+      "removed": 1
+    },
+    {
+      "op": "DEL",
+      "key": "burn:hist:contract-1779201784594-trend",
+      "removed": 1
+    },
+    {
+      "op": "HDEL",
+      "key": "burn:leaderboard",
+      "field": "contract-1779201784594-single",
+      "removed": 1
+    },
+    {
+      "op": "DEL",
+      "key": "burn:hist:contract-1779201784594-single",
+      "removed": 1
+    },
+    {
+      "op": "LREM",
+      "key": "burn:challenges",
+      "removed": 0,
+      "skipped_reason": "live_match_count=0 (audited noop, matches backup=0)"
+    }
+  ],
+  "after": {
+    "chongwon83_present": true,
+    "per_target": [
+      {
+        "base": "contract-1779201784594-month",
+        "leaderboard_absent": true,
+        "hist_empty": true
+      },
+      {
+        "base": "contract-1779201784594-dedup",
+        "leaderboard_absent": true,
+        "hist_empty": true
+      },
+      {
+        "base": "contract-1779201784594-trend",
+        "leaderboard_absent": true,
+        "hist_empty": true
+      },
+      {
+        "base": "contract-1779201784594-single",
+        "leaderboard_absent": true,
+        "hist_empty": true
+      }
+    ],
+    "residual_challenges_count": 0,
+    "violations": [],
+    "clean": true
+  }
+}
+
+[ok] 4 handles purged, @chongwon83 preserved. Apply report on stdout.

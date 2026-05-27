@@ -1,0 +1,20 @@
+{
+  "2026-01-05T00:00:00Z": {
+    "handle": "contract-1779201784594-trend",
+    "weekKey": "2026-01-05T00:00:00Z",
+    "totalTokens": 100,
+    "importedAt": "2026-05-19T14:43:06.601Z"
+  },
+  "2026-01-12T00:00:00Z": {
+    "handle": "contract-1779201784594-trend",
+    "weekKey": "2026-01-12T00:00:00Z",
+    "totalTokens": 200,
+    "importedAt": "2026-05-19T14:43:07.006Z"
+  },
+  "2026-01-19T00:00:00Z": {
+    "handle": "contract-1779201784594-trend",
+    "weekKey": "2026-01-19T00:00:00Z",
+    "totalTokens": 300,
+    "importedAt": "2026-05-19T14:43:07.485Z"
+  }
+}

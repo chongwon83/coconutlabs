@@ -1,0 +1,18 @@
+[env] loaded 26 variables from .env.local.prod
+[env] url=model-opossum-130447.upstash.io  token=gQAA***  (token redacted)
+[backup] dir=tasks/hero-3issue-fix/work-e-backup-20260527T005523Z
+[redis] HGETALL burn:leaderboard
+[redis] HGETALL burn:hist:contract-1779201784594-month
+[redis] HGETALL burn:hist:contract-1779201784594-dedup
+[redis] HGETALL burn:hist:contract-1779201784594-trend
+[redis] HGETALL burn:hist:contract-1779201784594-single
+[redis] LRANGE burn:challenges 0 -1
+
+[summary]
+  leaderboard fields: 5
+  @chongwon83 present: true
+  challenges total: 1
+  contract-1779201784594-month → contract-1779201784594-month: 0 weekKey(s), 0 challenge row(s)
+  contract-1779201784594-dedup → contract-1779201784594-dedup: 2 weekKey(s), 0 challenge row(s)
+  contract-1779201784594-trend → contract-1779201784594-trend: 3 weekKey(s), 0 challenge row(s)
+  contract-1779201784594-single → contract-1779201784594-single: 1 weekKey(s), 0 challenge row(s)

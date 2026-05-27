@@ -1,0 +1,89 @@
+[env] loaded 26 variables from .env.local.prod
+[env] url=model-opossum-130447.upstash.io  token=gQAA***  (token redacted)
+[backup] manifest sha256 OK (05af0e1a...), schema_version=1
+[before] @chongwon83 present=true, targets present=4/4, challenge matches=0
+{
+  "schema": "work-e-purge-plan/1",
+  "generated_at": "2026-05-27T01:10:16.521Z",
+  "backup_validation": {
+    "backup_dir": "tasks/hero-3issue-fix/work-e-backup-20260527T005523Z",
+    "manifest_path": "tasks/hero-3issue-fix/work-e-backup-20260527T005523Z/manifest.json",
+    "manifest_sha256": "05af0e1a893d5fdda7544372e374228c10910e98d67d8f17e0a10636b5ab85eb",
+    "schema_version": 1
+  },
+  "deny_list_assertion": {
+    "deny_handles": [
+      "@chongwon83",
+      "chongwon83"
+    ],
+    "target_intersection": [],
+    "defense_in_depth_passed": true
+  },
+  "chongwon83_in_leaderboard_before": true,
+  "leaderboard": {
+    "fields_to_hdel": [
+      {
+        "field": "contract-1779201784594-month",
+        "present_live": true,
+        "backup_present": true
+      },
+      {
+        "field": "contract-1779201784594-dedup",
+        "present_live": true,
+        "backup_present": true
+      },
+      {
+        "field": "contract-1779201784594-trend",
+        "present_live": true,
+        "backup_present": true
+      },
+      {
+        "field": "contract-1779201784594-single",
+        "present_live": true,
+        "backup_present": true
+      }
+    ],
+    "fields_preserved": [
+      "@chongwon83"
+    ],
+    "total_hdel_planned": 4
+  },
+  "hist_to_del": [
+    {
+      "key": "burn:hist:contract-1779201784594-month",
+      "live_hlen": 0,
+      "backup_week_count": 0
+    },
+    {
+      "key": "burn:hist:contract-1779201784594-dedup",
+      "live_hlen": 2,
+      "backup_week_count": 2
+    },
+    {
+      "key": "burn:hist:contract-1779201784594-trend",
+      "live_hlen": 3,
+      "backup_week_count": 3
+    },
+    {
+      "key": "burn:hist:contract-1779201784594-single",
+      "live_hlen": 1,
+      "backup_week_count": 1
+    }
+  ],
+  "challenges_lrem": {
+    "live_match_count": 0,
+    "backup_match_count": 0,
+    "backup_matches_per_handle": {
+      "contract-1779201784594-month": 0,
+      "contract-1779201784594-dedup": 0,
+      "contract-1779201784594-trend": 0,
+      "contract-1779201784594-single": 0
+    },
+    "noop_if_zero_intent": true,
+    "will_perform_lrem": false
+  },
+  "all_planned_hdels_present": true,
+  "ready_to_apply": true
+}
+
+[dry-run] no writes performed. Re-run with --apply --confirm-purge to commit.

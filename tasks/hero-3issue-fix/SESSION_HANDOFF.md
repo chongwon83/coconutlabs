@@ -42,7 +42,9 @@
 
 ---
 
-## 3. 다음 세션 즉시 액션 — Work E (owner-only Upstash HDEL)
+## 3. ✅ COMPLETED 2026-05-27 — Work E (owner-only Upstash HDEL)
+
+> **상태**: 2026-05-27T01:24:20Z apply 완료. 4 handles purged + @chongwon83 보존. 상세 §11.
 
 Claude는 production destruction 권한 없음 (글로벌 CLAUDE.md "permanent deletions" prohibited). **owner 본인이 콘솔에서 직접 수행**:
 
@@ -176,3 +178,83 @@ DevVault 인덱스 재빌드: `python3 ~/Documents/DevVault/.scripts/build_index
 - ~120 insertions, ~80 deletions (approx)
 - 가장 큰 변경: `app/globals.css` (+신규 hero-secondary-* 스타일 + reduced-motion 게이트 확장)
 - 가장 작은 변경: `Hero.tsx` (codex #3 한 줄)
+
+---
+
+## 11. Work E 완료 (2026-05-27)
+
+**Completed**: 2026-05-27T01:24:20Z (Session B B-1 apply 종료 시각)
+**Owner**: chongwon83 (scw0526)
+**Execution path**: 2-session split (Session A backup+dry-run+codex GO / Session B apply+verify+codex APPROVE)
+
+### 실행 명령
+
+```bash
+node tasks/hero-3issue-fix/scripts/work-e-purge.mjs \
+  --env-file .env.local.prod \
+  --backup-dir tasks/hero-3issue-fix/work-e-backup-20260527T005523Z \
+  --expected-manifest-sha256 05af0e1a893d5fdda7544372e374228c10910e98d67d8f17e0a10636b5ab85eb \
+  --apply --confirm-purge
+```
+
+### 4 handle 제거 확인 (handle form: NO `@` prefix as stored)
+
+| Target base | leaderboard HDEL | hist DEL | 후 상태 |
+|-------------|------------------|----------|---------|
+| contract-1779201784594-month | removed=1 | skipped (hlen=0 BEFORE) | leaderboard_absent + hist_empty |
+| contract-1779201784594-dedup | removed=1 | removed=1 (2 weekKeys) | leaderboard_absent + hist_empty |
+| contract-1779201784594-trend | removed=1 | removed=1 (3 weekKeys) | leaderboard_absent + hist_empty |
+| contract-1779201784594-single | removed=1 | removed=1 (1 weekKey) | leaderboard_absent + hist_empty |
+| `burn:challenges` LREM | — | 0 matches (audited noop, live=backup=0) | 변동 없음 |
+
+### Backup 정보 (90일 보관, archive 2026-08-25 예정)
+
+- 경로: `web/tasks/hero-3issue-fix/work-e-backup-20260527T005523Z/`
+- Manifest SHA-256: `05af0e1a893d5fdda7544372e374228c10910e98d67d8f17e0a10636b5ab85eb` (Session B B-0 재계산 일치 확인)
+- 13 files: manifest + leaderboard + challenges + 4 hist + 4 v1 dryrun logs (HANDLE_RE error 역사적 보존) + 1 v2 dryrun JSON + BLOCKER-ANALYSIS.md
+- 추가 산출물 (apply 단계): `apply-work-e-purge.log` + `verify-redis-readback.log` + `verify-namespace-scan.log`
+
+### Codex verdict references
+
+- Pre-apply (Session A v2): `work-e-handoff-packet.md` Slot 7-9 — GO @ 2026-05-27T01:11:30Z
+- Pre-apply (Session B reconfirm): codex 5축 평가 — Session A GO 재확인, 신규 위험 없음
+- Post-apply: codex 4축 평가 — **APPROVE**, 단 namespace residue scan 권고 (수행 완료, matched 0건)
+
+### Triple verify 결과 (3/3 통과)
+
+(a) **Redis 독립 readback** (verify-redis-readback.log):
+- `burn:leaderboard` fields count=1, 단일 field=`@chongwon83` ✅
+- 4 targets ALL ABSENT ✅
+- 4 `burn:hist:*` hlen=0 ALL ✅
+- `burn:challenges` llen=1 (보존)
+
+(b) **Production HTTP** (https://www.coconutlabs.xyz/?cb=work_e_post_purge, Claude in Chrome):
+- Hero stats: builders=1, tokens=2.6B, AI spend=$3,767 ✅
+- Leaderboard 1 row: `@chongwon83 / 2.6B / +59.7%` (VERIFIED 배지) ✅
+- HeroSecondaryCard header "Community weekly total · Live" + footnote "Latest weekly upload per handle" ✅
+- Filter chips: All / Claude Code / Codex ✅
+
+(c) **Diff vs §7 fingerprint** (7-row grid):
+- 6/7 fingerprint 그대로 통과
+- ProductShot rows: 5 live rows → 1 live row (의도된 4 contract test row 제거, Plan B-2 (c) "변경 zero이거나 '4 contract test row 사라짐'으로 설명 가능" 충족)
+
+### Bonus: Namespace residue SCAN (codex 권고 #2 mitigation)
+
+- Pattern: `*contract-1779201784594*` (full keyspace scan)
+- Matched keys count: **0** ✅
+- Production Redis 전 namespace에 4 handle 흔적 0건 잔존 확인
+
+### Plan invariants 4종 충족 최종 확인
+
+| INV | 내용 | 사후 검증 |
+|-----|------|-----------|
+| INV-1 | @chongwon83 보존 | verifyAfter `chongwon83_present=true` + B-2 (a)(b) 양쪽 확인 ✅ |
+| INV-2 | 4 target만 처리 | apply report ops 9건 모두 4 target 범위 + namespace scan residue=0 ✅ |
+| INV-3 | backup required | B-0 manifest SHA-256 재계산 일치 + script `--expected-manifest-sha256` 통과 ✅ |
+| INV-4 | cleanup-test-handle.mjs unmodified | May 21 timestamp 유지 (B-0 mtime 확인), git diff 0건 ✅ |
+
+### 추가 후속 작업
+
+- `web/.env.local.prod` 삭제 완료 (B-5 cleanup, §11 작성 시점 기준)
+- decision-log 업데이트 불필요 (Work E는 데이터 정리, 정책 변경 아님 — 본 §11이 운영 기록)
+- 90일 후 (2026-08-25) backup folder archive 검토
