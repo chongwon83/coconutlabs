@@ -22,7 +22,10 @@
 // to ensure the dot is actually rendered and queryable.
 //
 // `.ticker-track` is the second carrier checked under reduced motion.
-// It's always rendered (components/Ticker.tsx:37) regardless of viewport.
+// Cycle A (2026-05-27) replaced hardcoded items with a live
+// /api/burnindex feed — Ticker returns null when the store is empty
+// (memory store in CI). The two ticker tests below install a minimal
+// route stub so the Ticker mounts and .ticker-track is present.
 //
 // Codex REVISE fix (2026-05-26): the ticker uses `padding-left: 100%` to
 // start content offscreen and relies on the `ticker` keyframe to scroll
@@ -35,6 +38,37 @@
 import { test, expect, Page } from "@playwright/test";
 
 const DESKTOP = { width: 1280, height: 800 };
+
+// Minimal entry that satisfies ImportedEntry shape + triggers Ticker render.
+const TICKER_STUB = {
+  handle: "@test-ticker",
+  avatar: "TT",
+  verif: "Device-synced",
+  totalTokens: 500_000,
+  estimatedCostUsd: 5.0,
+  period: "week",
+  since: "2026-05-18T00:00:00Z",
+  until: "2026-05-25T00:00:00Z",
+  importedAt: "2026-05-27T00:00:00Z",
+  toolsUsed: ["claude-code"],
+  breakdown: [],
+};
+
+// Install a GET stub for /api/burnindex so Ticker mounts in CI (empty store).
+// Must be called BEFORE page.goto() — Playwright intercepts register in order.
+async function seedTicker(page: Page): Promise<void> {
+  await page.route("**/api/burnindex", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ entries: [TICKER_STUB] }),
+    });
+  });
+}
 
 async function awaitFonts(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "networkidle" });
@@ -97,6 +131,7 @@ test.describe("B.5 Hero pulse + reduced-motion gates", () => {
   test("reduced-motion: .ticker-track animation frozen (B.4 debt closed)", async ({
     page,
   }) => {
+    await seedTicker(page); // ensure Ticker mounts (live feed, empty CI store)
     await page.emulateMedia({ reducedMotion: "reduce" });
     await awaitFonts(page);
     const ticker = page.locator(".ticker-track").first();
@@ -117,6 +152,7 @@ test.describe("B.5 Hero pulse + reduced-motion gates", () => {
     // worse than the original a11y debt. The reduced-motion block now
     // forces `padding-left: 0; transform: none` on both selectors.
     // This test guards that override.
+    await seedTicker(page); // ensure Ticker mounts (live feed, empty CI store)
     await page.emulateMedia({ reducedMotion: "reduce" });
     await awaitFonts(page);
     const ticker = page.locator(".ticker-track").first();
