@@ -142,7 +142,7 @@ function HeroSecondaryCard({ stats = EMPTY_HERO_STATS, entries = [] }: { stats?:
   const weekRange = representativeWeek(entries);
 
   return (
-    <div className="hero-secondary-card" data-testid="hero-secondary-card">
+    <div className="hero-secondary-card" data-testid="hero-secondary-card" data-mask="dynamic">
       <div className="hero-secondary-header" data-testid="hero-secondary-header">
         <span className="hero-secondary-header-label">Community weekly total</span>
         <span className="hero-secondary-header-live">

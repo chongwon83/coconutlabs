@@ -106,7 +106,10 @@ const LEGACY_SEED: ImportedEntry[] = [
     toolsUsed: ["claude-code"],
     breakdown: [], // pre-B-cycle — no per-model data
   },
-  { ...SEED[0] }, // @alice alongside for ordering reference
+  {
+    ...SEED[0], // @alice alongside for ordering reference
+    breakdown: [{ tool: "claude-code", model: "claude-sonnet-4-6", totalTokens: 300_000, estimatedCostUsd: 3.0 }],
+  },
 ];
 
 async function seedLeaderboard(
