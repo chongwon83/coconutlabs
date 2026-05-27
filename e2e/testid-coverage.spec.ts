@@ -13,7 +13,7 @@
 // Counts encode the Step B contract from the plan:
 //   - 11 unique Hero testids (some attached to 3 ProductShot variants;
 //     only 1 variant renders at a time when SHOW_LEGACY=false default).
-//   - 7 unique Nav testids (nav-link repeats per V3_NAV link, currently 4).
+//   - 5 unique Nav testids (nav-links + nav-link removed in 3fb9bc8).
 
 import { test, expect } from "@playwright/test";
 
@@ -31,18 +31,17 @@ const EXPECTED = [
   { testid: "product-shot-header",  min: 1, max: 1 }, // 1 variant rendered
   { testid: "product-shot-content", min: 1, max: 1 }, // 1 variant rendered
 
-  // Nav (7 unique types)
+  // Nav (5 unique types — nav-links + nav-link removed in 3fb9bc8;
+  //   links pointed to sections not in launch scope)
   { testid: "nav-root",         min: 1, max: 1 },
   { testid: "nav-inner",        min: 1, max: 1 },
   { testid: "nav-logo",         min: 1, max: 1 },
-  { testid: "nav-links",        min: 1, max: 1 },
-  { testid: "nav-link",         min: 1, max: 10 }, // V3_NAV count, allow drift
   { testid: "nav-cta",          min: 1, max: 1 },
   { testid: "nav-cta-primary",  min: 1, max: 1 }, // Button primitive pass-through
 ];
 
 test.describe("Track 4 Step B: data-testid DOM coverage", () => {
-  test("18 unique testid types present in expected counts", async ({ page }) => {
+  test("16 unique testid types present in expected counts", async ({ page }) => {
     await page.goto("/", { waitUntil: "networkidle" });
     await page.evaluate(() => document.fonts.ready);
 

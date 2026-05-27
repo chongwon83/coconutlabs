@@ -124,13 +124,13 @@ test.describe("upload success card (A.12)", () => {
     // non-interrupting screen-reader announcement.
     await expect(card).toHaveAttribute("aria-live", "polite");
     await expect(card.locator(".upload-success-card__title")).toHaveText(
-      "리더보드에 추가되었어요",
+      "You're on the Leaderboard!",
     );
     await expect(card.locator(".upload-success-card__handle")).toHaveText(
       handle,
     );
     await expect(card.locator(".upload-success-card__cta")).toHaveText(
-      "리더보드 보기",
+      "View Leaderboard",
     );
     // CTA click MUST set window.location.hash = "#burn" (JoinBurnIndexForm.tsx
     // L672 — the locked invariant: no other handler, no router, no onClose).
