@@ -1252,16 +1252,6 @@ button { font: inherit; cursor: pointer; }
   #burn { padding-top: 72px; }
   .section-title { font-size: 32px; }
   .nav-links { display: none; }
-  /* 안 2: mobile에서도 정체성 anchor 노출 (devil 시나리오 1 완화 보존).
-     375px 가용 폭 한계 → font 10px + 좌측 padding 축소 + border 제거 + ellipsis fallback. */
-  .nav-tagline {
-    font-size: 10px;
-    padding-left: 6px;
-    border-left: none;
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
   .lb-v3 .lb-head, .lb-v3 .lb-row { grid-template-columns: 32px 1fr 100px 80px; gap: 10px; padding: 0 14px; }
   .lb-tools { display: none; }
 }
@@ -1725,12 +1715,7 @@ textarea.form-input {
 
 /* Nav v3 */
 .nav-v3 { position: sticky; top: 0; z-index: 30; background: #FFFFFF; border-bottom: 1px solid var(--border); }
-.nav-logo { font-weight: 600; font-size: 14px; color: var(--fg); letter-spacing: -0.01em; text-decoration: none; margin-right: 8px; }
-.nav-tagline {
-  font-size: 12px; color: var(--fg2); letter-spacing: -0.005em;
-  font-weight: 400; padding-left: 10px; border-left: 1px solid var(--border);
-  margin-right: 4px; white-space: nowrap;
-}
+.nav-logo { font-weight: 600; font-size: 14px; color: var(--fg); letter-spacing: -0.01em; text-decoration: none; }
 .nav-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
 /* Hero v3 — compressed top padding for 안 2 above-fold fit (mobile 375x667) */

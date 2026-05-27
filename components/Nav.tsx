@@ -14,8 +14,7 @@ export function Nav({ onJoin }: NavProps) {
         <a href="#hero" className="nav-logo" data-testid="nav-logo">
           CoconutLabs
         </a>
-        <span className="nav-tagline">Measure the burn. Own the ship.</span>
-        <div className="nav-links" data-testid="nav-links">
+<div className="nav-links" data-testid="nav-links">
           {V3_NAV.map((link) => (
             <a key={link.href} href={link.href} className="nav-link" data-testid="nav-link">
               {link.label}
