@@ -72,3 +72,6 @@ tools/usage-poc/dist/
 
 # /senior dispatch 명세 (휘발성 — decision-log에 영속 결정만 흡수)
 HANDOFF.md
+
+# backfill temp artifacts (contains Redis data)
+tmp/
