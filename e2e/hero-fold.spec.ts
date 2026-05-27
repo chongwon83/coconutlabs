@@ -46,13 +46,13 @@ const MOBILE = { width: 375, height: 667 };
 // HYBRID lock invariant 2 (above-fold artifact).
 const CTA_BOTTOM_MAX_PX = 640;
 
-// 920 = last mobile breakpoint (nav-links display:none required)
-// 921 = first desktop breakpoint (nav-links visible required)
-const NAV_HIDDEN_VIEWPORTS = [
+// Nav layout test viewports — all viewports share the same structure now that
+// .nav-links was removed in 3fb9bc8 (links pointed to sections not in launch
+// scope). The test only needs to confirm nav root + logo + CTA render at every
+// breakpoint and that logo sits to the left of the CTA (no overlap).
+const NAV_ALL_VIEWPORTS = [
   { name: "375", width: 375, height: 667 },
   { name: "920", width: 920, height: 768 },
-];
-const NAV_VISIBLE_VIEWPORTS = [
   { name: "921", width: 921, height: 768 },
   { name: "1024", width: 1024, height: 800 },
   { name: "1280", width: 1280, height: 800 },
@@ -128,68 +128,37 @@ test.describe("Above-fold HYBRID lock (mobile 375x667)", () => {
   });
 });
 
-test.describe("Nav-links visibility per breakpoint", () => {
-  for (const v of NAV_HIDDEN_VIEWPORTS) {
-    test(`hidden at ${v.name}x${v.height}`, async ({ page }) => {
-      await disableMotionAndAwaitFonts(page);
-      await page.setViewportSize({ width: v.width, height: v.height });
-      await gotoStable(page);
-
-      const navLinks = page.locator(".nav-links");
-      const display = await navLinks.evaluate(
-        (el) => window.getComputedStyle(el).display
-      );
-      expect(
-        display,
-        `.nav-links must be display:none at viewport ${v.name}`
-      ).toBe("none");
-    });
-  }
-
-  for (const v of NAV_VISIBLE_VIEWPORTS) {
-    test(`visible + no wrap + no CTA overlap at ${v.name}x${v.height}`, async ({
+// Nav-links were removed in 3fb9bc8 — the .nav-links div no longer exists.
+// Tests below confirm the current Nav structure (logo + CTA) renders correctly
+// across all breakpoints and that logo and CTA do not overlap.
+test.describe("Nav layout per breakpoint (logo + CTA)", () => {
+  for (const v of NAV_ALL_VIEWPORTS) {
+    test(`nav root, logo, CTA all visible at ${v.name}x${v.height}`, async ({
       page,
     }) => {
       await disableMotionAndAwaitFonts(page);
       await page.setViewportSize({ width: v.width, height: v.height });
       await gotoStable(page);
 
-      const navLinks = page.locator(".nav-links");
-      await expect(navLinks).toBeVisible();
+      // Nav root is sticky and visible at all breakpoints.
+      await expect(page.locator(".nav-v3")).toBeVisible();
 
-      // Wrap check: scrollWidth must equal clientWidth for each .nav-link.
-      // (rectHeight > lineHeight*1.25 was a false positive — .nav-link
-      //  has padding 6px 12px so rect = lineHeight + 12px ≠ wrap. See
-      //  Track 3 Gate A decision-log entry.)
-      const wrapInfo = await page.$$eval(".nav-links .nav-link", (links) =>
-        links.map((el) => ({
-          text: (el as HTMLElement).innerText,
-          scrollWidth: (el as HTMLElement).scrollWidth,
-          clientWidth: (el as HTMLElement).clientWidth,
-        }))
-      );
-      for (const info of wrapInfo) {
-        expect(
-          info.scrollWidth,
-          `nav-link "${info.text}" must not horizontally overflow`
-        ).toBeLessThanOrEqual(info.clientWidth);
-      }
+      // Logo and CTA are the only two nav elements.
+      const logo = page.locator(".nav-logo");
+      const cta = page.locator('nav.nav-v3 button:has-text("Join Burn Index")').first();
+      await expect(logo).toBeVisible();
+      await expect(cta).toBeVisible();
 
-      // Overlap check: nav-links container right edge must precede the
-      // "Join Burn Index" CTA left edge. Measured tolerance 1px to
-      // absorb sub-pixel rounding.
-      const navBox = await navLinks.boundingBox();
-      const ctaBox = await page
-        .locator('nav.nav-v3 button:has-text("Join Burn Index")')
-        .first()
-        .boundingBox();
-      expect(navBox).not.toBeNull();
+      // Logo must sit to the left of the CTA (no overlap, 1px tolerance).
+      const logoBox = await logo.boundingBox();
+      const ctaBox = await cta.boundingBox();
+      expect(logoBox).not.toBeNull();
       expect(ctaBox).not.toBeNull();
-      const navRight = navBox!.x + navBox!.width;
-      const gap = ctaBox!.x - navRight;
+      const logoRight = logoBox!.x + logoBox!.width;
+      const gap = ctaBox!.x - logoRight;
       expect(
         gap,
-        `nav-links right (${navRight.toFixed(1)}) must not overlap CTA left ` +
+        `logo right (${logoRight.toFixed(1)}) must not overlap CTA left ` +
           `(${ctaBox!.x.toFixed(1)}); gap=${gap.toFixed(1)}`
       ).toBeGreaterThanOrEqual(-1);
     });
