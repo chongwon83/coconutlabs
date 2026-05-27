@@ -187,9 +187,12 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
     let h: FileSystemDirectoryHandle;
     try {
       const picker = (window as Window & typeof globalThis & {
-        showDirectoryPicker(opts?: { mode?: string }): Promise<FileSystemDirectoryHandle>;
+        showDirectoryPicker(opts?: { mode?: string; id?: string }): Promise<FileSystemDirectoryHandle>;
       }).showDirectoryPicker;
-      h = await picker({ mode: "read" });
+      h = await picker({
+        mode: "read",
+        id: kind === "claude" ? "coconut-claude-projects" : "coconut-codex-sessions",
+      });
     } catch (e) {
       if (e instanceof DOMException) {
         if (e.name === "AbortError") {
@@ -521,6 +524,13 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
               <span className="kbd-label" aria-hidden="true">(period)</span> on macOS or{" "}
               <kbd aria-label="Control H">Ctrl+H</kbd> on Linux.
             </p>
+            <details className="path-hint-details">
+              <summary>폴더를 찾기 어려우신가요?</summary>
+              <div className="path-hint-body">
+                <p><strong>macOS</strong>: Finder에서 <kbd>⌘⇧.</kbd> (점) 입력 → 숨김 폴더 표시 → 사용자 홈 폴더 → <code>.claude/projects</code> 또는 <code>.codex/sessions</code></p>
+                <p><strong>Windows</strong>: 탐색기 주소창에 <code>%USERPROFILE%\.claude\projects</code> 직접 입력 후 Enter</p>
+              </div>
+            </details>
           </div>
           <div className="form-fsa-pickers">
             <button
