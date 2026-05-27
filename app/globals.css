@@ -739,46 +739,16 @@ button { font: inherit; cursor: pointer; }
 .product-shot .card-footer .badges { display: flex; gap: 6px; }
 .product-shot .card-footer .right { margin-left: auto; color: var(--fg3); }
 
-/* Hero secondary card */
+/* Hero secondary card — vertical stat list. Children style themselves via
+   .hero-secondary-* selectors below (L1840-). Old icon+title+meta grid was
+   removed 2026-05-27 along with its dead .icon-wrap/.title/.sub/.ts-meta
+   rules. */
 .hero-secondary-card {
   background: #FFFFFF;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 14px;
   box-shadow: 0 0 0 1px var(--border);
-}
-.hero-secondary-card .icon-wrap {
-  width: 36px; height: 36px;
-  border-radius: 6px;
-  background: var(--young-coconut-soft);
-  display: inline-flex; align-items: center; justify-content: center;
-  color: var(--young-coconut-dark);
-  flex: none;
-}
-.hero-secondary-card .title { font-size: 13.5px; font-weight: 600; color: var(--fg); }
-.hero-secondary-card .sub {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg3);
-  margin-top: 2px;
-}
-.hero-secondary-card .ts-meta {
-  display: flex; gap: 14px; align-items: center;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
-  color: var(--fg);
-}
-.hero-secondary-card .ts-meta .label {
-  font-size: 10px;
-  text-transform: uppercase;
-  color: var(--fg3);
-  letter-spacing: 0.05em;
-  display: block;
 }
 
 /* ============================================================
@@ -1934,26 +1904,60 @@ textarea.form-input {
 /* LB grid override — 6 columns: # | Builder | Tokens | Cost | Models | Trend
    (burn-5col-reduction 2026-05-24: VES/Verification/Fixes/Sparkline removed
    from UI; backend fields preserved in lib/data.ts for API/storage contract.
-   Models column added 2026-05-27: per-tool model chips, desktop-only.) */
+   Models column widened 90→110px 2026-05-27: vertical mini-chip stack.) */
 .lb-v3 .lb-head, .lb-v3 .lb-row {
-  grid-template-columns: 32px 1.4fr 80px 80px 90px 70px;
+  grid-template-columns: 32px 1.4fr 80px 80px 110px 70px;
   gap: 10px;
   padding: 0 16px;
 }
 .lb-col-rank, .lb-col-builder, .lb-col-tokens, .lb-col-cost,
 .lb-col-models, .lb-col-trend { display: flex; align-items: center; min-width: 0; overflow: hidden; }
-.lb-col-models { gap: 4px; flex-wrap: wrap; }
-.lb-model-chip {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  padding: 2px 5px;
-  border-radius: var(--r-badge);
-  background: var(--surface-muted);
-  color: var(--fg2);
-  white-space: nowrap;
-  line-height: 1.3;
+.lb-col-models { gap: 0; flex-wrap: nowrap; align-items: stretch; }
+.lb-models-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
 }
+.lb-models-chip {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  column-gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--fg2);
+}
+.lb-models-chip-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-models-chip-pct {
+  color: var(--fg3);
+  font-variant-numeric: tabular-nums;
+}
+.lb-models-chip--more {
+  grid-template-columns: 1fr;
+  color: var(--fg3);
+  font-size: 10.5px;
+  padding-left: 14px;
+}
+.lb-models-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.lb-models-dot--opus   { background: #7C3AED; }
+.lb-models-dot--sonnet { background: #0F766E; }
+.lb-models-dot--haiku  { background: #14B8A6; }
+.lb-models-dot--gpt    { background: #16A34A; }
+.lb-models-dot--codex  { background: #65A30D; }
+.lb-models-dot--legacy { background: var(--fg3); }
+.lb-models-dot--other  { background: var(--fg3); }
+.lb-models-empty { color: var(--fg3); font-size: 12px; }
 .lb-mono { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--fg2); }
 
 /* Imported builder cell: handle + inline tier chip on row 1, period on row 2.

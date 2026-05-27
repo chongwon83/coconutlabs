@@ -58,14 +58,15 @@ test.describe("Track 4 Step C: visual baseline (3 viewports)", () => {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await stabilize(page);
 
-      // Mask: 2 scoped locators (Codex Q4 ✅). hero-secondary-card lives in
-      // hero-left and renders at all viewports. hero-right scope wraps the
-      // active ProductShot; at SHOW_LEGACY=false only 1 product-shot-content
-      // matches, and even at SHOW_LEGACY=true the scope keeps mask contained
-      // to the hero-right column instead of leaking to any future
-      // [data-mask="dynamic"] elsewhere on the page.
+      // Mask: live numeric values only. hero-secondary-card layout is now
+      // visually regression-tested (data-mask="dynamic" removed from the card
+      // wrapper 2026-05-27); only the 3 stat value spans still need masking
+      // because they receive live SWR data. hero-right scope wraps the active
+      // ProductShot for any remaining [data-mask="dynamic"] there.
       const mask = [
-        page.locator('[data-testid="hero-secondary-card"]'),
+        page.locator('[data-testid="hero-stat-builders"]'),
+        page.locator('[data-testid="hero-stat-tokens"]'),
+        page.locator('[data-testid="hero-stat-spend"]'),
         page.locator('[data-testid="hero-right"] [data-mask="dynamic"]'),
       ];
 

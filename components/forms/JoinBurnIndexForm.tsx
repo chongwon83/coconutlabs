@@ -525,10 +525,10 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
               <kbd aria-label="Control H">Ctrl+H</kbd> on Linux.
             </p>
             <details className="path-hint-details">
-              <summary>폴더를 찾기 어려우신가요?</summary>
+              <summary>Can&apos;t find the folder?</summary>
               <div className="path-hint-body">
-                <p><strong>macOS</strong>: Finder에서 <kbd>⌘⇧.</kbd> (점) 입력 → 숨김 폴더 표시 → 사용자 홈 폴더 → <code>.claude/projects</code> 또는 <code>.codex/sessions</code></p>
-                <p><strong>Windows</strong>: 탐색기 주소창에 <code>%USERPROFILE%\.claude\projects</code> 직접 입력 후 Enter</p>
+                <p><strong>macOS</strong>: In Finder, press <kbd>⌘⇧.</kbd> (period) to reveal hidden folders, then navigate to your home folder → <code>.claude/projects</code> or <code>.codex/sessions</code>.</p>
+                <p><strong>Windows</strong>: In File Explorer, paste <code>%USERPROFILE%\.claude\projects</code> into the address bar and press Enter.</p>
               </div>
             </details>
           </div>

@@ -19,6 +19,11 @@
 // matter because the second one would regress to the first if someone
 // short-circuits `imported.length === 0` upstream.
 //
+// Legacy fallback branch: @legacy is a pre-B-cycle entry with breakdown:[].
+// It has toolsUsed:["claude-code"] so the render fallback must show its
+// tokens+cost on the Claude Code tab (not "—"). This seed guards the
+// sliceForFilter legacy path added 2026-05-27.
+//
 // SECURITY: GET stub only (POST passes through). No real store, no token,
 // no Redis. Identical risk envelope to burn-index-sort.spec.ts.
 
@@ -82,6 +87,26 @@ const CLAUDE_ONLY_SEED: ImportedEntry[] = [
     avatar: "DA",
     toolsUsed: ["claude-code"], // strip codex from carol's shape
   },
+];
+
+// Legacy seed: pre-B-cycle entry with breakdown:[] and toolsUsed:["claude-code"].
+// The render fallback in sliceForFilter must return the aggregate (not NaN)
+// on the Claude Code tab so tokens and cost are visible rather than "—".
+const LEGACY_SEED: ImportedEntry[] = [
+  {
+    handle: "@legacy",
+    avatar: "LG",
+    verif: "Device-synced",
+    totalTokens: 150_000,
+    estimatedCostUsd: 1.5,
+    period: "week",
+    since: "2026-05-11T00:00:00Z",
+    until: "2026-05-18T00:00:00Z",
+    importedAt: "2026-05-18T09:00:00Z",
+    toolsUsed: ["claude-code"],
+    breakdown: [], // pre-B-cycle — no per-model data
+  },
+  { ...SEED[0] }, // @alice alongside for ordering reference
 ];
 
 async function seedLeaderboard(
@@ -186,5 +211,31 @@ test.describe("BurnIndex leaderboard tool filter", () => {
     // collapsing these two branches would mislead users into thinking
     // their own data hasn't been submitted yet.
     await expect(empty).not.toContainText("Join Burn Index");
+  });
+
+  test("legacy entry (breakdown:[]) shows tokens+cost on Claude Code tab (render fallback)", async ({
+    page,
+  }) => {
+    // @legacy has breakdown:[] — pre-B-cycle import. The render fallback in
+    // sliceForFilter must attribute the aggregate to claude-code when
+    // toolsUsed===["claude-code"], so tokens+cost are visible (not "—").
+    await seedLeaderboard(page, LEGACY_SEED);
+    await page.goto("/#burn");
+    await filterButton(page, "Claude Code").click();
+
+    // Both rows appear on the Claude Code tab.
+    await expect(page.locator(".lb-row")).toHaveCount(2);
+
+    // Find the @legacy row and verify its token/cost cells are not "—".
+    // allTextContents() returns the text of every .lb-col-tokens in DOM order.
+    // After filter+sort, @alice (300k) ranks first; @legacy (150k) ranks second.
+    const tokenCells = await page.locator(".lb-row .lb-col-tokens").allTextContents();
+    expect(tokenCells[1]).not.toBe("—");
+    const costCells = await page.locator(".lb-row .lb-col-cost").allTextContents();
+    expect(costCells[1]).not.toBe("—");
+
+    // The row must carry data-legacy="true" so QA can target it.
+    const legacyRow = page.locator('.lb-row[data-legacy="true"]');
+    await expect(legacyRow).toHaveCount(1);
   });
 });

@@ -137,7 +137,7 @@ function HeroSecondaryCard({ stats = EMPTY_HERO_STATS }: { stats?: HeroStats }) 
     stats.builderCount === 0 ? "Be first" : `${stats.builderCount} builders`;
 
   return (
-    <div className="hero-secondary-card" data-testid="hero-secondary-card" data-mask="dynamic">
+    <div className="hero-secondary-card" data-testid="hero-secondary-card">
       <div className="hero-secondary-header" data-testid="hero-secondary-header">
         <span className="hero-secondary-header-label">Community weekly total</span>
         <span className="hero-secondary-header-live">

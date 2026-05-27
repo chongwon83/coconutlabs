@@ -85,21 +85,29 @@ function sortArrow(active: boolean, dir: SortDir): string {
 }
 
 // Per-tool slice: extract tokens/cost for a specific tool filter from breakdown.
-// NaN signals "no breakdown data" (legacy entry without breakdown field) → renders "—".
+// NaN signals "no breakdown data for this filter" → renders "—".
 function sliceForFilter(
   e: ImportedEntry,
   f: ToolFilter,
 ): { tokens: number; costUsd: number } {
   if (f === "all") return { tokens: e.totalTokens, costUsd: e.estimatedCostUsd };
   const slices = (e.breakdown ?? []).filter((b) => b.tool === f);
-  if (slices.length === 0) return { tokens: NaN, costUsd: NaN };
-  return {
-    tokens: slices.reduce((acc, b) => acc + b.totalTokens, 0),
-    costUsd: slices.reduce((acc, b) => acc + b.estimatedCostUsd, 0),
-  };
+  if (slices.length > 0) {
+    return {
+      tokens: slices.reduce((acc, b) => acc + b.totalTokens, 0),
+      costUsd: slices.reduce((acc, b) => acc + b.estimatedCostUsd, 0),
+    };
+  }
+  // Legacy fallback: pre-B-cycle entry has no breakdown but `toolsUsed`
+  // tags a single tool — attribute the whole aggregate to that one tool.
+  if ((e.breakdown ?? []).length === 0 && e.toolsUsed.length === 1 && e.toolsUsed[0] === f) {
+    return { tokens: e.totalTokens, costUsd: e.estimatedCostUsd };
+  }
+  return { tokens: NaN, costUsd: NaN };
 }
 
 function shortenModelName(model: string): string {
+  if (model === "unknown") return "legacy";
   if (model.includes("opus-4-7")) return "opus 4.7";
   if (model.includes("opus-4-5")) return "opus 4.5";
   if (model.includes("sonnet-4-6")) return "sonnet 4.6";
@@ -108,6 +116,21 @@ function shortenModelName(model: string): string {
   if (model.includes("gpt-5.5") || model.includes("gpt-5-codex")) return "gpt-5.5";
   if (model.includes("codex-mini")) return "codex-mini";
   return model;
+}
+
+function modelFamily(label: string): "opus" | "sonnet" | "haiku" | "gpt" | "codex" | "legacy" | "other" {
+  const l = label.toLowerCase();
+  if (l === "legacy") return "legacy";
+  if (l.startsWith("opus")) return "opus";
+  if (l.startsWith("sonnet")) return "sonnet";
+  if (l.startsWith("haiku")) return "haiku";
+  if (l.startsWith("gpt")) return "gpt";
+  if (l.startsWith("codex")) return "codex";
+  return "other";
+}
+
+function visibleModelChips(chips: { label: string; pct: number }[], max: number) {
+  return chips.filter((c) => c.pct > 0).slice(0, max);
 }
 
 // Top-N model chips by cost share; overflow appended as "+N" chip (pct=0).
@@ -216,7 +239,7 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
             const { tokens, costUsd } = sliceForFilter(e, filter);
             const modelChips = topModelsChips(e.breakdown ?? [], 2);
             return (
-              <div key={e.handle} className="lb-row lb-imported-row">
+              <div key={e.handle} className="lb-row lb-imported-row" data-legacy={e.breakdown.length === 0 ? "true" : undefined}>
                 <span className="lb-col-rank lb-rank">{i + 1}</span>
                 <span className="lb-col-builder">
                   <Avatar initials={e.avatar} size="sm" />
@@ -243,11 +266,30 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
                   {Number.isNaN(costUsd) ? "—" : fmtCostShort(costUsd)}
                 </span>
                 <span className="lb-col-models">
-                  {modelChips.map((c) => (
-                    <span key={c.label} className="lb-model-chip">
-                      {c.label}{c.pct > 0 ? ` · ${c.pct}%` : ""}
+                  {modelChips.length === 0 ? (
+                    <span className="lb-models-empty" aria-label="No model breakdown available">—</span>
+                  ) : (
+                    <span
+                      className="lb-models-stack"
+                      title={modelChips.map((c) => `${c.label} ${c.pct}%`).join(", ")}
+                    >
+                      {visibleModelChips(modelChips, 3).map((c) => (
+                        <span key={c.label} className="lb-models-chip">
+                          <span
+                            className={`lb-models-dot lb-models-dot--${modelFamily(c.label)}`}
+                            aria-hidden="true"
+                          />
+                          <span className="lb-models-chip-label">{c.label}</span>
+                          <span className="lb-models-chip-pct">{c.pct}%</span>
+                        </span>
+                      ))}
+                      {modelChips.length > 3 && (
+                        <span className="lb-models-chip lb-models-chip--more">
+                          +{modelChips.length - 3} more
+                        </span>
+                      )}
                     </span>
-                  ))}
+                  )}
                 </span>
                 <span className="lb-col-trend">
                   {e.trendDir != null && e.trendPct != null ? (

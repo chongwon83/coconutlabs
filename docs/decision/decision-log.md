@@ -748,3 +748,11 @@ S0에서 작성, S10에서 회고 2줄 추가.
 [S10 회고]
 - 무엇이 잘 됐나: 5 call site lockstep을 grep 0 hit + tsc clean으로 이중 검증해 Playwright silent miss 방지. 단일 commit + 단일 rebaseline 전략이 beraseline 노이즈를 최소화했고, mobile/desktop 영향 분리 분석이 Linux runner 1회로 충분함을 확인했다.
 - 다음엔 무엇을 바꿀까: 라벨 통일 작업처럼 같은 단어가 여러 파일에 흩어진 경우, 변경 전 `grep -rn '"Cost"' components/ e2e/` 스캔을 plan에 명시해 누락 call site를 설계 단계에서 발견하는 습관 필요.
+
+
+---
+
+### 2026-05-27 Cycle A (Ticker live feed) + Cycle B (per-tool breakdown + model chips) — S10 주간 회고
+
+- 무엇이 잘 됐나: Cycle B의 `ImportedEntry.breakdown[]` required 필드 추가가 6파일 lockstep + 3종 burnStore lazy migration까지 한 사이클에 완결됨. TIL 2건 등록(sliceForFilter NaN fallback 패턴 / Playwright route stub before goto 패턴) — 같은 함정 재발 방지 기록 완료. 10일 shipping streak(May 18-27) + test ratio 11.2%→18.1% (+6.9pp) — 품질 지표 역대 최고.
+- 다음엔 무엇을 바꿀까: 필수(required) 스키마 필드 추가 시 6파일 lockstep 비용이 크므로 다음 `ImportedEntry` 확장은 optional(`breakdown?:`)로 먼저 설계. SWR silent fail 패턴을 프로젝트 CLAUDE.md에 명시해 향후 PR 리뷰에서 자동 걸림돌 역할 부여.
