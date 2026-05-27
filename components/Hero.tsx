@@ -68,7 +68,9 @@ function ProductShot({ tab, entries }: { tab: HeroTab; entries: ImportedEntry[] 
         <div className="product-shot-rows" data-testid="product-shot-content" data-mask="dynamic">
           {top.length === 0 ? (
             <div className="product-shot-empty" data-testid="product-shot-empty">
-              Be the first to import. Join Burn Index to claim #1.
+              Your burn score will appear here.
+              <br />
+              First card claims rank #1.
             </div>
           ) : (
             top.map((entry, idx) => {

@@ -100,7 +100,7 @@ async function visibleHandles(page: Page): Promise<string[]> {
 }
 
 // Header button locator — aria-label is `Sort by ${col.label}`. Click target.
-function sortButton(page: Page, label: "Builder" | "Tokens" | "Cost" | "Trend") {
+function sortButton(page: Page, label: "Builder" | "Tokens" | "API cost" | "Trend") {
   return page.getByRole("button", { name: `Sort by ${label}` });
 }
 
@@ -108,7 +108,7 @@ function sortButton(page: Page, label: "Builder" | "Tokens" | "Cost" | "Trend") 
 // a bare <button>. BurnIndexSection wraps each sort button in a
 // `<div role="columnheader">` and hangs aria-sort on the wrapper — assert via
 // the columnheader, not the button. Locator is parent of sortButton.
-function sortHeader(page: Page, label: "Builder" | "Tokens" | "Cost" | "Trend") {
+function sortHeader(page: Page, label: "Builder" | "Tokens" | "API cost" | "Trend") {
   return page
     .locator('[role="columnheader"]')
     .filter({ has: sortButton(page, label) });
@@ -128,7 +128,7 @@ test.describe("BurnIndex leaderboard column sort", () => {
     await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "descending");
     // The other three columns report aria-sort="none" until clicked.
     await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "none");
-    await expect(sortHeader(page, "Cost")).toHaveAttribute("aria-sort", "none");
+    await expect(sortHeader(page, "API cost")).toHaveAttribute("aria-sort", "none");
     await expect(sortHeader(page, "Trend")).toHaveAttribute("aria-sort", "none");
   });
 
@@ -153,9 +153,9 @@ test.describe("BurnIndex leaderboard column sort", () => {
     await sortButton(page, "Builder").click();
     await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "descending");
 
-    await sortButton(page, "Cost").click();
+    await sortButton(page, "API cost").click();
     expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
-    await expect(sortHeader(page, "Cost")).toHaveAttribute("aria-sort", "descending");
+    await expect(sortHeader(page, "API cost")).toHaveAttribute("aria-sort", "descending");
     await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "none");
   });
 

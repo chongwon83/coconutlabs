@@ -50,7 +50,7 @@ const FILTERS: { key: ToolFilter; label: string }[] = [
 const SORT_COLS: { key: SortKey; cls: string; label: string }[] = [
   { key: "handle", cls: "lb-col-builder", label: "Builder" },
   { key: "totalTokens", cls: "lb-col-tokens", label: "Tokens" },
-  { key: "estimatedCostUsd", cls: "lb-col-cost", label: "Cost" },
+  { key: "estimatedCostUsd", cls: "lb-col-cost", label: "API cost" },
   { key: "trendPct", cls: "lb-col-trend", label: "Trend" },
 ];
 
