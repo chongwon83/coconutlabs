@@ -443,6 +443,12 @@ export function fmtCostShort(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
+// VES (Verified Efficiency Score) for the leaderboard cell: one decimal — 201.7.
+// Absent VES renders "—" at the call site, never 0; this only formats a number.
+export function fmtVes(n: number): string {
+  return n.toFixed(1);
+}
+
 // Pick the entry whose `since` is the most recent and return its [since, until)
 // window. Guarantees a valid pair from real data — never synthesizes a range.
 // Returns null when no weekly entry exists; callers must hide UI in that case.

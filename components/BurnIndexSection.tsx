@@ -2,7 +2,8 @@
 //
 // PR Track A (2026-05-25) replaced the V3_BUILDERS mock grid + tier sub-headers
 // + sibling "Your imports" block with ONE unified grid driven by real imports.
-// useColumnSort owns sort state (default: highest token usage); a 3-tab filter
+// useColumnSort owns sort state (default: highest VES, the headline metric);
+// a 3-tab filter
 // (All / Claude Code / Codex) groups by toolsUsed so the leaderboard reads as
 // an inclusive cross-tool contest. Empty store → inline CTA back to the hero
 // so the section never renders a dead grid.
@@ -18,6 +19,7 @@ import {
   V3_TRUST,
   fmtTokensCompact,
   fmtCostShort,
+  fmtVes,
   verifDisplayLabel,
   representativeWeek,
   type ImportedEntry,
@@ -168,7 +170,7 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
 
   const { sorted, sortKey, sortDir, toggle, ariaSort } = useColumnSort(
     filtered,
-    "totalTokens",
+    "ves",
     "desc",
   );
 
@@ -186,7 +188,7 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
           <WeekRangePill range={representativeWeek(imported)} variant="section" />
         </div>
         <p className="burn-methodology-caption">
-          Ranked from real imports. Default: most tokens first. Ties break by
+          Ranked from real imports. Default: highest VES first. Ties break by
           upload recency.
         </p>
 
@@ -216,6 +218,12 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
               <button type="button" className={`lb-sort-btn${sortKey === "handle" ? " lb-sort-btn-active" : ""}`} onClick={() => toggle("handle")} aria-label="Sort by Builder">
                 <span>Builder</span>
                 <span className="lb-sort-arrow" aria-hidden="true">{sortArrow(sortKey === "handle", sortDir)}</span>
+              </button>
+            </div>
+            <div role="columnheader" aria-sort={ariaSort("ves")} className="lb-col-ves">
+              <button type="button" className={`lb-sort-btn${sortKey === "ves" ? " lb-sort-btn-active" : ""}`} onClick={() => toggle("ves")} aria-label="Sort by VES">
+                <span>VES</span>
+                <span className="lb-sort-arrow" aria-hidden="true">{sortArrow(sortKey === "ves", sortDir)}</span>
               </button>
             </div>
             <div role="columnheader" aria-sort={ariaSort("totalTokens")} className="lb-col-tokens">
@@ -263,6 +271,9 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
                     </span>
                     <span className="lb-imported-period">{periodLabel(e)}</span>
                   </span>
+                </span>
+                <span className="lb-col-ves lb-mono">
+                  {e.ves == null ? "—" : fmtVes(e.ves)}
                 </span>
                 <span className="lb-col-tokens lb-mono">
                   {Number.isNaN(tokens) ? "—" : fmtTokensCompact(tokens)}

@@ -8,10 +8,12 @@
 // implementation would silently drop @carol from both single-tool tabs.
 //
 // Seed mirrors burn-index-sort.spec.ts so a future test author has one
-// mental model for "the 3-row leaderboard":
-//   @alice  toolsUsed=[claude-code]            (300k tokens — top under All + Claude Code)
-//   @bob    toolsUsed=[codex]                  (100k tokens — bottom under All + Codex)
-//   @carol  toolsUsed=[claude-code, codex]     (200k — appears under BOTH single filters)
+// mental model for "the 3-row leaderboard". Default sort is VES desc; ves
+// values are chosen so the visible order equals the old totalTokens-desc order,
+// keeping these filter assertions stable:
+//   @alice  toolsUsed=[claude-code]            (ves 200 — top under All + Claude Code)
+//   @bob    toolsUsed=[codex]                  (ves null — bottom under All + Codex)
+//   @carol  toolsUsed=[claude-code, codex]     (ves 150 — appears under BOTH single filters)
 //
 // Empty-state branch: a second seed (only claude-code rows) → clicking Codex
 // triggers the "No results in this tab" copy — distinct from
@@ -37,6 +39,7 @@ const SEED: ImportedEntry[] = [
     verif: "Device-synced",
     totalTokens: 300_000,
     estimatedCostUsd: 3.0,
+    ves: 200,
     period: "week",
     since: "2026-05-18T00:00:00Z",
     until: "2026-05-25T00:00:00Z",
@@ -65,6 +68,7 @@ const SEED: ImportedEntry[] = [
     verif: "Device-synced",
     totalTokens: 200_000,
     estimatedCostUsd: 2.0,
+    ves: 150,
     period: "week",
     since: "2026-05-18T00:00:00Z",
     until: "2026-05-25T00:00:00Z",
@@ -146,14 +150,14 @@ test.describe("BurnIndex leaderboard tool filter", () => {
     await page.goto("/#burn");
     await expect(page.locator(".lb-row")).toHaveCount(3);
 
-    // Default sort kicks in (totalTokens desc) so order is calibrated.
+    // Default sort kicks in (VES desc) so order is calibrated.
     expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
     await expect(filterButton(page, "All")).toHaveAttribute("aria-pressed", "true");
     await expect(filterButton(page, "Claude Code")).toHaveAttribute("aria-pressed", "false");
     await expect(filterButton(page, "Codex")).toHaveAttribute("aria-pressed", "false");
   });
 
-  test("Claude Code filter shows alice + carol (2 rows, totalTokens desc)", async ({ page }) => {
+  test("Claude Code filter shows alice + carol (2 rows, VES desc)", async ({ page }) => {
     await seedLeaderboard(page);
     await page.goto("/#burn");
     await expect(page.locator(".lb-row")).toHaveCount(3);
@@ -167,7 +171,7 @@ test.describe("BurnIndex leaderboard tool filter", () => {
     await expect(filterButton(page, "All")).toHaveAttribute("aria-pressed", "false");
   });
 
-  test("Codex filter shows carol + bob (2 rows, totalTokens desc)", async ({ page }) => {
+  test("Codex filter shows carol + bob (2 rows, VES desc)", async ({ page }) => {
     await seedLeaderboard(page);
     await page.goto("/#burn");
     await expect(page.locator(".lb-row")).toHaveCount(3);
@@ -231,7 +235,8 @@ test.describe("BurnIndex leaderboard tool filter", () => {
 
     // Find the @legacy row and verify its token/cost cells are not "—".
     // allTextContents() returns the text of every .lb-col-tokens in DOM order.
-    // After filter+sort, @alice (300k) ranks first; @legacy (150k) ranks second.
+    // After filter+sort (VES desc), @alice (ves 200) ranks first; @legacy
+    // (no ves → sinks) ranks second.
     const tokenCells = await page.locator(".lb-row .lb-col-tokens").allTextContents();
     expect(tokenCells[1]).not.toBe("—");
     const costCells = await page.locator(".lb-row .lb-col-cost").allTextContents();

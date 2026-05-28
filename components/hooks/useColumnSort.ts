@@ -1,18 +1,21 @@
 // useColumnSort.ts — generic column-sort state for the Burn Index leaderboard.
 //
-// Owner specified "highest token usage" as the default sort with clickable column headers.
-// This hook owns sort state + the comparator; BurnIndexSection only wires the
-// button onClick to toggle() and reads ariaSort(key) for screen-reader hints.
+// Owner specified "highest VES" (the headline metric) as the default sort with
+// clickable column headers. This hook owns sort state + the comparator;
+// BurnIndexSection only wires the button onClick to toggle() and reads
+// ariaSort(key) for screen-reader hints.
 //
 // Direction rules (column switch):
 //   handle           → asc  (A→Z reads naturally for names)
-//   totalTokens      → desc (biggest first — owner's stated default)
+//   ves              → desc (biggest first — owner's stated default)
+//   totalTokens      → desc (biggest first)
 //   estimatedCostUsd → desc (biggest first — same mental model)
 //   trendPct         → desc (steepest gainers first)
 //
-// Nullish handling: trendPct can be absent (pre-trend imports, or rows with
-// fewer than 2 weeks of history). They sort to the bottom regardless of
-// direction so an empty row never displaces a data row when the user toggles.
+// Nullish handling: ves and trendPct can be absent (ves: browser/pre-v3 imports
+// with no device-measured fixes, or zero-cost rows; trendPct: <2 weeks of
+// history). They sort to the bottom regardless of direction so an empty row
+// never displaces a data row when the user toggles.
 //
 // SECURITY: pure client state. No fetch, no storage. Re-renders on each
 // rows-prop change because the parent owns the data source (SWR in Track B).
@@ -20,7 +23,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
-export type SortKey = "handle" | "totalTokens" | "estimatedCostUsd" | "trendPct";
+export type SortKey = "handle" | "ves" | "totalTokens" | "estimatedCostUsd" | "trendPct";
 export type SortDir = "asc" | "desc";
 export type AriaSort = "ascending" | "descending" | "none";
 
@@ -30,12 +33,13 @@ export type Sortable = {
   handle: string;
   totalTokens: number;
   estimatedCostUsd: number;
+  ves?: number | null;
   trendPct?: number | null;
 };
 
 export function useColumnSort<T extends Sortable>(
   rows: T[],
-  defaultKey: SortKey = "totalTokens",
+  defaultKey: SortKey = "ves",
   defaultDir: SortDir = "desc",
 ) {
   const [sortKey, setSortKey] = useState<SortKey>(defaultKey);

@@ -15,14 +15,19 @@
 // fetches /api/burnindex and feeds entries → BurnIndexSection's `imported`
 // prop, so a single GET interception fully seeds the table.
 //
-// Three rows are calibrated so EVERY sort produces a different visible order:
-//   @alice  totalTokens=300  cost=$3.00  trendPct=+15  toolsUsed=[claude]
-//   @bob    totalTokens=100  cost=$1.00  trendPct=null toolsUsed=[codex]
-//   @carol  totalTokens=200  cost=$2.00  trendPct=-5   toolsUsed=[both]
+// Rows are calibrated so EVERY sort produces a different visible order. VES is
+// the default sort (desc) and @bob has no VES — it doubles as the null-VES case:
+//   @alice  ves=200  totalTokens=300  cost=$3.00  trendPct=+15  toolsUsed=[claude]
+//   @bob    ves=null totalTokens=100  cost=$1.00  trendPct=null toolsUsed=[codex]
+//   @carol  ves=150  totalTokens=200  cost=$2.00  trendPct=-5   toolsUsed=[both]
 //
-// This catches: stuck-direction bugs, nullish-to-bottom regression in the
-// trendPct comparator, and the "new column resets to type-appropriate
-// default" branch in useColumnSort.toggle (handle→asc, numeric→desc).
+// VES desc → [alice, carol, bob] (bob's null sinks), which intentionally equals
+// the old totalTokens-desc order, so the filter spec's order assertions still hold.
+//
+// This catches: stuck-direction bugs, nullish-to-bottom regression in the ves AND
+// trendPct comparators (incl. the em-dash render for absent ves), and the "new
+// column resets to type-appropriate default" branch in useColumnSort.toggle
+// (handle→asc, numeric→desc).
 //
 // SECURITY: no real store touched, no token issued. The route stub is the
 // security boundary — even if dev .env.local leaks, no write path is exercised.
@@ -37,6 +42,7 @@ const SEED: ImportedEntry[] = [
     verif: "Device-synced",
     totalTokens: 300_000,
     estimatedCostUsd: 3.0,
+    ves: 200,
     period: "week",
     since: "2026-05-18T00:00:00Z",
     until: "2026-05-25T00:00:00Z",
@@ -58,7 +64,8 @@ const SEED: ImportedEntry[] = [
     importedAt: "2026-05-25T11:00:00Z",
     toolsUsed: ["codex"],
     breakdown: [],
-    // trendDir/trendPct intentionally absent — exercises nullish-to-bottom.
+    // ves AND trendDir/trendPct intentionally absent — exercises nullish-to-bottom
+    // for both comparators plus the em-dash render for an absent VES.
   },
   {
     handle: "@carol",
@@ -66,6 +73,7 @@ const SEED: ImportedEntry[] = [
     verif: "Device-synced",
     totalTokens: 200_000,
     estimatedCostUsd: 2.0,
+    ves: 150,
     period: "week",
     since: "2026-05-18T00:00:00Z",
     until: "2026-05-25T00:00:00Z",
@@ -102,8 +110,15 @@ async function visibleHandles(page: Page): Promise<string[]> {
   return await page.locator(".lb-row .lb-handle").allTextContents();
 }
 
+// VES cell text in row order. Present rows render one decimal (fmtVes → "200.0");
+// absent VES renders the em-dash. Header VES lives in .lb-head, so scoping to
+// .lb-row excludes it (mirrors visibleHandles).
+async function vesCells(page: Page): Promise<string[]> {
+  return await page.locator(".lb-row .lb-col-ves").allTextContents();
+}
+
 // Header button locator — aria-label is `Sort by ${col.label}`. Click target.
-function sortButton(page: Page, label: "Builder" | "Tokens" | "API cost" | "Trend") {
+function sortButton(page: Page, label: "Builder" | "VES" | "Tokens" | "API cost" | "Trend") {
   return page.getByRole("button", { name: `Sort by ${label}` });
 }
 
@@ -111,7 +126,7 @@ function sortButton(page: Page, label: "Builder" | "Tokens" | "API cost" | "Tren
 // a bare <button>. BurnIndexSection wraps each sort button in a
 // `<div role="columnheader">` and hangs aria-sort on the wrapper — assert via
 // the columnheader, not the button. Locator is parent of sortButton.
-function sortHeader(page: Page, label: "Builder" | "Tokens" | "API cost" | "Trend") {
+function sortHeader(page: Page, label: "Builder" | "VES" | "Tokens" | "API cost" | "Trend") {
   return page
     .locator('[role="columnheader"]')
     .filter({ has: sortButton(page, label) });
@@ -126,11 +141,13 @@ test.describe("BurnIndex leaderboard column sort", () => {
     await expect(page.locator(".lb-row")).toHaveCount(3);
   });
 
-  test("default order is totalTokens desc", async ({ page }) => {
+  test("default order is VES desc", async ({ page }) => {
+    // alice 200, carol 150, bob null → null sinks: [alice, carol, bob].
     expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
-    await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "descending");
-    // The other three columns report aria-sort="none" until clicked.
+    await expect(sortHeader(page, "VES")).toHaveAttribute("aria-sort", "descending");
+    // Every other column reports aria-sort="none" until clicked.
     await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "none");
+    await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "none");
     await expect(sortHeader(page, "API cost")).toHaveAttribute("aria-sort", "none");
     await expect(sortHeader(page, "Trend")).toHaveAttribute("aria-sort", "none");
   });
@@ -139,9 +156,9 @@ test.describe("BurnIndex leaderboard column sort", () => {
     await sortButton(page, "Builder").click();
     expect(await visibleHandles(page)).toEqual(["@alice", "@bob", "@carol"]);
     await expect(sortHeader(page, "Builder")).toHaveAttribute("aria-sort", "ascending");
-    // Previously-active column drops back to "none" — only one column owns
-    // the sort state at a time.
-    await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "none");
+    // Previously-active column (VES, the default) drops back to "none" — only
+    // one column owns the sort state at a time.
+    await expect(sortHeader(page, "VES")).toHaveAttribute("aria-sort", "none");
 
     await sortButton(page, "Builder").click();
     expect(await visibleHandles(page)).toEqual(["@carol", "@bob", "@alice"]);
@@ -165,7 +182,7 @@ test.describe("BurnIndex leaderboard column sort", () => {
   test("switching to Builder from a numeric column resets dir to handle default (asc)", async ({
     page,
   }) => {
-    // Default is (totalTokens, desc). Click Builder once — must land on asc
+    // Default is (ves, desc). Click Builder once — must land on asc
     // (handle's type-default), not inherit "desc" from the prior column.
     await sortButton(page, "Builder").click();
     expect(await visibleHandles(page)).toEqual(["@alice", "@bob", "@carol"]);
@@ -185,15 +202,35 @@ test.describe("BurnIndex leaderboard column sort", () => {
     await expect(sortHeader(page, "Trend")).toHaveAttribute("aria-sort", "ascending");
   });
 
-  test("Tokens header click pattern: same-key flips, fresh column resets", async ({ page }) => {
-    // Tokens is the initial sort (desc) — clicking it flips to asc.
-    await sortButton(page, "Tokens").click();
-    expect(await visibleHandles(page)).toEqual(["@bob", "@carol", "@alice"]);
-    await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "ascending");
-
-    // Click Tokens again — flips back to desc.
+  test("Tokens header click pattern: fresh column resets to desc, same-key flips", async ({ page }) => {
+    // VES is the default; Tokens is a fresh column → first click sets the
+    // numeric default (desc), NOT a flip. tokens desc: 300 > 200 > 100.
     await sortButton(page, "Tokens").click();
     expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
     await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "descending");
+
+    // Click Tokens again — same key flips to asc.
+    await sortButton(page, "Tokens").click();
+    expect(await visibleHandles(page)).toEqual(["@bob", "@carol", "@alice"]);
+    await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  test("VES default renders one-decimal + em-dash, and null-VES stays at bottom on flip", async ({
+    page,
+  }) => {
+    // Default (VES desc): alice 200.0, carol 150.0, bob has no ves → "—".
+    expect(await vesCells(page)).toEqual(["200.0", "150.0", "—"]);
+
+    // Flip to asc — null still sinks (the regression we care about: a naive
+    // comparator would float the em-dash row to the top under asc).
+    await sortButton(page, "VES").click();
+    expect(await visibleHandles(page)).toEqual(["@carol", "@alice", "@bob"]);
+    await expect(sortHeader(page, "VES")).toHaveAttribute("aria-sort", "ascending");
+    expect(await vesCells(page)).toEqual(["150.0", "200.0", "—"]);
+
+    // Flip back to desc — original order restored.
+    await sortButton(page, "VES").click();
+    expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
+    await expect(sortHeader(page, "VES")).toHaveAttribute("aria-sort", "descending");
   });
 });

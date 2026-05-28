@@ -902,9 +902,11 @@ button { font: inherit; cursor: pointer; }
 
 .lb-v3 .lb-head, .lb-v3 .lb-row {
   display: grid;
-  grid-template-columns: 40px 1.3fr 1.05fr 110px 130px 130px 64px;
-  padding: 0 18px;
-  gap: 14px;
+  /* Mirrors the canonical 7-track grid defined lower in this file (search
+     "VES re-added"). Kept in sync so the column count is unambiguous. */
+  grid-template-columns: 32px 1.4fr 72px 80px 80px 110px 70px;
+  padding: 0 16px;
+  gap: 10px;
   align-items: center;
 }
 .lb-head {
@@ -1253,9 +1255,8 @@ button { font: inherit; cursor: pointer; }
   #burn { padding-top: 72px; }
   .section-title { font-size: 32px; }
   .nav-links { display: none; }
-  .lb-v3 .lb-head, .lb-v3 .lb-row { grid-template-columns: 32px 1fr 100px 80px; gap: 10px; padding: 0 14px; }
-  .lb-tools { display: none; }
-  .lb-col-models { display: none; }
+  /* Leaderboard ≤920/≤600 column overrides live AFTER the canonical .lb-v3 grid
+     (search "Leaderboard responsive") — they must follow it in source order to win. */
 }
 
 /* ============================================================
@@ -1935,15 +1936,36 @@ textarea.form-input {
 /* LB grid override — 6 columns: # | Builder | Tokens | Cost | Models | Trend
    (burn-5col-reduction 2026-05-24: VES/Verification/Fixes/Sparkline removed
    from UI; backend fields preserved in lib/data.ts for API/storage contract.
-   Models column widened 90→110px 2026-05-27: vertical mini-chip stack.) */
+   Models column widened 90→110px 2026-05-27: vertical mini-chip stack.
+   VES re-added 2026-05-29 as the headline column (device-verified numerator
+   from commit 6401241), placed right after Builder. This is the single
+   canonical grid; the .lb-head/.lb-row rule near the top mirrors it.) */
 .lb-v3 .lb-head, .lb-v3 .lb-row {
-  grid-template-columns: 32px 1.4fr 80px 80px 110px 70px;
+  grid-template-columns: 32px 1.4fr 72px 80px 80px 110px 70px;
   gap: 10px;
   padding: 0 16px;
 }
-.lb-col-rank, .lb-col-builder, .lb-col-tokens, .lb-col-cost,
+.lb-col-rank, .lb-col-builder, .lb-col-ves, .lb-col-tokens, .lb-col-cost,
 .lb-col-models, .lb-col-trend { display: flex; align-items: center; min-width: 0; overflow: hidden; }
 .lb-col-models { gap: 0; flex-wrap: nowrap; align-items: stretch; }
+
+/* Leaderboard responsive — MUST follow the canonical .lb-v3 grid above so these
+   win on source-order ties (the canonical rule is unusually late in the file;
+   placing these earlier lets the desktop grid + .lb-col-* display:flex override
+   them, which silently breaks the breakpoints). VES is the headline metric and
+   is protected down to the smallest width. */
+@media (max-width: 920px) {
+  /* hide Models — #/Builder/VES/Tokens/Cost/Trend */
+  .lb-v3 .lb-head, .lb-v3 .lb-row { grid-template-columns: 32px 1fr 72px 80px 80px 70px; gap: 10px; padding: 0 14px; }
+  .lb-tools { display: none; }
+  .lb-col-models { display: none; }
+}
+@media (max-width: 600px) {
+  /* drop Tokens + Cost too — #/Builder/VES/Trend (Models already hidden ≤920) */
+  .lb-v3 .lb-head, .lb-v3 .lb-row { grid-template-columns: 28px 1fr 72px 60px; gap: 8px; padding: 0 12px; }
+  .lb-col-tokens { display: none; }
+  .lb-col-cost { display: none; }
+}
 .lb-models-stack {
   display: flex;
   flex-direction: column;
@@ -2288,13 +2310,9 @@ textarea.form-input {
   .hero-chips { display: none; }
   .hero-right { display: none; }
   .builders-layout { grid-template-columns: 1fr; }
-  .lb-v3 .lb-head, .lb-v3 .lb-row {
-    grid-template-columns: 28px 1fr 100px 60px;
-    gap: 8px; padding: 0 12px;
-  }
-  /* Mobile drops Cost and Models to keep the row readable; #|Builder|Tokens|Trend remain. */
-  .lb-col-cost { display: none; }
-  .lb-col-models { display: none; }
+  /* Leaderboard responsive rules live with the other .lb-v3 grid defs above
+     (the ≤920 and ≤600 blocks); kept out of here so there's one source of
+     truth for the column tracks. */
 }
 
 /* ============================================================
