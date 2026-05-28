@@ -1,6 +1,6 @@
 // burnStore/index.ts — getStore() factory: the single entry point.
 //
-// store.ts / importHistory.ts / challenge.ts all delegate here. getStore()
+// store.ts / importHistory.ts all delegate here. getStore()
 // picks the implementation by environment, in priority order:
 //   - BURN_STORE=memory             → MemoryBurnStore (E2E ONLY, process-local)
 //   - UPSTASH_REDIS_REST_URL present → RedisBurnStore (Vercel / production)

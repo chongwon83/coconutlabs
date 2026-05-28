@@ -1,17 +1,17 @@
 // burnStore/fileStore.ts — BurnStore backed by JSON files under .data/.
 //
 // This is the local-dev implementation: no account, no network, no deps. It
-// is the original store.ts / importHistory.ts / challenge.ts logic gathered
-// behind the BurnStore interface, unchanged in behavior.
+// is the original store.ts / importHistory.ts logic gathered behind the
+// BurnStore interface, unchanged in behavior.
 //
 // Vercel's filesystem is ephemeral and per-instance, so this implementation is
 // NOT used in production — getStore() picks redisStore when Upstash env vars
 // are present. fileStore stays the honest local default.
 //
-// SECURITY: persists ONLY the derived ImportedEntry / ImportHistoryPoint /
-// ChallengeRecord shapes. route.ts builds ImportedEntry via buildImportedEntry
-// before calling upsertEntry — the raw envelope, content, paths, and secrets
-// never reach this layer.
+// SECURITY: persists ONLY the derived ImportedEntry / ImportHistoryPoint
+// shapes. route.ts builds ImportedEntry via buildImportedEntry before calling
+// upsertEntry — the raw envelope, content, paths, and secrets never reach this
+// layer.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -19,14 +19,12 @@ import type { ImportedEntry } from "@/lib/data";
 import { withLock, atomicWriteJson } from "@/lib/server/atomic";
 import type {
   BurnStore,
-  ChallengeRecord,
   ImportHistoryPoint,
 } from "@/lib/server/burnStore/types";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const STORE_PATH = path.join(DATA_DIR, "leaderboard.json");
 const HIST_PATH = path.join(DATA_DIR, "import-history.json");
-const CHALLENGES_PATH = path.join(DATA_DIR, "challenges.json");
 
 const KEEP_PER_HANDLE = 12; // > trend WINDOW(7), caps history file growth
 
@@ -61,10 +59,6 @@ export class FileBurnStore implements BurnStore {
 
   async readHistory(): Promise<ImportHistoryPoint[]> {
     return readArray<ImportHistoryPoint>(HIST_PATH);
-  }
-
-  async readChallenges(): Promise<ChallengeRecord[]> {
-    return readArray<ChallengeRecord>(CHALLENGES_PATH);
   }
 
   // Upsert by handle (a re-import replaces the older card), newest first, and
@@ -110,16 +104,5 @@ export class FileBurnStore implements BurnStore {
       .sort((a, b) => a.weekKey.localeCompare(b.weekKey))
       .slice(-KEEP_PER_HANDLE);
     await atomicWriteJson(HIST_PATH, [...notMine, ...myNext]);
-  }
-
-  // Append a new submission (newest first). Submissions are never deduped — a
-  // builder may submit to multiple challenges, each verified on its own. The
-  // read-modify-write runs under withLock so two concurrent submissions cannot
-  // drop one another.
-  async addChallenge(record: ChallengeRecord): Promise<void> {
-    await withLock(CHALLENGES_PATH, async () => {
-      const prev = await readArray<ChallengeRecord>(CHALLENGES_PATH);
-      await atomicWriteJson(CHALLENGES_PATH, [record, ...prev]);
-    });
   }
 }

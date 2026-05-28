@@ -22,11 +22,11 @@
 
 import { test, expect, type Page } from "@playwright/test";
 
-// Minimal schemaVersion 2 envelope — 9 row fields, no extras, passes
-// validateSummary (lib/validateSummary.ts:127). One row keeps the preview
-// card render cheap and skips the schemaVersion 2 fan-out.
+// Minimal schemaVersion 3 envelope — 9 row fields, no extras, passes
+// validateSummary (lib/validateSummary.ts). One row keeps the preview card
+// render cheap. verifiedCommits omitted → entry renders "—".
 const FIXTURE_ENVELOPE = JSON.stringify({
-  schemaVersion: "2",
+  schemaVersion: "3",
   generatedAt: "2026-05-21T07:14:26Z",
   periodWindow: {
     period: "week",

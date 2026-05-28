@@ -241,11 +241,16 @@ export interface PeriodWindow {
 }
 
 export interface BurnSummaryEnvelope {
-  schemaVersion: "2";
+  schemaVersion: "3";
   generatedAt: string;
   periodWindow: PeriodWindow;
   rows: BurnSummary[];
   grandTotal: { totalTokens: number; estimatedCostUsd: number };
+  // Device-measured count of the operator's own git commits within
+  // periodWindow — the VES numerator. Optional: the CLI emits it (a real 0
+  // included) when the count is known, and omits it when unknown; the browser
+  // FSA path always omits it (it can't run git). See gitcount.py.
+  verifiedCommits?: number;
 }
 
 // Per-tool×model breakdown inside an ImportedEntry. Allows the leaderboard to
@@ -259,11 +264,13 @@ export interface ImportedEntryBreakdown {
   estimatedCostUsd: number;
 }
 
-// A builder card derived from an imported envelope. The envelope only carries
-// tokens/cost/period, so `fixes`/`ves` are absent at import time — the
-// /api/burnindex GET fills them in by joining verified challenge submissions
-// (see lib/server/challenge.ts). A card with no verified submission keeps both
-// undefined and renders "—".
+// A builder card derived from an imported envelope. `fixes` is the
+// device-measured git commit count (the VES numerator), stored at import time
+// from `env.verifiedCommits` when present (see buildImportedEntry). `ves` is
+// NOT persisted — the /api/burnindex GET derives it at read time from the
+// stored `fixes` and current cost via computeVes, so `fixes` stays the single
+// source of truth. An entry with no measured count keeps `fixes` undefined and
+// renders "—".
 export interface ImportedEntry {
   handle: string;
   avatar: string;
@@ -403,7 +410,7 @@ export function buildImportedEntry(
   const toolsUsed = Array.from(
     new Set(env.rows.map((r) => r.tool)),
   ).sort() as ("claude-code" | "codex")[];
-  return {
+  const entry: ImportedEntry = {
     handle,
     avatar: avatarFor(handle),
     verif: aggregateVerifLevel(env.rows),
@@ -416,6 +423,11 @@ export function buildImportedEntry(
     toolsUsed,
     breakdown: aggregateBreakdown(env.rows),
   };
+  // The single point where the device-measured numerator enters entry state.
+  // Stored only when the CLI measured it (a real 0 is stored); ves is left to
+  // read-time derivation in the GET route. Browser uploads omit it → "—".
+  if (env.verifiedCommits != null) entry.fixes = env.verifiedCommits;
+  return entry;
 }
 
 // Compact token count: 2.6B / 1.2M / 340K / 980 — for the dense leaderboard grid.

@@ -13,6 +13,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from .gitcount import count_commits, git_author_email
 from .hashing import load_or_create_salt
 from .parsers import (cost_breakdown, find_logs, load_pricing, match_model,
                       parse_claude, parse_codex)
@@ -23,6 +24,14 @@ _DAY_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 
 # Selectable leaderboard windows. 'all' disables filtering (local audit only).
 _PERIODS = ("day", "week", "month", "year", "all")
+
+# Sentinel added to the cwd sink for an in-window, token-contributing session
+# that carries NO cwd. We cannot attribute that work to a repo, so the commit
+# numerator is unknowable for the window — build_envelope omits verifiedCommits
+# rather than publishing a partial count (unknown != partial, see gitcount.py).
+# The NUL byte cannot occur in a real filesystem path, so it never collides
+# with a genuine cwd.
+_UNKNOWN_CWD = "\x00no-cwd"
 
 
 def _utc_day(timestamp: str | None) -> str | None:
@@ -133,7 +142,8 @@ def _verification(price_confidence: str) -> dict:
 
 def collect(pricing: dict, salt: str, period: str = "all",
             now: datetime | None = None,
-            scan_root: "Path | None" = None) -> dict:
+            scan_root: "Path | None" = None,
+            cwd_sink: "set | None" = None) -> dict:
     """Scan every local session log and aggregate into grouped rows.
 
     Each log file is one session. Files that fail to parse or carry zero
@@ -146,6 +156,13 @@ def collect(pricing: dict, salt: str, period: str = "all",
     ``scan_root/.codex/sessions`` instead of the standard home-relative
     defaults. Useful when the user passes their home directory explicitly
     (e.g. ``coconut-collector ~/``).
+
+    `cwd_sink`, when provided, is populated with the raw `cwd` of every
+    in-window session that has one; a token-contributing session that lacks a
+    cwd adds the `_UNKNOWN_CWD` sentinel instead, which poisons the commit
+    numerator (build_envelope then omits verifiedCommits — unknown != partial).
+    The caller uses it ONLY locally to resolve git repo roots for the commit
+    count — cwds never enter the emitted envelope.
     """
     if now is None:
         now = datetime.now(timezone.utc)
@@ -162,6 +179,10 @@ def collect(pricing: dict, salt: str, period: str = "all",
                 continue
             if not _in_window(sp, window):
                 continue
+            if cwd_sink is not None:
+                # A contributing session with no cwd is work we can't attribute
+                # to a repo → poison the numerator rather than undercount it.
+                cwd_sink.add(sp.cwd if sp.cwd else _UNKNOWN_CWD)
             key = (tool, sp.model, sp.project_hash)
             grp = groups.get(key)
             if grp is None:
@@ -181,7 +202,7 @@ def build_envelope(pricing: dict, salt: str,
                    generated_at: str | None = None,
                    period: str = "week",
                    scan_root: "Path | None" = None) -> dict:
-    """Assemble the Burn Summary envelope (schemaVersion 2).
+    """Assemble the Burn Summary envelope (schemaVersion 3).
 
     `period` selects the calendar window (day/week/month/year/all). The
     window end and `generatedAt` are anchored to the same instant. Raises
@@ -201,7 +222,9 @@ def build_envelope(pricing: dict, salt: str,
         # input still serialises as schema-valid second-precision UTC 'Z'.
         generated_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     fallback_day = generated_at[:10]
-    groups = collect(pricing, salt, period=period, now=now, scan_root=scan_root)
+    repo_cwds: set[str] = set()
+    groups = collect(pricing, salt, period=period, now=now,
+                     scan_root=scan_root, cwd_sink=repo_cwds)
     rows = []
     total_tokens = 0
     total_cost = 0.0
@@ -233,8 +256,8 @@ def build_envelope(pricing: dict, salt: str,
     else:
         since_iso = window[0].strftime("%Y-%m-%dT%H:%M:%SZ")
         until_iso = window[1].strftime("%Y-%m-%dT%H:%M:%SZ")
-    return {
-        "schemaVersion": "2",
+    envelope = {
+        "schemaVersion": "3",
         "generatedAt": generated_at,
         "periodWindow": {
             "period": period,
@@ -247,6 +270,17 @@ def build_envelope(pricing: dict, salt: str,
             "estimatedCostUsd": round(total_cost, 4),
         },
     }
+    # VES numerator: device-measured commit count over the SAME window.
+    # Emitted only when bounded ('all' has no window) and the count is known
+    # (count_commits returns None for unknown — see gitcount.py); a real 0 is
+    # emitted. cwd/SHA/email never leave this process. A _UNKNOWN_CWD sentinel
+    # means some in-window work had no repo signal → the count would be partial,
+    # so omit the field entirely.
+    if window is not None and repo_cwds and _UNKNOWN_CWD not in repo_cwds:
+        vc = count_commits(repo_cwds, git_author_email(), window[0], window[1])
+        if vc is not None:
+            envelope["verifiedCommits"] = vc
+    return envelope
 
 
 def print_table(envelope: dict) -> None:

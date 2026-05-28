@@ -12,7 +12,7 @@ type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]>
 
 // Canonical valid envelope used as the baseline for all tests.
 const BASE_ENVELOPE = {
-  schemaVersion: "2" as const,
+  schemaVersion: "3" as const,
   generatedAt: "2026-05-20T00:00:00Z",
   periodWindow: { period: "week" as const, since: "2026-05-14T00:00:00Z", until: "2026-05-20T00:00:00Z" },
   rows: [
@@ -36,9 +36,31 @@ describe("validateSummary — schema invariants", () => {
     expect(validateSummary(JSON.stringify(BASE_ENVELOPE)).ok).toBe(true);
   });
 
-  it("schemaVersion must be '2'", () => {
+  it("schemaVersion must be '3'", () => {
     const bad = { ...BASE_ENVELOPE, schemaVersion: "1" };
     expect(validateSummary(JSON.stringify(bad)).ok).toBe(false);
+  });
+
+  it("schemaVersion '2' is now rejected with a re-run hint", () => {
+    const bad = { ...BASE_ENVELOPE, schemaVersion: "2" };
+    const res = validateSummary(JSON.stringify(bad));
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toContain("v3");
+  });
+
+  it("optional verifiedCommits (integer ≥ 0, including 0) passes", () => {
+    expect(validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: 7 })).ok).toBe(true);
+    expect(validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: 0 })).ok).toBe(true);
+  });
+
+  it("verifiedCommits absent is accepted (renders '—')", () => {
+    expect(validateSummary(JSON.stringify(BASE_ENVELOPE)).ok).toBe(true);
+  });
+
+  it("verifiedCommits negative or non-integer is rejected", () => {
+    expect(validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: -1 })).ok).toBe(false);
+    expect(validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: 1.5 })).ok).toBe(false);
+    expect(validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: "3" })).ok).toBe(false);
   });
 
   it("missing required root field (rows) fails", () => {

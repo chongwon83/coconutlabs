@@ -7,7 +7,6 @@
 //  2. The RedisBurnStore projectEntry function strips any extra runtime
 //     properties — only the declared ImportedEntry fields are persisted.
 //  3. ImportHistoryPoint is limited to {handle, weekKey, totalTokens, importedAt}.
-//  4. ChallengeRecord is limited to its 7 declared fields.
 //
 // These tests exercise real code paths, not mocks.
 
@@ -34,7 +33,7 @@ const VALID_ROW = {
 };
 
 const VALID_ENVELOPE = {
-  schemaVersion: "2" as const,
+  schemaVersion: "3" as const,
   generatedAt: "2026-05-20T00:00:00Z",
   periodWindow: {
     period: "week" as const,
@@ -191,55 +190,5 @@ describe("ImportHistoryPoint — only 4 fields allowed", () => {
     const serialized = JSON.stringify(projected);
     expect(serialized).not.toContain("secret");
     expect(serialized).not.toContain("should-not-be-stored");
-  });
-});
-
-// ── Axis 6.4 — ChallengeRecord 7-field constraint ────────────────────────────
-
-import type { ChallengeRecord } from "@/lib/server/burnStore/types";
-
-describe("ChallengeRecord — only 7 declared fields persist", () => {
-  it("a valid ChallengeRecord has exactly the 7 declared fields", () => {
-    const record: ChallengeRecord = {
-      handle: "@user",
-      challenge: "challenge-id",
-      claimedFixes: 10,
-      status: "unverified",
-      verifiedFixes: null,
-      submittedAt: "2026-05-20T10:00:00Z",
-      verifiedAt: null,
-    };
-    const keys = Object.keys(record).sort();
-    expect(keys).toEqual(
-      ["challenge", "claimedFixes", "handle", "status", "submittedAt", "verifiedAt", "verifiedFixes"].sort(),
-    );
-  });
-
-  it("projectChallenge-style projection strips extra runtime properties", () => {
-    const extra = {
-      handle: "@user",
-      challenge: "challenge-id",
-      claimedFixes: 10,
-      status: "unverified" as const,
-      verifiedFixes: null as number | null,
-      submittedAt: "2026-05-20T10:00:00Z",
-      verifiedAt: null as string | null,
-      rawPrompt: "hidden content",
-      filePath: "/home/user/project",
-    };
-    // Simulate projectChallenge projection
-    const projected: ChallengeRecord = {
-      handle: extra.handle,
-      challenge: extra.challenge,
-      claimedFixes: extra.claimedFixes,
-      status: extra.status,
-      verifiedFixes: extra.verifiedFixes,
-      submittedAt: extra.submittedAt,
-      verifiedAt: extra.verifiedAt,
-    };
-    const serialized = JSON.stringify(projected);
-    expect(serialized).not.toContain("rawPrompt");
-    expect(serialized).not.toContain("filePath");
-    expect(serialized).not.toContain("hidden content");
   });
 });

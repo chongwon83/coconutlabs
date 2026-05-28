@@ -25,7 +25,6 @@ import path from "node:path";
 import { MemoryBurnStore } from "@/lib/server/burnStore/memoryStore";
 import { RedisBurnStore } from "@/lib/server/burnStore/redisStore";
 import type { ImportedEntry } from "@/lib/data";
-import type { ChallengeRecord } from "@/lib/server/burnStore/types";
 
 const BASE_ENTRY: Omit<ImportedEntry, "toolsUsed" | "handle"> = {
   avatar: "AL",
@@ -102,7 +101,6 @@ function makeRedisStub() {
     calls,
     hgetallReturn: null as Record<string, ImportedEntry> | null,
     hkeysReturn: [] as string[],
-    lrangeReturn: [] as ChallengeRecord[],
     async eval(script: string, keys: string[], argv: string[]) {
       calls.push({ method: "eval", args: [script, keys, argv] });
       return 1;
@@ -114,10 +112,6 @@ function makeRedisStub() {
     async hkeys(key: string): Promise<string[]> {
       calls.push({ method: "hkeys", args: [key] });
       return this.hkeysReturn;
-    },
-    async lrange<T>(key: string, start: number, stop: number): Promise<T[]> {
-      calls.push({ method: "lrange", args: [key, start, stop] });
-      return this.lrangeReturn as T[];
     },
   };
   return stub;

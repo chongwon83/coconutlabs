@@ -7,18 +7,16 @@ import { DropsSection } from "@/components/DropsSection";
 interface LegacySectionsProps {
   slot: "mid" | "final";
   onJoin: () => void;
-  onChallenge: () => void;
 }
 
 export default function LegacySections({
   slot,
   onJoin,
-  onChallenge,
 }: LegacySectionsProps) {
   if (slot === "mid") {
     return (
       <>
-        <ChallengeSection onInvite={onChallenge} />
+        <ChallengeSection />
         <BuildersSection />
         <DropsSection onRequest={onJoin} />
       </>

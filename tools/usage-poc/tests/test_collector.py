@@ -7,6 +7,8 @@ prove the collector never echoes message content into its output.
 """
 
 import json
+import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -369,7 +371,7 @@ def test_empty_period_raises(tmp_path, monkeypatch):
                        generated_at="2026-05-19T12:00:00Z", period="day")
 
 
-# --- test 13: schemaVersion 2 + periodWindow shape -----------------------
+# --- test 13: schemaVersion 3 + periodWindow shape -----------------------
 
 def test_envelope_schema_version_and_period_window(tmp_path, monkeypatch):
     cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7",
@@ -381,7 +383,7 @@ def test_envelope_schema_version_and_period_window(tmp_path, monkeypatch):
     # contains the 2026-05-19 fixture.
     env = build_envelope(load_pricing(), SALT,
                          generated_at="2026-05-26T12:00:00Z", period="week")
-    assert env["schemaVersion"] == "2"
+    assert env["schemaVersion"] == "3"
     assert set(env["periodWindow"]) == {"period", "since", "until"}
     assert env["periodWindow"]["period"] == "week"
     assert env["periodWindow"]["since"] is not None
@@ -583,3 +585,113 @@ def test_friendly_error_no_sessions(tmp_path, monkeypatch):
     assert "→ 다음 액션:" in combined, (
         f"Error output must include '→ 다음 액션:' hint. Got: {combined!r}"
     )
+
+
+# --- test 16 (gitcount integration): verifiedCommits in the envelope -----
+
+def _init_repo_with_commit(path: Path, email: str, when_iso: str) -> Path:
+    """Init a repo with one commit authored by `email` at `when_iso`."""
+    path.mkdir(parents=True, exist_ok=True)
+
+    def g(*args, env=None):
+        subprocess.run(["git", "-C", str(path), *args],
+                       check=True, capture_output=True, text=True, env=env)
+
+    g("init", "-q")
+    g("config", "user.email", email)
+    g("config", "user.name", "T")
+    (path / "f.txt").write_text("x", encoding="utf-8")
+    cenv = dict(os.environ,
+                GIT_AUTHOR_NAME="T", GIT_AUTHOR_EMAIL=email,
+                GIT_COMMITTER_NAME="T", GIT_COMMITTER_EMAIL=email,
+                GIT_AUTHOR_DATE=when_iso, GIT_COMMITTER_DATE=when_iso)
+    g("add", "-A")
+    g("commit", "-q", "-m", "c", env=cenv)
+    return path
+
+
+def test_verified_commits_emitted_and_leaks_nothing(tmp_path, monkeypatch):
+    """A codex session whose cwd resolves to a real repo with one in-window
+    commit yields verifiedCommits == 1 — and the cwd/email never appear in
+    the envelope JSON (privacy invariant I1)."""
+    repo = _init_repo_with_commit(tmp_path / "repo", "dev@x.io",
+                                  "2026-05-19T10:00:00+00:00")
+    cx = write_codex_log(tmp_path, "s1", str(repo), "gpt-5.5",
+                         ts="2026-05-19T11:00:00Z")
+    monkeypatch.setattr(collect_mod, "find_logs",
+                        lambda tool, scan_root=None: [cx] if tool == "codex" else [])
+    monkeypatch.setattr(collect_mod, "git_author_email", lambda: "dev@x.io")
+    env = build_envelope(load_pricing(), SALT,
+                         generated_at="2026-05-26T12:00:00Z", period="week")
+    assert env["verifiedCommits"] == 1
+    blob = json.dumps(env)
+    assert str(repo) not in blob
+    assert "dev@x.io" not in blob
+
+
+def test_verified_commits_omitted_when_cwd_not_a_repo(tmp_path, monkeypatch):
+    """A cwd that is not inside a git repo is unknown, not zero -> field omitted."""
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    cx = write_codex_log(tmp_path, "s1", str(plain), "gpt-5.5",
+                         ts="2026-05-19T11:00:00Z")
+    monkeypatch.setattr(collect_mod, "find_logs",
+                        lambda tool, scan_root=None: [cx] if tool == "codex" else [])
+    monkeypatch.setattr(collect_mod, "git_author_email", lambda: "dev@x.io")
+    env = build_envelope(load_pricing(), SALT,
+                         generated_at="2026-05-26T12:00:00Z", period="week")
+    assert "verifiedCommits" not in env
+
+
+def test_verified_commits_omitted_when_no_cwd_signal(tmp_path, monkeypatch):
+    """Claude logs carry no line-level cwd in these fixtures -> no repo signal
+    -> field omitted (never 0)."""
+    cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7",
+                          ts="2026-05-19T09:00:00Z")
+    monkeypatch.setattr(collect_mod, "find_logs",
+                        lambda tool, scan_root=None: [cl] if tool == "claude" else [])
+    monkeypatch.setattr(collect_mod, "git_author_email", lambda: "dev@x.io")
+    env = build_envelope(load_pricing(), SALT,
+                         generated_at="2026-05-26T12:00:00Z", period="week")
+    assert "verifiedCommits" not in env
+
+
+def test_verified_commits_real_zero_when_inspected(tmp_path, monkeypatch):
+    """Repo resolves cleanly but the operator authored no commit in the window
+    -> a genuine 0 IS emitted (distinct from omission)."""
+    repo = _init_repo_with_commit(tmp_path / "repo", "dev@x.io",
+                                  "2026-05-01T10:00:00+00:00")  # before window
+    cx = write_codex_log(tmp_path, "s1", str(repo), "gpt-5.5",
+                         ts="2026-05-19T11:00:00Z")
+    monkeypatch.setattr(collect_mod, "find_logs",
+                        lambda tool, scan_root=None: [cx] if tool == "codex" else [])
+    monkeypatch.setattr(collect_mod, "git_author_email", lambda: "dev@x.io")
+    env = build_envelope(load_pricing(), SALT,
+                         generated_at="2026-05-26T12:00:00Z", period="week")
+    assert env["verifiedCommits"] == 0
+
+
+def test_verified_commits_omitted_when_a_contributing_session_lacks_cwd(
+        tmp_path, monkeypatch):
+    """A window mixing a cwd-bearing repo session with a token-contributing
+    session that has NO cwd is unknowable, not partial -> field omitted.
+
+    Regression for codex [P1]: the cwd-less session must poison the numerator
+    instead of being silently dropped (which previously emitted a partial 1)."""
+    repo = _init_repo_with_commit(tmp_path / "repo", "dev@x.io",
+                                  "2026-05-19T10:00:00+00:00")
+    cx = write_codex_log(tmp_path, "s1", str(repo), "gpt-5.5",
+                         ts="2026-05-19T11:00:00Z")
+    # The Claude fixture carries no line-level cwd → a contributing session
+    # with no repo signal.
+    cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7",
+                          ts="2026-05-20T09:00:00Z")
+    monkeypatch.setattr(
+        collect_mod, "find_logs",
+        lambda tool, scan_root=None: [cx] if tool == "codex" else [cl])
+    monkeypatch.setattr(collect_mod, "git_author_email", lambda: "dev@x.io")
+    env = build_envelope(load_pricing(), SALT,
+                         generated_at="2026-05-26T12:00:00Z", period="week")
+    # Both sessions contributed rows, but the cwd-less one poisons the count.
+    assert len(env["rows"]) == 2
+    assert "verifiedCommits" not in env

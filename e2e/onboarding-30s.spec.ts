@@ -13,11 +13,11 @@ import { test, expect } from "@playwright/test";
 
 // ── Fixture ──────────────────────────────────────────────────────────────────
 
-// Minimal valid schemaVersion 2 envelope — one row, all 9 required fields,
+// Minimal valid schemaVersion 3 envelope — one row, all 9 required fields,
 // no extra keys.  Passes the client validateSummary whitelist and the
 // server-side re-validation in POST /api/burnindex.
 const FIXTURE_ENVELOPE = JSON.stringify({
-  schemaVersion: "2",
+  schemaVersion: "3",
   generatedAt: "2026-05-21T07:14:26Z",
   periodWindow: {
     period: "week",

@@ -14,7 +14,6 @@ import type { NextRequest } from "next/server";
 import { validateSummary } from "@/lib/validateSummary";
 import { buildImportedEntry, computeVes } from "@/lib/data";
 import { readEntries, upsertEntry } from "@/lib/server/store";
-import { verifiedFixesByHandle } from "@/lib/server/challenge";
 import { trendByHandle } from "@/lib/server/trend";
 import { recordSubmission } from "@/lib/server/burn/metrics";
 import { verifyAndConsumeToken } from "@/lib/server/burn/token";
@@ -24,17 +23,15 @@ export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   const entries = await readEntries();
-  const verifiedFixes = await verifiedFixesByHandle();
   const trends = await trendByHandle();
-  // Join verified challenge submissions and the 7d trend onto each card. A
-  // handle missing either join keeps those fields absent, so the UI renders
-  // "—" rather than a fabricated value.
+  // Derive ves at read time from the device-measured commit count persisted on
+  // the entry (`fixes`) and the current cost. `fixes` is the single source of
+  // truth: an entry without it (browser uploads, pre-v3 rows) keeps ves absent,
+  // so the UI renders "—" rather than a fabricated value. Then join the 7d trend.
   const joined = entries.map((entry) => {
     const card = { ...entry };
-    const fixes = verifiedFixes.get(entry.handle);
-    if (fixes != null) {
-      card.fixes = fixes;
-      const ves = computeVes(fixes, entry.estimatedCostUsd);
+    if (card.fixes != null) {
+      const ves = computeVes(card.fixes, entry.estimatedCostUsd);
       if (ves != null) card.ves = ves;
     }
     const trend = trends.get(entry.handle);

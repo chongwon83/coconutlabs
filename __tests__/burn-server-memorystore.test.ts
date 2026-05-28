@@ -10,21 +10,17 @@
 //   2. upsertEntry returns the full list newest-first
 //   3. upsertEntry triggers history write only when period==="week" + since!==null
 //   4. history dedupes by (handle, weekKey), caps at KEEP_PER_HANDLE=12 per handle
-//   5. addChallenge prepends, never dedupes
-//   6. reads return DEFENSIVE COPIES — caller mutation must not corrupt store
+//   5. reads return DEFENSIVE COPIES — caller mutation must not corrupt store
 //
 // SECURITY note inherited from types.ts: this store, like fileStore, must hold
-// only the typed projections (ImportedEntry / ImportHistoryPoint / ChallengeRecord).
-// We do not assert that property here — projectEntry / Lua scripts live elsewhere
-// and have their own tests (burn-redis-store, burn-server-whitelist).
+// only the typed projections (ImportedEntry / ImportHistoryPoint). We do not
+// assert that property here — projectEntry / Lua scripts live elsewhere and
+// have their own tests (burn-redis-store, burn-server-whitelist).
 
 import { describe, it, expect, beforeEach } from "vitest";
 import type { ImportedEntry } from "@/lib/data";
 import { MemoryBurnStore } from "@/lib/server/burnStore/memoryStore";
-import type {
-  ChallengeRecord,
-  ImportHistoryPoint,
-} from "@/lib/server/burnStore/types";
+import type { ImportHistoryPoint } from "@/lib/server/burnStore/types";
 
 const VALID_ENTRY: ImportedEntry = {
   handle: "@alice",
@@ -40,16 +36,6 @@ const VALID_ENTRY: ImportedEntry = {
   breakdown: [],
 };
 
-const VALID_CHALLENGE: ChallengeRecord = {
-  handle: "@alice",
-  challenge: "vibe-eval-12",
-  claimedFixes: 7,
-  status: "verified",
-  verifiedFixes: 5,
-  submittedAt: "2026-05-20T12:00:00Z",
-  verifiedAt: "2026-05-20T13:00:00Z",
-};
-
 let store: MemoryBurnStore;
 
 beforeEach(() => {
@@ -62,9 +48,6 @@ describe("MemoryBurnStore — empty state", () => {
   });
   it("readHistory() returns [] on a fresh store", async () => {
     expect(await store.readHistory()).toEqual([]);
-  });
-  it("readChallenges() returns [] on a fresh store", async () => {
-    expect(await store.readChallenges()).toEqual([]);
   });
 });
 
@@ -175,24 +158,6 @@ describe("MemoryBurnStore.upsertEntry — history side-effect", () => {
   });
 });
 
-describe("MemoryBurnStore.addChallenge — append-only", () => {
-  it("appends a record, no dedup, newest first", async () => {
-    await store.addChallenge(VALID_CHALLENGE);
-    await store.addChallenge({ ...VALID_CHALLENGE, submittedAt: "2026-05-21T00:00:00Z" });
-    await store.addChallenge({ ...VALID_CHALLENGE, submittedAt: "2026-05-22T00:00:00Z" });
-    const out = await store.readChallenges();
-    expect(out).toHaveLength(3);
-    expect(out[0].submittedAt).toBe("2026-05-22T00:00:00Z");
-    expect(out[2].submittedAt).toBe("2026-05-20T12:00:00Z");
-  });
-
-  it("duplicate (handle, challenge) is preserved — verification pipeline owns dedup", async () => {
-    await store.addChallenge(VALID_CHALLENGE);
-    await store.addChallenge(VALID_CHALLENGE);
-    expect(await store.readChallenges()).toHaveLength(2);
-  });
-});
-
 describe("MemoryBurnStore — defensive copies on read", () => {
   it("mutating readEntries() result does NOT corrupt the store", async () => {
     await store.upsertEntry(VALID_ENTRY);
@@ -209,12 +174,5 @@ describe("MemoryBurnStore — defensive copies on read", () => {
     const snap = await store.readHistory();
     snap.length = 0;
     expect(await store.readHistory()).toHaveLength(1);
-  });
-
-  it("mutating readChallenges() result does NOT corrupt the store", async () => {
-    await store.addChallenge(VALID_CHALLENGE);
-    const snap = await store.readChallenges();
-    snap.length = 0;
-    expect(await store.readChallenges()).toHaveLength(1);
   });
 });

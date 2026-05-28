@@ -756,3 +756,24 @@ S0에서 작성, S10에서 회고 2줄 추가.
 
 - 무엇이 잘 됐나: Cycle B의 `ImportedEntry.breakdown[]` required 필드 추가가 6파일 lockstep + 3종 burnStore lazy migration까지 한 사이클에 완결됨. TIL 2건 등록(sliceForFilter NaN fallback 패턴 / Playwright route stub before goto 패턴) — 같은 함정 재발 방지 기록 완료. 10일 shipping streak(May 18-27) + test ratio 11.2%→18.1% (+6.9pp) — 품질 지표 역대 최고.
 - 다음엔 무엇을 바꿀까: 필수(required) 스키마 필드 추가 시 6파일 lockstep 비용이 크므로 다음 `ImportedEntry` 확장은 optional(`breakdown?:`)로 먼저 설계. SWR silent fail 패턴을 프로젝트 CLAUDE.md에 명시해 향후 PR 리뷰에서 자동 걸림돌 역할 부여.
+
+
+---
+
+### 2026-05-28 git 기반 실측 효율 분자 (VES numerator) 설계 — self-reported fixes 대체 [S0]
+
+- 문제: VES = verifiedFixes ÷ AI cost USD (`computeVes`, lib/data.ts:298). 분모(cost)는 device 실측이나 분자(verifiedFixes)는 self-reported. `triageChallenge` (challenge.ts:116-124)가 `claimedFixes ≤ TRIAGE_THRESHOLD(=5)`를 제출 시점에 real-world 교차참조 0으로 auto-verify — `{status:"verified", verifiedFixes:claimedFixes}`. 즉 "efficiency" 포지셔닝과 moat 전체가 조작 가능한 분자 위에 서 있음. 3-engine 디베이트의 이전 최종 권고(정렬을 VES desc로 flip + "verified" 워딩 수정)는 거짓을 워딩→포지셔닝으로 **이전**할 뿐 근본 미해결 — owner가 "정렬·워딩 수정보다 실제 효율 측정 기능 구축이 먼저 아니냐" 지적(정확). 본 엔트리로 방향 전환.
+- 버린 대안: (a) 정렬 VES desc flip + 워딩만 수정 — 조작된 숫자로 정렬, 거짓의 위치만 워딩에서 포지셔닝 전체로 이동. (b) GitHub OAuth로 merged PR 검증 — 새 auth 도입 + Chrome-first/no-account 트러스트 약속("never your code, prompts, or secrets") 위반 + 계정 생성은 prohibited action + 파일 import 단독 solo 퍼널 붕괴. (c) self-reported 유지 + owner 수동 검증 — owner 병목, 스케일 불가, triage 임계 이하는 여전히 무검증.
+- 핵심 트레이드오프: local git-derived 분자 채택. CLI가 이미 project path와 session time window를 보유 → `git log --since=<session_start> --until=<session_end>` 류의 **집계 정수만** 산출·업로드(코드·prompt·path 누출 0 → 트러스트 불변 유지). 단 (i) git-count는 "fixes" proxy — 모든 commit이 fix 아니고 모든 in-session 작업이 commit 되지도 않음, (ii) Goodhart commit-splitting 리스크(차후 net-lines 또는 per-session cap으로 완화), (iii) Claude project slug(`-Users-...-Coconut-Labs`)는 공백·경로구분자 양쪽이 `-`로 비가역 인코딩이라 hash 입력으로만 쓰였으나 — log line의 `cwd`가 원본 절대경로를 보존함을 본 세션 실측으로 확인해 우회 가능, (iv) schema v2→v3 migration + leaderboard recompute 필요.
+- 선택 이유: local git 분자 구축(대안 a/b/c 모두 근본 미해결). **위험 3축 3/3 충족** — ① 실패비용: 분자 산식 오류 시 전체 leaderboard 재계산 + 사용자 통지 ≥2h, ② 영향범위: CLI collect + server schema + Redis 영속 데이터 + leaderboard join = 4+ 모듈/배포경로, ③ 관찰가능성: 분자 drift는 단위테스트로 즉시 검출 불가, 운영 데이터로만 표면화 → `/codex` 교차 리뷰 **의무** + S8 게이트 필수. moat = volume 경쟁자(~11곳)가 회피한 "검증 가능한 OUTPUT 분자"를 만드는 것 그 자체. 단계: S0(본 엔트리) → S1/S3 design doc → S3.5 Design Phase(인터페이스·데이터흐름·schema v3·invariant) → S4 review → /codex 교차 → S6(node_modules/next/dist/docs/ 선독 후에만).
+- 강한 증거: (1) challenge.ts:116-124 — `claimedFixes <= TRIAGE_THRESHOLD` → `verifiedFixes:claimedFixes` (self-report가 곧 "verified"임을 코드로 증명). (2) 인프라 존재 확인: collect.py:165 `key=(tool, model, project_hash)` + parsers.py:200-249 Codex `cwd=payload["cwd"]` 직접 보유 + 본 세션 실측 — 최신 Claude log 257행 중 211행(message/assistant/user/attachment type)에 `cwd=/Users/dg-2412-pn-002/Desktop/Project/Coconut Labs` + `gitBranch` 동반 → 두 도구 모두 git 상관 feasible(parser가 현재 안 읽을 뿐). (3) hashing.py:47 salted `sha256[:12]`, salt 0600 never-upload → 집계 정수 업로드는 privacy invariant 유지. (4) 시장: volume 경쟁자(ccusage 14.8k★, Straude, Viberank 등 ~11곳)가 OUTPUT 분자를 회피 = empty efficiency lane이 곧 moat. Meta "Claudeonomics" 종료 + "tokenmaxxing" 퇴조 = efficiency로의 시장 이동.
+
+[S6/S8 구현 + /codex 구현 리뷰 — 2026-05-28]
+- 구현 완료: schema v2→v3(`verifiedCommits` optional top-level), gitcount.py 분자 producer, store-at-import(`buildImportedEntry`→`entry.fixes`) + read-time `ves` 도출, challenge flow A+ decommission(코드 제거, `burn:challenges` Redis 데이터는 1사이클 보존). 39파일 변경 +871/-1367.
+- /codex 구현 리뷰(session 019e6dde, gpt-5.5 xhigh): privacy·schema·store-at-import·decommission 완전성 모두 PASS. 분자 로직에서 3건 적출:
+  - [P1] missing-cwd 부분집계 → 수정: token 기여 in-window 세션이 cwd 없으면 `_UNKNOWN_CWD` 센티넬로 분자 전체 omit (unknown ≠ partial). collect.py + build_envelope guard + test_collector 회귀 테스트.
+  - [P2] unborn-HEAD vs git-error 혼동 → 수정: `_has_commits`(bool) → `_head_state`(tri-state: True=커밋有, False=unborn→실제 0, None=git 에러→omit). 실측 exit code 확인(unborn=1, error=128, none=launch 실패). test_gitcount 4건 추가.
+  - [P2] HEAD-only undercount(feature branch→main 체크아웃 시 누락, checkout 의존성) → **v2 defer**: gitcount.py docstring + 본 로그에 known-limitation 명시. `--branches` 확장은 scoring semantics 변경 + unborn-HEAD 프로브와 orphan-branch 상호작용 + S3.5가 HEAD-only로 ratify → owner 결정 사안. plan Q6(분자 정밀화 v2 deferral)와 일관.
+- 검증: pytest 47 passed(41+6 신규). vitest/tsc/build는 v3 변경분 그대로(분자 수정은 Python 측만 변경) — 재실행 예정.
+
+[S10 회고 — 다음 사이클에서 작성]

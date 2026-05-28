@@ -22,6 +22,7 @@ export type ValidationResult =
 
 const ENVELOPE_KEYS = [
   "schemaVersion", "generatedAt", "periodWindow", "rows", "grandTotal",
+  "verifiedCommits",
 ];
 const PERIOD_WINDOW_KEYS = ["period", "since", "until"];
 const PERIODS = ["day", "week", "month", "year", "all"];
@@ -159,15 +160,20 @@ export function validateSummary(raw: string): ValidationResult {
   const bad = unexpectedKey(parsed, ENVELOPE_KEYS);
   if (bad) return { ok: false, error: `Envelope has unexpected key "${bad}".` };
 
-  if (parsed.schemaVersion === "1")
+  if (parsed.schemaVersion === "1" || parsed.schemaVersion === "2")
     return {
       ok: false,
-      error: "This file is schema v1. Re-run the collector to emit v2.",
+      error: `This file is schema v${parsed.schemaVersion}. Re-run the collector to emit v3.`,
     };
-  if (parsed.schemaVersion !== "2")
-    return { ok: false, error: 'schemaVersion must be "2".' };
+  if (parsed.schemaVersion !== "3")
+    return { ok: false, error: 'schemaVersion must be "3".' };
   if (typeof parsed.generatedAt !== "string" || !ISO_Z_RE.test(parsed.generatedAt))
     return { ok: false, error: "generatedAt must be an ISO-8601 UTC timestamp." };
+
+  // verifiedCommits (the VES numerator) is optional. When present it must be a
+  // non-negative integer; when absent the entry's fixes/ves stay undefined.
+  if (parsed.verifiedCommits !== undefined && !isIntAtLeastZero(parsed.verifiedCommits))
+    return { ok: false, error: "verifiedCommits must be an integer ≥ 0 when present." };
 
   const pwErr = checkPeriodWindow(parsed.periodWindow);
   if (pwErr) return { ok: false, error: pwErr };

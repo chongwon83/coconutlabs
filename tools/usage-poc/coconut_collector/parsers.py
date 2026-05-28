@@ -95,6 +95,9 @@ class SessionParse:
     project_hash: 12-hex salted hash of the raw path slug. The raw slug is
                   consumed inside parse_claude/parse_codex and NEVER stored
                   here — callers cannot accidentally emit it.
+    cwd:          raw working directory of the session, or None when the log
+                  carries none. Used ONLY locally by gitcount to resolve repo
+                  roots — it is NEVER written into an uploaded envelope.
     """
 
     tool: str
@@ -102,6 +105,7 @@ class SessionParse:
     tokens: dict
     timestamp: str | None
     project_hash: str
+    cwd: str | None = None
 
 
 def load_pricing() -> dict:
@@ -158,6 +162,7 @@ def parse_claude(path: Path, salt: str) -> SessionParse:
     """
     model = "unknown"
     timestamp: str | None = None
+    cwd: str | None = None
     tok = {"input": 0, "output": 0, "cache_read": 0,
            "cache_write_5m": 0, "cache_write_1h": 0}
     with open(path, "r", encoding="utf-8") as f:
@@ -173,6 +178,12 @@ def parse_claude(path: Path, salt: str) -> SessionParse:
                 ts = obj.get("timestamp")
                 if isinstance(ts, str):
                     timestamp = ts
+            # The Claude slug (parent dir name) is irreversible, so the actual
+            # working directory must come from the line-level cwd field.
+            if cwd is None:
+                c = obj.get("cwd")
+                if isinstance(c, str) and c:
+                    cwd = c
             msg = obj.get("message")
             if obj.get("type") != "assistant" or not isinstance(msg, dict):
                 continue
@@ -194,7 +205,7 @@ def parse_claude(path: Path, salt: str) -> SessionParse:
             tok["cache_write_1h"] += _as_int(cc.get("ephemeral_1h_input_tokens"))
     raw_slug = path.parent.name
     return SessionParse("claude", model, tok, timestamp,
-                        project_hash(raw_slug, salt))
+                        project_hash(raw_slug, salt), cwd)
 
 
 def parse_codex(path: Path, salt: str) -> SessionParse:
@@ -246,7 +257,7 @@ def parse_codex(path: Path, salt: str) -> SessionParse:
            "cached_input": cached,
            "output": _as_int(final.get("output_tokens"))}
     return SessionParse("codex", model, tok, timestamp,
-                        project_hash(cwd, salt))
+                        project_hash(cwd, salt), cwd or None)
 
 
 def cost_breakdown(tok: dict, price: dict) -> dict:

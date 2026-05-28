@@ -10,26 +10,23 @@
 // the leaderboard + history write is one atomic Lua EVAL — no read-modify-write
 // race exists because the script runs indivisibly on the Redis server.
 //
-// SECURITY: persists ONLY the derived ImportedEntry / ImportHistoryPoint /
-// ChallengeRecord shapes. Every value written below is an explicit
-// JSON.stringify of a typed object — never a spread of unknown data. The raw
-// envelope, raw content, file paths, repo names, and secrets never reach this
-// layer (route.ts builds ImportedEntry via buildImportedEntry first).
+// SECURITY: persists ONLY the derived ImportedEntry / ImportHistoryPoint
+// shapes. Every value written below is an explicit JSON.stringify of a typed
+// object — never a spread of unknown data. The raw envelope, raw content, file
+// paths, repo names, and secrets never reach this layer (route.ts builds
+// ImportedEntry via buildImportedEntry first).
 
 import type { Redis } from "@upstash/redis";
 import type { ImportedEntry } from "@/lib/data";
 import type {
   BurnStore,
-  ChallengeRecord,
   ImportHistoryPoint,
 } from "@/lib/server/burnStore/types";
 
 const LEADERBOARD_KEY = "burn:leaderboard";
-const CHALLENGES_KEY = "burn:challenges";
 const histKey = (handle: string) => `burn:hist:${handle}`;
 
 const KEEP_PER_HANDLE = 12; // > trend WINDOW(7), caps history hash growth
-const CHALLENGES_CAP = 500; // LTRIM bound — submission retention
 
 // Atomic upsert: leaderboard HSET + (week-only) history HSET + history trim,
 // all in one indivisible server-side script. This is what makes redisStore
@@ -49,18 +46,6 @@ if ARGV[3] == '1' then
   local excess = #keys - tonumber(ARGV[6])
   for i = 1, excess do redis.call('HDEL', KEYS[2], keys[i]) end
 end
-return 1
-`;
-
-// Atomic append + trim for a challenge submission — LPUSH then LTRIM in one
-// indivisible script. As two separate REST calls, a failure between them would
-// leave the list one element over CHALLENGES_CAP while the method still threw;
-// a single EVAL closes that window.
-//
-//   KEYS[1] = burn:challenges     ARGV = recordJson, cap-1
-const ADD_CHALLENGE_LUA = `
-redis.call('LPUSH', KEYS[1], ARGV[1])
-redis.call('LTRIM', KEYS[1], 0, tonumber(ARGV[2]))
 return 1
 `;
 
@@ -109,20 +94,6 @@ function hydrateEntry(e: ImportedEntry): ImportedEntry {
     ...e,
     toolsUsed: Array.isArray(e.toolsUsed) ? e.toolsUsed : [],
     breakdown: Array.isArray(e.breakdown) ? e.breakdown : [],
-  };
-}
-
-// Same defence for ChallengeRecord — rebuild the 7 declared fields so no extra
-// runtime property is ever serialized into the challenge list.
-function projectChallenge(r: ChallengeRecord): ChallengeRecord {
-  return {
-    handle: r.handle,
-    challenge: r.challenge,
-    claimedFixes: r.claimedFixes,
-    status: r.status,
-    verifiedFixes: r.verifiedFixes,
-    submittedAt: r.submittedAt,
-    verifiedAt: r.verifiedAt,
   };
 }
 
@@ -191,23 +162,5 @@ export class RedisBurnStore implements BurnStore {
       if (hash != null) points.push(...Object.values(hash));
     }
     return points;
-  }
-
-  // Every challenge submission, newest first (LPUSH order).
-  async readChallenges(): Promise<ChallengeRecord[]> {
-    return this.#redis.lrange<ChallengeRecord>(CHALLENGES_KEY, 0, -1);
-  }
-
-  // Append one submission (newest first) and trim to CHALLENGES_CAP — one
-  // atomic Lua EVAL (see ADD_CHALLENGE_LUA), so a failure can never leave the
-  // list over-cap. Never deduped — each claim is verified on its own. The
-  // stored value is an explicit JSON.stringify of the projected
-  // ChallengeRecord (projectChallenge blocks extra runtime properties).
-  async addChallenge(record: ChallengeRecord): Promise<void> {
-    await this.#redis.eval(
-      ADD_CHALLENGE_LUA,
-      [CHALLENGES_KEY],
-      [JSON.stringify(projectChallenge(record)), String(CHALLENGES_CAP - 1)],
-    );
   }
 }

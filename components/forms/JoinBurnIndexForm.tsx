@@ -838,7 +838,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
           id="jbi-paste"
           className="form-input"
           rows={5}
-          placeholder='{ "schemaVersion": "2", "periodWindow": { … }, "rows": [ … ] }'
+          placeholder='{ "schemaVersion": "3", "periodWindow": { … }, "rows": [ … ] }'
           value={raw}
           onChange={(e) => {
             setRaw(e.target.value);

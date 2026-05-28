@@ -378,7 +378,7 @@ export interface PeriodWindow {
 }
 
 export interface Envelope {
-  schemaVersion: "2";
+  schemaVersion: "3";
   generatedAt: string;
   periodWindow: PeriodWindow;
   rows: EnvelopeRow[];
@@ -388,7 +388,7 @@ export interface Envelope {
   };
 }
 
-// Public API. Assembles the Burn Summary envelope (schemaVersion 2).
+// Public API. Assembles the Burn Summary envelope (schemaVersion 3).
 // `period` selects the calendar window; window end and `generatedAt` are
 // anchored to the same instant. Throws when `period` is unknown or no
 // sessions fall in the window.
@@ -485,7 +485,9 @@ export async function buildEnvelope(
         until: formatGenerated(window[1]),
       };
   return {
-    schemaVersion: "2",
+    // Browser FSA path can't run git, so verifiedCommits is always omitted
+    // here → the imported entry renders "—". Only the Python CLI emits it.
+    schemaVersion: "3",
     generatedAt,
     periodWindow,
     rows,

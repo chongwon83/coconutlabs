@@ -1,13 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://coconutlabs.xyz/schemas/burn-summary.v2.json",
+  "$id": "https://coconutlabs.xyz/schemas/burn-summary.v3.json",
   "title": "CoconutLabs Burn Summary",
-  "description": "Device-side aggregated AI coding token usage. Uploadable fields ONLY (handoff §8): tool, model, token count, estimated cost, timestamp bucket, session count, active day, project hash, verification level. No raw prompt/response/source/path/repo-name/secret keys ever appear here. periodWindow records the calendar window the rows were aggregated over.",
+  "description": "Device-side aggregated AI coding token usage. Uploadable fields ONLY (handoff §8): tool, model, token count, estimated cost, timestamp bucket, session count, active day, project hash, verification level, plus an optional device-measured verifiedCommits integer (the VES numerator). No raw prompt/response/source/path/repo-name/secret keys ever appear here. periodWindow records the calendar window the rows were aggregated over.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "generatedAt", "periodWindow", "rows", "grandTotal"],
   "properties": {
-    "schemaVersion": { "const": "2" },
+    "schemaVersion": { "const": "3" },
+    "verifiedCommits": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Device-measured count of the operator's own git commits within periodWindow (the VES numerator). Optional: omitted when the count is unknown (browser uploads, unresolvable/shallow repos). A real 0 means inspected and none matched."
+    },
     "generatedAt": {
       "type": "string",
       "description": "ISO 8601 UTC timestamp of when this summary was generated.",

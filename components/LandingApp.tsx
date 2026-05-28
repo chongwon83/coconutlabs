@@ -20,7 +20,6 @@ import { BurnIndexSection } from "@/components/BurnIndexSection";
 import { Footer } from "@/components/Footer";
 import { Toast } from "@/components/Toast";
 import { JoinBurnIndexForm } from "@/components/forms/JoinBurnIndexForm";
-import { ChallengeInviteForm } from "@/components/forms/ChallengeInviteForm";
 import type { ImportedEntry } from "@/lib/data";
 
 const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
@@ -33,7 +32,7 @@ const LegacySections = SHOW_LEGACY
   ? dynamic(() => import("@/components/LegacySections"))
   : null;
 
-type ModalKind = "join" | "challenge" | null;
+type ModalKind = "join" | null;
 
 const BURN_INDEX_REFRESH_MS = 30_000;
 
@@ -198,16 +197,11 @@ export default function LandingApp() {
           onJoin={() => setModal("join")}
           stats={stats}
           entries={imported}
-          {...(SHOW_LEGACY ? { onChallenge: () => setModal("challenge") } : {})}
         />
         <Ticker size={SHOW_LEGACY ? "default" : "compact"} />
         <BurnIndexSection imported={imported} onJoin={() => setModal("join")} />
         {LegacySections && (
-          <LegacySections
-            slot="mid"
-            onJoin={() => setModal("join")}
-            onChallenge={() => setModal("challenge")}
-          />
+          <LegacySections slot="mid" onJoin={() => setModal("join")} />
         )}
       </main>
       <Footer />
@@ -231,15 +225,11 @@ export default function LandingApp() {
             >
               ×
             </button>
-            {modal === "join" ? (
-              <JoinBurnIndexForm
-                onSuccess={showToast}
-                onImport={handleImport}
-                onClose={closeModal}
-              />
-            ) : (
-              <ChallengeInviteForm onSuccess={showToast} />
-            )}
+            <JoinBurnIndexForm
+              onSuccess={showToast}
+              onImport={handleImport}
+              onClose={closeModal}
+            />
           </div>
         </div>
       )}

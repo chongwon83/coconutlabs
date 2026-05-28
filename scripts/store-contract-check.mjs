@@ -3,9 +3,9 @@
 // The leaderboard store has two backends behind one BurnStore interface
 // (FileBurnStore for local dev, RedisBurnStore for Vercel). A migration is
 // only safe if BOTH backends behave identically. This script exercises the
-// store through the real HTTP surface (POST/GET /api/burnindex, POST
-// /api/challenge) so it is backend-agnostic: getStore() picks file vs redis
-// from env exactly as production does.
+// store through the real HTTP surface (POST/GET /api/burnindex) so it is
+// backend-agnostic: getStore() picks file vs redis from env exactly as
+// production does.
 //
 //   npm run build                  # once — this script needs the build
 //   node scripts/store-contract-check.mjs            # file mode (no env)
@@ -14,17 +14,13 @@
 //
 // Scenarios mirror the approved plan's "검증" list. GET-based assertions run
 // in either mode; assertions that read .data/*.json directly are file-mode
-// only (skipped with a note under redis). Scenarios 5-7 cover Task C: triage
-// (small claim auto-verified, large claim unverified) and the per-handle
-// rate-limit (6th submission inside the window → 429). Scenario 8 guards the
-// dedup-then-filter regression — a later REJECT must cancel a prior verified
-// record for the same (handle, challenge).
+// only (skipped with a note under redis).
 //
 // Non-destructive: every run uses unique handles (contract-<ts>-*), so it
 // never wipes or collides with existing store data.
 
 import { spawn } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 const WEB_ROOT = path.dirname(import.meta.dirname);
@@ -63,7 +59,7 @@ function makeEnvelope({ period, since, until, tokens, cost }) {
     },
   };
   return {
-    schemaVersion: "2",
+    schemaVersion: "3",
     generatedAt: "2026-01-20T00:00:00Z",
     periodWindow: { period, since, until },
     rows: [row],
@@ -83,24 +79,6 @@ async function postEnvelope(handle, envelope) {
   }
 }
 
-// Returns the raw HTTP status — callers that expect a specific status (429 for
-// rate-limit, 201 for accepted) assert on it themselves.
-async function postChallengeRaw(handle, challenge, claimedFixes) {
-  const res = await fetch(`${BASE}/api/challenge`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ handle, challenge, claimedFixes }),
-  });
-  return res.status;
-}
-
-async function postChallenge(handle, challenge, claimedFixes) {
-  const status = await postChallengeRaw(handle, challenge, claimedFixes);
-  if (status !== 201) {
-    throw new Error(`POST /api/challenge → ${status} (expected 201)`);
-  }
-}
-
 async function getCard(handle) {
   const res = await fetch(`${BASE}/api/burnindex`);
   if (!res.ok) throw new Error(`GET /api/burnindex → ${res.status}`);
@@ -108,21 +86,13 @@ async function getCard(handle) {
   return entries.find((e) => e.handle === handle);
 }
 
-// --- the 8 contract scenarios ----------------------------------------------
+// --- the 4 contract scenarios ----------------------------------------------
 
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok, status: "pass-or-fail", detail });
   console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
 }
-// SKIP is recorded so the tally distinguishes scenarios genuinely passed
-// from those that were not exercised in this mode (e.g. redis-only paths
-// when run in file mode, or vice versa). A skip neither passes nor fails.
-function skip(name, detail) {
-  results.push({ name, ok: false, status: "skip", detail });
-  console.log(`  SKIP  ${name}${detail ? ` — ${detail}` : ""}`);
-}
-
 // Week timestamps double as weekKeys (the store keys history by `since`).
 const W1 = "2026-01-05T00:00:00Z";
 const W2 = "2026-01-12T00:00:00Z";
@@ -188,128 +158,6 @@ async function runScenarios() {
       check("month import → history not recorded", !recorded, recorded ? "unexpected history point" : "no history point");
     }
   }
-
-  // 5. A small claim (claimedFixes <= TRIAGE_THRESHOLD=5) → auto-verified at
-  //    submission time, with verifiedFixes set to the claim.
-  const hSmall = `${RUN}-triage-small`;
-  await postChallenge(hSmall, "c1", 3);
-  if (REDIS_MODE) {
-    check("small claim → auto-verified", true, "[skipped: redis mode — no GET endpoint; verify on Vercel preview]");
-  } else {
-    const challenges = await readJsonArray(".data/challenges.json");
-    const found = challenges.find((c) => c.handle === hSmall);
-    check(
-      "small claim (3 <= 5) → auto-verified, verifiedFixes set",
-      found != null &&
-        found.status === "verified" &&
-        found.claimedFixes === 3 &&
-        found.verifiedFixes === 3 &&
-        found.verifiedAt != null,
-      found ? `status=${found.status} verifiedFixes=${found.verifiedFixes}` : "record missing",
-    );
-  }
-
-  // 6. A large claim (claimedFixes > TRIAGE_THRESHOLD) → stays unverified for
-  //    owner review; verifiedFixes/verifiedAt stay null.
-  const hLarge = `${RUN}-triage-large`;
-  await postChallenge(hLarge, "c2", 10);
-  if (REDIS_MODE) {
-    check("large claim → unverified", true, "[skipped: redis mode — no GET endpoint; verify on Vercel preview]");
-  } else {
-    const challenges = await readJsonArray(".data/challenges.json");
-    const found = challenges.find((c) => c.handle === hLarge);
-    check(
-      "large claim (10 > 5) → unverified, verifiedFixes null",
-      found != null &&
-        found.status === "unverified" &&
-        found.verifiedFixes === null &&
-        found.verifiedAt === null,
-      found ? `status=${found.status} verifiedFixes=${found.verifiedFixes}` : "record missing",
-    );
-  }
-
-  // 7. Rate-limit: a handle may submit RATE_LIMIT_MAX=5 challenges inside the
-  //    window; the 6th in the same window is rejected with 429. Backend-
-  //    agnostic — asserts on HTTP status, so it runs in both modes.
-  const hFlood = `${RUN}-ratelimit`;
-  let accepted = 0;
-  for (let i = 0; i < 5; i += 1) {
-    if ((await postChallengeRaw(hFlood, "c1", 1)) === 201) accepted += 1;
-  }
-  const sixth = await postChallengeRaw(hFlood, "c1", 1);
-  check(
-    "rate-limit → 5 accepted, 6th in window → 429",
-    accepted === 5 && sixth === 429,
-    `accepted=${accepted} sixth=${sixth}`,
-  );
-
-  // 8. Dedup-then-filter regression: a later REJECT decision for the same
-  //    (handle, challenge) MUST cancel the prior verified record, so the
-  //    leaderboard card's `fixes` field becomes absent. The HTTP surface only
-  //    writes verified or unverified at submission time — rejections are an
-  //    owner-CLI write (manage-unverified.mjs --reject). To exercise the
-  //    dedup path here we inject the reject record directly into
-  //    .data/challenges.json, which the file store reads on its next call.
-  //    Redis mode has no equivalent surface from this script; the same
-  //    dedup logic in verifiedFixesByHandle() is exercised on Vercel preview
-  //    when an owner runs the CLI against UPSTASH_*.
-  if (REDIS_MODE) {
-    skip(
-      "reject cancels prior verified (dedup-then-filter)",
-      "redis mode — verify on Vercel preview via manage-unverified.mjs --reject --force",
-    );
-  } else {
-    const hCancel = `${RUN}-reject-cancel`;
-    // Pre-state: import an envelope so the handle has a leaderboard card to
-    // join `fixes` onto, then submit a small claim that is auto-verified.
-    await postEnvelope(
-      hCancel,
-      makeEnvelope({ period: "week", since: W1, until: W1_END, tokens: 100, cost: 1 }),
-    );
-    await postChallenge(hCancel, "c1", 3);
-    const cardBefore = await getCard(hCancel);
-    const preOk = cardBefore?.fixes === 3;
-    check(
-      "reject-cancel precondition (verified record gives fixes=3)",
-      preOk,
-      `fixes=${cardBefore?.fixes ?? "absent"}`,
-    );
-    if (preOk) {
-      // Append a later REJECT decision for the SAME (handle, challenge). The
-      // file store prepends newest-first, so insert at the head with a
-      // verifiedAt strictly after the existing verified record.
-      const challengesPath = path.join(WEB_ROOT, ".data/challenges.json");
-      const existing = JSON.parse(await readFile(challengesPath, "utf-8"));
-      const ours = existing.find(
-        (c) => c.handle === hCancel && c.challenge === "c1",
-      );
-      // manage-unverified.mjs preserves the original submittedAt and stamps a
-      // fresh verifiedAt at decision time; mirror that here so the fixture
-      // matches what the real CLI writes. The dedup picker keys on verifiedAt
-      // (= decisionAt), so submittedAt has no effect on the test outcome —
-      // matching the CLI just keeps the fixture honest.
-      const laterAt = new Date(Date.parse(ours.verifiedAt) + 60_000).toISOString();
-      const rejectRecord = {
-        handle: hCancel,
-        challenge: "c1",
-        claimedFixes: 3,
-        status: "rejected",
-        verifiedFixes: null,
-        submittedAt: ours.submittedAt,
-        verifiedAt: laterAt,
-      };
-      await writeFile(
-        challengesPath,
-        JSON.stringify([rejectRecord, ...existing], null, 2),
-      );
-      const cardAfter = await getCard(hCancel);
-      check(
-        "reject cancels prior verified (dedup-then-filter)",
-        cardAfter != null && cardAfter.fixes == null,
-        cardAfter ? `fixes=${cardAfter.fixes ?? "absent"}` : "card missing",
-      );
-    }
-  }
 }
 
 async function readJsonArray(rel) {
@@ -372,7 +220,7 @@ async function main() {
   let exitCode = 0;
   try {
     await waitForReady();
-    console.log("server ready — running 8 contract scenarios:\n");
+    console.log("server ready — running 4 contract scenarios:\n");
     await runScenarios();
   } catch (err) {
     console.error(`\nERROR: ${err.message}`);
@@ -382,17 +230,9 @@ async function main() {
     stop();
   }
 
-  // SKIP entries are recorded with ok=false but status="skip" so they don't
-  // count as failures — only genuine pass-or-fail scenarios drive the exit
-  // code. Without this split a redis-only skip (or a file-only skip) would
-  // both inflate the "failed" count and trip a non-zero exit, masking real
-  // regressions across the two store backends.
-  const skipped = results.filter((r) => r.status === "skip");
-  const failed = results.filter((r) => !r.ok && r.status !== "skip");
-  const runnable = results.length - skipped.length;
-  const passed = runnable - failed.length;
-  const skipNote = skipped.length > 0 ? ` (${skipped.length} skipped)` : "";
-  console.log(`\n${passed}/${runnable} scenarios passed${skipNote}.`);
+  const failed = results.filter((r) => !r.ok);
+  const passed = results.length - failed.length;
+  console.log(`\n${passed}/${results.length} scenarios passed.`);
   if (failed.length > 0) exitCode = 1;
   process.exit(exitCode);
 }

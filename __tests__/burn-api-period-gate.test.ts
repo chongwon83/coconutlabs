@@ -16,9 +16,6 @@ vi.mock("@/lib/server/store", () => ({
   readEntries: vi.fn().mockResolvedValue([] as ImportedEntry[]),
   upsertEntry: vi.fn().mockResolvedValue([] as ImportedEntry[]),
 }));
-vi.mock("@/lib/server/challenge", () => ({
-  verifiedFixesByHandle: vi.fn().mockResolvedValue(new Map()),
-}));
 vi.mock("@/lib/server/trend", () => ({
   trendByHandle: vi.fn().mockResolvedValue(new Map()),
 }));
@@ -53,7 +50,7 @@ const BASE_ROW = {
 
 function makeEnvelope(period: string, since: string | null, until: string | null) {
   return {
-    schemaVersion: "2",
+    schemaVersion: "3",
     generatedAt: "2026-05-20T00:00:00Z",
     periodWindow: { period, since, until },
     rows: [BASE_ROW],

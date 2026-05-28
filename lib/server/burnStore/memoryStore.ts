@@ -11,13 +11,11 @@
 // Behavior parity with FileBurnStore:
 //   - upsertEntry: dedupe by handle, newest first, then record weekly history
 //   - history KEEP_PER_HANDLE = 12 (matches fileStore)
-//   - addChallenge: prepended (newest first), never deduped
 // Concurrency: single Node process + single worker → no lock needed.
 
 import type { ImportedEntry } from "@/lib/data";
 import type {
   BurnStore,
-  ChallengeRecord,
   ImportHistoryPoint,
 } from "@/lib/server/burnStore/types";
 
@@ -39,7 +37,6 @@ function hydrateEntry(e: ImportedEntry): ImportedEntry {
 export class MemoryBurnStore implements BurnStore {
   #entries: ImportedEntry[] = [];
   #history: ImportHistoryPoint[] = [];
-  #challenges: ChallengeRecord[] = [];
 
   async readEntries(): Promise<ImportedEntry[]> {
     return this.#entries.map(hydrateEntry);
@@ -47,10 +44,6 @@ export class MemoryBurnStore implements BurnStore {
 
   async readHistory(): Promise<ImportHistoryPoint[]> {
     return [...this.#history];
-  }
-
-  async readChallenges(): Promise<ChallengeRecord[]> {
-    return [...this.#challenges];
   }
 
   async upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
@@ -61,10 +54,6 @@ export class MemoryBurnStore implements BurnStore {
     this.#recordHistory(hydrated);
     this.#entries = next;
     return [...next];
-  }
-
-  async addChallenge(record: ChallengeRecord): Promise<void> {
-    this.#challenges = [record, ...this.#challenges];
   }
 
   // Mirrors FileBurnStore.#recordHistory — same dedupe + cap rules.

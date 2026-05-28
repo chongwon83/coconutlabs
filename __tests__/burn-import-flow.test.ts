@@ -26,7 +26,7 @@ import { buildEnvelope } from "@/lib/client/burn/collect";
 const buildEnvelopeMock = vi.mocked(buildEnvelope);
 
 const VALID_ENVELOPE = {
-  schemaVersion: "2" as const,
+  schemaVersion: "3" as const,
   generatedAt: "2026-05-20T00:00:00Z",
   periodWindow: {
     period: "week" as const,
@@ -71,7 +71,7 @@ describe("runImport — happy path", () => {
   it("returns the validated envelope when buildEnvelope succeeds", async () => {
     buildEnvelopeMock.mockResolvedValueOnce(VALID_ENVELOPE);
     const result = await runImport(ARGS);
-    expect(result.schemaVersion).toBe("2");
+    expect(result.schemaVersion).toBe("3");
     expect(result.rows.length).toBe(1);
     expect(result.rows[0].projectHash).toBe("abc123def456");
     expect(buildEnvelopeMock).toHaveBeenCalledOnce();

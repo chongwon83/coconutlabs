@@ -17,7 +17,7 @@
 // SECURITY: pure projection — no I/O, no env access.
 
 import { describe, it, expect } from "vitest";
-import { buildImportedEntry } from "@/lib/data";
+import { buildImportedEntry, computeVes } from "@/lib/data";
 import type { BurnSummary, BurnSummaryEnvelope } from "@/lib/data";
 
 const baseTokenCount = {
@@ -57,7 +57,7 @@ function envelope(rows: BurnSummary[]): BurnSummaryEnvelope {
   }, 0);
   const totalCost = rows.reduce((s, r) => s + r.estimatedCostUsd, 0);
   return {
-    schemaVersion: "2",
+    schemaVersion: "3",
     generatedAt: "2026-05-25T00:00:00Z",
     periodWindow: {
       period: "week",
@@ -108,7 +108,7 @@ describe("buildImportedEntry — toolsUsed extraction", () => {
     // Collector should never emit a 0-row envelope, but the filter UI reads
     // toolsUsed unconditionally, so [] is the only safe extraction.
     const env: BurnSummaryEnvelope = {
-      schemaVersion: "2",
+      schemaVersion: "3",
       generatedAt: "2026-05-25T00:00:00Z",
       periodWindow: { period: "all", since: null, until: null },
       rows: [],
@@ -116,6 +116,28 @@ describe("buildImportedEntry — toolsUsed extraction", () => {
     };
     const entry = buildImportedEntry(env, "@eve");
     expect(entry.toolsUsed).toEqual([]);
+  });
+});
+
+describe("buildImportedEntry — verifiedCommits → fixes mapping (store-at-import)", () => {
+  it("stores fixes from env.verifiedCommits when present", () => {
+    const env = { ...envelope([row("claude-code")]), verifiedCommits: 12 };
+    const entry = buildImportedEntry(env, "@heidi");
+    expect(entry.fixes).toBe(12);
+    // ves is NOT persisted — derived at read time in the GET route.
+    expect(entry.ves).toBeUndefined();
+  });
+
+  it("stores a genuine 0 (inspected, no commits) as fixes: 0", () => {
+    const env = { ...envelope([row("claude-code")]), verifiedCommits: 0 };
+    const entry = buildImportedEntry(env, "@ivan");
+    expect(entry.fixes).toBe(0);
+  });
+
+  it("leaves fixes undefined when verifiedCommits is absent (browser upload → '—')", () => {
+    const entry = buildImportedEntry(envelope([row("claude-code")]), "@judy");
+    expect(entry.fixes).toBeUndefined();
+    expect(entry.ves).toBeUndefined();
   });
 });
 
@@ -146,5 +168,21 @@ describe("buildImportedEntry — other projected fields stay intact", () => {
     ]);
     const entry = buildImportedEntry(env, "@grace");
     expect(entry.verif).toBe("Self-reported");
+  });
+});
+
+describe("computeVes — verified commits per dollar", () => {
+  it("returns commits / cost for a positive cost", () => {
+    expect(computeVes(10, 2)).toBe(5);
+    expect(computeVes(3, 0.5)).toBe(6);
+  });
+
+  it("returns 0 for a 0 numerator with positive cost", () => {
+    expect(computeVes(0, 4)).toBe(0);
+  });
+
+  it("returns null when cost is non-positive (avoids Infinity/NaN → '—')", () => {
+    expect(computeVes(5, 0)).toBeNull();
+    expect(computeVes(5, -1)).toBeNull();
   });
 });

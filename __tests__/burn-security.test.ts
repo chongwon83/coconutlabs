@@ -109,7 +109,7 @@ describe("parseCodexFile — sentinel non-leakage", () => {
 // ── 9-field whitelist enforcement via validateSummary ─────────────────────
 describe("validateSummary — 9-field whitelist", () => {
   const VALID_ENVELOPE = {
-    schemaVersion: "2" as const,
+    schemaVersion: "3" as const,
     generatedAt: "2026-05-20T00:00:00Z",
     periodWindow: { period: "week" as const, since: "2026-05-14T00:00:00Z", until: "2026-05-20T00:00:00Z" },
     rows: [
