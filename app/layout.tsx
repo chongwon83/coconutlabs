@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "CoconutLabs — Tiny tokens. Big ships.",
   description:
-    "Track your AI coding burn, compete in verified cost-per-fix challenges, and learn the workflows behind top builders.",
+    "Track your AI coding burn and see where you rank against verified solo devs on the CoconutLabs Burn Index.",
 };
 
 export default function RootLayout({
