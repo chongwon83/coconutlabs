@@ -278,8 +278,8 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
                       className="lb-models-stack"
                       title={modelChips.map((c) => `${c.label} ${c.pct}%`).join(", ")}
                     >
-                      {visibleModelChips(modelChips, 3).map((c) => (
-                        <span key={c.label} className="lb-models-chip">
+                      {visibleModelChips(modelChips, 3).map((c, ci) => (
+                        <span key={`${c.label}-${ci}`} className="lb-models-chip">
                           <span
                             className={`lb-models-dot lb-models-dot--${modelFamily(c.label)}`}
                             aria-hidden="true"
