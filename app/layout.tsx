@@ -14,10 +14,28 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500", "600"],
 });
 
+const SITE_URL = "https://www.coconutlabs.xyz";
+const SITE_TITLE = "CoconutLabs — Tiny tokens. Big ships.";
+const SITE_DESCRIPTION =
+  "Track your AI coding burn and see where you rank against verified solo devs on the CoconutLabs Burn Index.";
+
 export const metadata: Metadata = {
-  title: "CoconutLabs — Tiny tokens. Big ships.",
-  description:
-    "Track your AI coding burn and see where you rank against verified solo devs on the CoconutLabs Burn Index.",
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: "CoconutLabs",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({
