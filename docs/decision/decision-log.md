@@ -791,3 +791,12 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 핵심 트레이드오프: retro JSON = `/retro`가 트렌드용으로 읽는 **로컬 분석 캐시**. 영속 서사 기록은 이미 커밋되는 본 decision-log가 담당 → 역할 분리. 스냅샷은 디스크에 그대로 남으므로 트렌드 기능은 git 추적 여부와 무관하게 동작.
 - 선택 이유: ignore-all 확정. 05-19 잔재 2개를 `git rm --cached`로 추적 해제(로컬 파일 보존), 이후 전 스냅샷이 `.gitignore:57` 단일 규칙을 따름. /codex(session 019e6ed1, gpt-5.5 xhigh) 권고와 owner 판단 일치 — "솔로 1머신엔 로컬 캐시 + 커밋된 서사 로그가 더 깔끔한 분리".
 - 검증/배포: push 전 codex 사전 점검(session 019e6ed5) + grep 교차검증으로 fixture coupling 위험 배제(`2026-05-19` 매치 전부 테스트 날짜 문자열, `.context/retros` 참조 0건). `64624e5` push → main 3 CI 체크 전부 ✅(CI / parity-test / security-test).
+
+### 2026-05-28 페이지 메타데이터 정리 — challenge 잔재 제거 + OpenGraph/Twitter 카드 추가
+
+- 문제: "라이브 적용 맞냐" 검증 중 발견 — A+ challenge decommission 후에도 라이브 `<head>`의 `<meta name="description">`가 제거된 기능을 광고("compete in verified cost-per-fix challenges") + 레거시 Workflow Drops("workflows behind top builders") 둘 다 노출. 추가로 `layout.tsx`는 `title`+`description`만 정의 → `og:*`/`twitter:*` 태그가 **0개**(Next는 description에서 OG 자동생성 안 함). SNS 공유 카드에 제목/설명 미노출 상태. (참고: 모든 challenge UI는 `SHOW_LEGACY=false`로 이미 비표시 — 메타 문자열만 잔재.)
+- 버린 대안: (a) og:image 동적 생성(`app/opengraph-image.tsx` + ImageResponse) — 썸네일 카드 가능하나 ImageResponse 폰트 렌더링이 CI Linux↔macOS에서 갈리는 기존 리스크([[preflight-linux-smoke-required]] 계열) + 새 edge 런타임 표면. (b) 기존 GIF를 og:image로 — GIF는 OG 플랫폼 호환성 낮음. (c) description만 고치고 OG는 그대로 둠 — 공유 카드 갭 미해결.
+- 핵심 트레이드오프: 2단계로 분리. (1) `083fdfd` description 문자열을 현 Burn Index 포지셔닝으로 재작성(라이브 Hero 비레거시 카피와 정렬). (2) `a31da24` `metadataBase` + `openGraph`(title/description/url/siteName/type/locale) + `twitter`(card=summary) 추가, og:image는 **의도적 생략**(정규 1200×630 자산 부재 + 동적생성 폰트 리스크 회피). title/description은 상수(`SITE_TITLE`/`SITE_DESCRIPTION`)로 추출해 표준·OG·twitter 3 표면 불일치 방지(golden #10).
+- 선택 이유: 이미지 없는 텍스트 OG가 안전·완전한 최소 변경 — `card=summary`는 이미지 없이도 정상(X 스펙상 twitter:image optional). 동적 이미지는 별도 후속으로 격리해 폰트 리스크를 이번 배포에 끌어들이지 않음.
+- 검증/배포: `083fdfd` — build ✅(`/api/challenge` 부재 재확인), 라이브 재검증 시 description 새 문자열 반영 + 옛 문자열 0건. `a31da24` — `npm run build` ✅(tsc clean, metadataBase 경고 없음), /codex PASS(session 019e6ef7 — Next 16.2.6 shape 유효, card=summary 정답, 상수 추출 적정). 양 커밋 main 3 CI 체크 전부 ✅. **라이브 최종 재검증**: og+twitter 태그 `0개 → 9개`(og:title/description/url/site_name/locale/type + twitter:card/title/description), `<meta name="description">` 새 문자열 유지, og:image/twitter:image 의도대로 부재.
+- 후속(미결): og:image 1200×630 추가 시 공유 카드 썸네일 노출 — 정규 자산 제작 vs `opengraph-image` 동적생성(CI 폰트 smoke 검증 선행) 중 owner 택일 대기.
