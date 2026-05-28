@@ -774,6 +774,12 @@ S0에서 작성, S10에서 회고 2줄 추가.
   - [P1] missing-cwd 부분집계 → 수정: token 기여 in-window 세션이 cwd 없으면 `_UNKNOWN_CWD` 센티넬로 분자 전체 omit (unknown ≠ partial). collect.py + build_envelope guard + test_collector 회귀 테스트.
   - [P2] unborn-HEAD vs git-error 혼동 → 수정: `_has_commits`(bool) → `_head_state`(tri-state: True=커밋有, False=unborn→실제 0, None=git 에러→omit). 실측 exit code 확인(unborn=1, error=128, none=launch 실패). test_gitcount 4건 추가.
   - [P2] HEAD-only undercount(feature branch→main 체크아웃 시 누락, checkout 의존성) → **v2 defer**: gitcount.py docstring + 본 로그에 known-limitation 명시. `--branches` 확장은 scoring semantics 변경 + unborn-HEAD 프로브와 orphan-branch 상호작용 + S3.5가 HEAD-only로 ratify → owner 결정 사안. plan Q6(분자 정밀화 v2 deferral)와 일관.
-- 검증: pytest 47 passed(41+6 신규). vitest/tsc/build는 v3 변경분 그대로(분자 수정은 Python 측만 변경) — 재실행 예정.
+- 검증: pytest 47 passed(41+6 신규). vitest 317 ✅ · tsc clean · `next build` OK(`/api/challenge` 제거 확인). 라이브 브라우저 스모크 정상(challenge 진입점 소거, JoinBurnIndexForm 단독).
+- 머지/배포: `6401241` push → main 3 CI 체크 전부 ✅(CI 2m13s / parity-test 36s / security-test 29s). Vercel 라이브 반영 확인.
+
+[후속 — 2026-05-28 라이브 스모크 중 발견한 legacy dup-key 워닝 수정]
+- 라이브 스모크 도중 React duplicate-key 워닝 표면화. 근본원인: `BurnIndexSection.tsx`의 model-chips map이 `key={c.label}`로 렌더했는데 `shortenModelName`이 모든 `unknown` 모델을 리터럴 `"legacy"`로 collapse(line 112) → unknown-model breakdown 행 2개가 sibling chip 2개를 동일 키 `"legacy"`로 생성. **A+ decommission 이전부터 존재한 pre-existing 버그**(변경셋 무관) — 스모크가 표면화시킴.
+- 수정: array index suffix(`key={c.label}` → `key={`${c.label}-${ci}`}`). key-only, 렌더/DOM/텍스트 무변경. /codex 리뷰(session 019e6ea3, gpt-5.5 xhigh) PASS — render-derived·stateless·행당 stable 리스트라 index 참여가 reconciliation 결함 무유발 확인. codex는 `${tool}:${model}` semantic key가 더 깔끔하나 chip data shape 변경 필요 → 최소 수정으로 index-suffix 적정 판정.
+- 검증: vitest 317 ✅ · tsc clean · 라이브 스모크 콘솔 무에러(`legacy`/same-key/duplicate 0건). `7de5a70` push → main 3 CI 체크 전부 ✅(gh API 2회 transient 404는 직접 폴링으로 success 확인 — outage 오인 배제).
 
 [S10 회고 — 다음 사이클에서 작성]
