@@ -783,3 +783,11 @@ S0에서 작성, S10에서 회고 2줄 추가.
 - 검증: vitest 317 ✅ · tsc clean · 라이브 스모크 콘솔 무에러(`legacy`/same-key/duplicate 0건). `7de5a70` push → main 3 CI 체크 전부 ✅(gh API 2회 transient 404는 직접 폴링으로 success 확인 — outage 오인 배제).
 
 [S10 회고 — 다음 사이클에서 작성]
+
+### 2026-05-28 retro 스냅샷 git 추적 정책 — local-only cache로 확정 (ignore-all)
+
+- 문제: `/retro`가 매 실행 시 `.context/retros/YYYY-MM-DD-N.json` 스냅샷을 쓰고 직전 스냅샷을 읽어 "vs last retro" 트렌드 델타를 계산. 그런데 추적 상태가 불일치 — 05-19 스냅샷 2개만 git 추적(`.gitignore`에 `.context/` 규칙 생기기 전 커밋), 최근 05-21/05-27은 로컬-온리. 이번 주 retro로 05-28 스냅샷이 새로 생기며 "commit the snapshot?" 결정 필요.
+- 버린 대안: (a) `git add -f`로 스냅샷 강제 추적(+ 선택적으로 `.context/retros/` un-ignore) — 멀티머신 연속성/CI 트렌드/팀 공유/git 재해복구가 필요할 때만 의미. 솔로 1머신에는 해당 없고 `.gitignore:57` 의도와 충돌하며 저가치 churn 발생. (b) 잔재 2개 그대로 두고 아무것도 안 함 — 무해하나 추적 정책이 영구 불일치.
+- 핵심 트레이드오프: retro JSON = `/retro`가 트렌드용으로 읽는 **로컬 분석 캐시**. 영속 서사 기록은 이미 커밋되는 본 decision-log가 담당 → 역할 분리. 스냅샷은 디스크에 그대로 남으므로 트렌드 기능은 git 추적 여부와 무관하게 동작.
+- 선택 이유: ignore-all 확정. 05-19 잔재 2개를 `git rm --cached`로 추적 해제(로컬 파일 보존), 이후 전 스냅샷이 `.gitignore:57` 단일 규칙을 따름. /codex(session 019e6ed1, gpt-5.5 xhigh) 권고와 owner 판단 일치 — "솔로 1머신엔 로컬 캐시 + 커밋된 서사 로그가 더 깔끔한 분리".
+- 검증/배포: push 전 codex 사전 점검(session 019e6ed5) + grep 교차검증으로 fixture coupling 위험 배제(`2026-05-19` 매치 전부 테스트 날짜 문자열, `.context/retros` 참조 0건). `64624e5` push → main 3 CI 체크 전부 ✅(CI / parity-test / security-test).
