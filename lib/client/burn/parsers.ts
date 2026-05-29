@@ -515,24 +515,35 @@ function poisonedTokenKeys(line: string): PoisonedKeys {
 }
 
 // Longest-prefix-at-hyphen-boundary wins. A "-x" suffix on a pricing key
-// is wildcard sugar ("claude-opus-4-x" matches every "claude-opus-4-N").
+// is a current-generation wildcard ("claude-opus-4-x" matches every
+// "claude-opus-4-N" not otherwise listed). A wildcard-only match prices at
+// the current tier but reports LOW confidence: it is a family estimate, not a
+// recognised version, so a not-yet-listed future minor is flagged "Estimated"
+// instead of being charged a sibling rate at high confidence. An exact /
+// dated version key (longer prefix) always wins the tie and stays high.
 // Falls back to _default with low confidence — that low confidence is what
 // downstream uses to downgrade the displayed verification level.
 export function matchModel<T>(
   providerTable: Record<string, T> & { _default: T },
   model: string,
 ): { rate: T; confidence: "high" | "low" } {
-  const candidates: Array<{ prefixLen: number; rate: T }> = [];
+  const candidates: Array<{ prefixLen: number; isWildcard: boolean; rate: T }> = [];
   for (const [key, row] of Object.entries(providerTable)) {
     if (key === "_default") continue;
-    const prefix = key.endsWith("-x") ? key.slice(0, -2) : key;
+    const isWildcard = key.endsWith("-x");
+    const prefix = isWildcard ? key.slice(0, -2) : key;
     if (model === prefix || model.startsWith(prefix + "-")) {
-      candidates.push({ prefixLen: prefix.length, rate: row });
+      candidates.push({ prefixLen: prefix.length, isWildcard, rate: row });
     }
   }
   if (candidates.length > 0) {
-    candidates.sort((a, b) => b.prefixLen - a.prefixLen);
-    return { rate: candidates[0].rate, confidence: "high" };
+    // Longest prefix wins; on a tie a non-wildcard (specific) key beats the
+    // wildcard so an exact version never degrades to Estimated.
+    candidates.sort(
+      (a, b) => b.prefixLen - a.prefixLen || Number(a.isWildcard) - Number(b.isWildcard),
+    );
+    const best = candidates[0];
+    return { rate: best.rate, confidence: best.isWildcard ? "low" : "high" };
   }
   return { rate: providerTable._default, confidence: "low" };
 }

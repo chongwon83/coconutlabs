@@ -3,7 +3,7 @@
 //
 // USD per 1M tokens. Browser-side cost estimation MUST use this table — live fetch
 // would create a second source of truth and let a tampered response inflate costs.
-export const PRICING_AS_OF = "2026-05-18" as const;
+export const PRICING_AS_OF = "2026-05-29" as const;
 
 export interface ClaudeRate {
   input: number;
@@ -26,6 +26,20 @@ export interface PricingTable {
 
 export const MODEL_PRICING: PricingTable = {
   "claude": {
+    "claude-opus-4-x": {
+      "input": 5,
+      "output": 25,
+      "cache_read": 0.5,
+      "cache_write_5m": 6.25,
+      "cache_write_1h": 10
+    },
+    "claude-opus-4-8": {
+      "input": 5,
+      "output": 25,
+      "cache_read": 0.5,
+      "cache_write_5m": 6.25,
+      "cache_write_1h": 10
+    },
     "claude-opus-4-7": {
       "input": 5,
       "output": 25,
@@ -54,7 +68,14 @@ export const MODEL_PRICING: PricingTable = {
       "cache_write_5m": 18.75,
       "cache_write_1h": 30
     },
-    "claude-opus-4": {
+    "claude-opus-4-0": {
+      "input": 15,
+      "output": 75,
+      "cache_read": 1.5,
+      "cache_write_5m": 18.75,
+      "cache_write_1h": 30
+    },
+    "claude-opus-4-20250514": {
       "input": 15,
       "output": 75,
       "cache_read": 1.5,
@@ -81,6 +102,13 @@ export const MODEL_PRICING: PricingTable = {
       "cache_read": 0.3,
       "cache_write_5m": 3.75,
       "cache_write_1h": 6
+    },
+    "claude-haiku-4-x": {
+      "input": 1,
+      "output": 5,
+      "cache_read": 0.1,
+      "cache_write_5m": 1.25,
+      "cache_write_1h": 2
     },
     "claude-haiku-4-5": {
       "input": 1,

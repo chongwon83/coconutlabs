@@ -1,20 +1,24 @@
 {
-  "_pricing_as_of": "2026-05-18",
+  "_pricing_as_of": "2026-05-29",
   "_note": "USD per 1M tokens. Sourced from official provider pricing pages on the date above. Prices change — verify before relying on. Codex 'pro' models have no cached-input discount, so cached_input == input. gpt-4-generation models predate the gpt-5 10%-of-input cached rule and use their own official cached prices.",
-  "_match": "Model name is prefix-matched at hyphen boundaries, longest prefix wins (e.g. claude-opus-4-7-20260101 -> claude-opus-4-7). Minor versions are listed separately because pricing differs (Opus 4.7-4.5 = $5 input, Opus 4.1-4.0 = $15). Unmatched model falls back to provider _default with price_confidence=low.",
+  "_match": "Model name is prefix-matched at hyphen boundaries, longest prefix wins (e.g. claude-opus-4-7-20260101 -> claude-opus-4-7). Minor versions are listed separately because pricing differs (Opus 4.8-4.5 = $5 input, Opus 4.1-4.0 = $15). A '-x' key is a current-generation wildcard (claude-opus-4-x matches any claude-opus-4-N not otherwise listed): it prices at the current tier but reports low/Estimated confidence, so a not-yet-listed future minor is no longer silently charged the legacy rate at high confidence. The $15 Opus 4.0 GA snapshot is pinned explicitly as claude-opus-4-20250514 because its id has no '-0' for the claude-opus-4-0 alias key to catch, so the wildcard would otherwise mis-price it at $5. Unmatched model falls back to provider _default with price_confidence=low.",
   "_source": {
     "claude": "https://platform.claude.com/docs/en/about-claude/pricing",
     "codex": "https://developers.openai.com/api/docs/pricing"
   },
   "claude": {
+    "claude-opus-4-x":    { "input": 5,    "output": 25, "cache_read": 0.5,  "cache_write_5m": 6.25,  "cache_write_1h": 10 },
+    "claude-opus-4-8":    { "input": 5,    "output": 25, "cache_read": 0.5,  "cache_write_5m": 6.25,  "cache_write_1h": 10 },
     "claude-opus-4-7":    { "input": 5,    "output": 25, "cache_read": 0.5,  "cache_write_5m": 6.25,  "cache_write_1h": 10 },
     "claude-opus-4-6":    { "input": 5,    "output": 25, "cache_read": 0.5,  "cache_write_5m": 6.25,  "cache_write_1h": 10 },
     "claude-opus-4-5":    { "input": 5,    "output": 25, "cache_read": 0.5,  "cache_write_5m": 6.25,  "cache_write_1h": 10 },
     "claude-opus-4-1":    { "input": 15,   "output": 75, "cache_read": 1.5,  "cache_write_5m": 18.75, "cache_write_1h": 30 },
-    "claude-opus-4":      { "input": 15,   "output": 75, "cache_read": 1.5,  "cache_write_5m": 18.75, "cache_write_1h": 30 },
+    "claude-opus-4-0":    { "input": 15,   "output": 75, "cache_read": 1.5,  "cache_write_5m": 18.75, "cache_write_1h": 30 },
+    "claude-opus-4-20250514": { "input": 15, "output": 75, "cache_read": 1.5, "cache_write_5m": 18.75, "cache_write_1h": 30 },
     "claude-sonnet-4-6":  { "input": 3,    "output": 15, "cache_read": 0.3,  "cache_write_5m": 3.75,  "cache_write_1h": 6 },
     "claude-sonnet-4-5":  { "input": 3,    "output": 15, "cache_read": 0.3,  "cache_write_5m": 3.75,  "cache_write_1h": 6 },
     "claude-sonnet-4":    { "input": 3,    "output": 15, "cache_read": 0.3,  "cache_write_5m": 3.75,  "cache_write_1h": 6 },
+    "claude-haiku-4-x":   { "input": 1,    "output": 5,  "cache_read": 0.1,  "cache_write_5m": 1.25,  "cache_write_1h": 2 },
     "claude-haiku-4-5":   { "input": 1,    "output": 5,  "cache_read": 0.1,  "cache_write_5m": 1.25,  "cache_write_1h": 2 },
     "claude-haiku-3-5":   { "input": 0.8,  "output": 4,  "cache_read": 0.08, "cache_write_5m": 1,     "cache_write_1h": 1.6 },
     "_default":           { "input": 3,    "output": 15, "cache_read": 0.3,  "cache_write_5m": 3.75,  "cache_write_1h": 6 }

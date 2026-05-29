@@ -122,18 +122,31 @@ def match_model(provider_table: dict, model: str) -> tuple[dict, str]:
 
     A key's prefix must match at a hyphen boundary, so 'claude-opus-4-x'
     matches 'claude-opus-4-7' but not 'claude-opus-40'. Longest-prefix-wins
-    removes order-dependency. Unmatched -> _default + 'low' confidence.
+    removes order-dependency.
+
+    A '-x' key is a current-generation wildcard. A wildcard-only match prices
+    at the current tier but reports 'low' confidence: it is a family estimate,
+    not a recognised version, so a not-yet-listed future minor is flagged
+    'Estimated' rather than charged a sibling rate at high confidence. An exact
+    or dated version key (longer prefix) wins the tie and stays 'high'.
+    Unmatched -> _default + 'low' confidence.
+
+    Mirrors matchModel in web/lib/client/burn/parsers.ts.
     """
     candidates = []
     for key, row in provider_table.items():
         if key == "_default":
             continue
-        prefix = key[:-2] if key.endswith("-x") else key
+        is_wildcard = key.endswith("-x")
+        prefix = key[:-2] if is_wildcard else key
         if model == prefix or model.startswith(prefix + "-"):
-            candidates.append((len(prefix), row))
+            candidates.append((len(prefix), is_wildcard, row))
     if candidates:
-        candidates.sort(key=lambda c: c[0], reverse=True)
-        return candidates[0][1], "high"
+        # Longest prefix wins; on a tie a non-wildcard (specific) key beats the
+        # wildcard so an exact version never degrades to Estimated.
+        candidates.sort(key=lambda c: (c[0], not c[1]), reverse=True)
+        _, best_is_wildcard, best_row = candidates[0]
+        return best_row, ("low" if best_is_wildcard else "high")
     return provider_table.get("_default", {}), "low"
 
 

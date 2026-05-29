@@ -248,6 +248,77 @@ def test_find_logs_uses_standard_paths():
     assert conf == "high"
 
 
+# --- match_model: current-gen pricing + wildcard confidence --------------
+
+def test_match_model_opus_pricing_and_confidence():
+    """Regression for the legacy-rate over-charge bug.
+
+    Before the fix, an unlisted Opus minor (e.g. claude-opus-4-8) matched the
+    bare 'claude-opus-4' legacy key at HIGH confidence -> $15 input, a 3x
+    over-charge vs. the real $5 current-Opus rate. The fix lists 4-8 explicitly
+    and adds a 'claude-opus-4-x' current-gen wildcard, so a not-yet-listed
+    future minor prices at the $5 tier but reports LOW (Estimated) confidence.
+    """
+    claude = load_pricing()["claude"]
+
+    # Explicit current version -> $5 input, high confidence.
+    row, conf = match_model(claude, "claude-opus-4-8")
+    assert row["input"] == 5
+    assert conf == "high"
+
+    # Dated build of a listed version -> still the specific key, high.
+    row, conf = match_model(claude, "claude-opus-4-7-20260101")
+    assert row["input"] == 5
+    assert conf == "high"
+
+    # Not-yet-listed future minor -> current-gen wildcard: $5 tier, LOW conf
+    # (the regression: must NOT be $15, must NOT be high confidence).
+    row, conf = match_model(claude, "claude-opus-4-9")
+    assert row["input"] == 5
+    assert conf == "low"
+
+    # Legacy minors stay $15 at high confidence (explicit keys win the tie).
+    for legacy in ("claude-opus-4-1", "claude-opus-4-0"):
+        row, conf = match_model(claude, legacy)
+        assert row["input"] == 15, legacy
+        assert conf == "high", legacy
+
+    # The Opus 4.0 GA snapshot id has no '-0', so only the explicit pin keeps
+    # it at $15 high — without it the wildcard would undercharge it at $5 and
+    # inflate VES (codex round-1 HIGH).
+    row, conf = match_model(claude, "claude-opus-4-20250514")
+    assert row["input"] == 15
+    assert conf == "high"
+
+    # Bare 'claude-opus-4' is NOT a real Anthropic model id (the 4.0 alias is
+    # claude-opus-4-0). If one ever appears it resolves via the wildcard to the
+    # current $5 tier at LOW/Estimated confidence — an accepted, flagged guess,
+    # never a silent high-confidence charge.
+    row, conf = match_model(claude, "claude-opus-4")
+    assert row["input"] == 5
+    assert conf == "low"
+
+
+def test_match_model_haiku_wildcard_and_default():
+    """Future Haiku-4 minor prices at the $1 family tier (wildcard, low conf)
+    instead of silently falling to the $3 _default; an unknown family still
+    falls to _default at low confidence."""
+    claude = load_pricing()["claude"]
+
+    row, conf = match_model(claude, "claude-haiku-4-5")
+    assert row["input"] == 1
+    assert conf == "high"
+
+    row, conf = match_model(claude, "claude-haiku-4-6")  # not listed
+    assert row["input"] == 1
+    assert conf == "low"
+
+    # Unknown family -> _default ($3) + low.
+    row, conf = match_model(claude, "gemini-3-pro")
+    assert row["input"] == claude["_default"]["input"]
+    assert conf == "low"
+
+
 # --- test 8: period='week' excludes sessions outside the window ----------
 
 def test_week_period_excludes_out_of_window(tmp_path, monkeypatch):
