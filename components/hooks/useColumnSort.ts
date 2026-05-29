@@ -18,7 +18,15 @@
 // Nullish handling: ves and trendPct can be absent (ves: browser/pre-v3 imports
 // with no device-measured fixes, or zero-cost rows; trendPct: <2 weeks of
 // history). They sort to the bottom regardless of direction so an empty row
-// never displaces a data row when the user toggles.
+// never displaces a data row when the user toggles. A *zero* VES is treated the
+// same as null: it renders as "Pending" (no verified fixes yet), so it must
+// sink with the other Pending rows rather than floating to the top under an
+// ascending sort.
+//
+// Column-gating (`vesColumnShown`): when the VES column drops below the reveal
+// threshold on a later poll it stops rendering. If the user had manually sorted
+// by VES we fall back to the default key — you can't sort by a column that
+// isn't on screen.
 //
 // SECURITY: pure client state. No fetch, no storage. Re-renders on each
 // rows-prop change because the parent owns the data source (SWR in Track B).
@@ -40,10 +48,33 @@ export type Sortable = {
   trendPct?: number | null;
 };
 
+// Pure comparator factory — exported for unit testing without a DOM. A zero VES
+// is normalized to null so "Pending" rows (null or 0) always sink to the
+// bottom, in both directions.
+export function compareBy(sortKey: SortKey, sortDir: SortDir) {
+  const factor = sortDir === "asc" ? 1 : -1;
+  return (a: Sortable, b: Sortable): number => {
+    if (sortKey === "handle") {
+      return a.handle.localeCompare(b.handle) * factor;
+    }
+    let av = a[sortKey] as number | null | undefined;
+    let bv = b[sortKey] as number | null | undefined;
+    if (sortKey === "ves") {
+      if (av === 0) av = null;
+      if (bv === 0) bv = null;
+    }
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return (av - bv) * factor;
+  };
+}
+
 export function useColumnSort<T extends Sortable>(
   rows: T[],
   defaultKey: SortKey = "totalTokens",
   defaultDir: SortDir = "desc",
+  vesColumnShown = true,
 ) {
   const [sortKey, setSortKey] = useState<SortKey>(defaultKey);
   const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
@@ -51,27 +82,20 @@ export function useColumnSort<T extends Sortable>(
   // The default key can change after mount (entries load → VES column reveals
   // → default flips tokens→ves). Re-apply it, but freeze once the user picks a
   // column so an async reveal never yanks the sort out from under them.
+  // Exception: if the user is stuck on a VES sort that has since been gated off,
+  // fall back to the default — the column is no longer on screen.
   const userTouchedRef = useRef(false);
   useEffect(() => {
-    if (userTouchedRef.current) return;
+    const stuckOnHiddenVes = sortKey === "ves" && !vesColumnShown;
+    if (userTouchedRef.current && !stuckOnHiddenVes) return;
     setSortKey(defaultKey);
     setSortDir(defaultDir);
-  }, [defaultKey, defaultDir]);
+  }, [defaultKey, defaultDir, vesColumnShown, sortKey]);
 
-  const sorted = useMemo(() => {
-    const factor = sortDir === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
-      if (sortKey === "handle") {
-        return a.handle.localeCompare(b.handle) * factor;
-      }
-      const av = a[sortKey] as number | null | undefined;
-      const bv = b[sortKey] as number | null | undefined;
-      if (av == null && bv == null) return 0;
-      if (av == null) return 1;
-      if (bv == null) return -1;
-      return (av - bv) * factor;
-    });
-  }, [rows, sortKey, sortDir]);
+  const sorted = useMemo(
+    () => [...rows].sort(compareBy(sortKey, sortDir)),
+    [rows, sortKey, sortDir],
+  );
 
   const toggle = useCallback(
     (key: SortKey) => {
