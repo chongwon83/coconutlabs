@@ -16,6 +16,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  COLLECTOR_REPO_URL,
   V3_TRUST,
   fmtTokensCompact,
   fmtCostShort,
@@ -388,7 +389,14 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
             <span>
               CoconutLabs never stores raw prompts, source code, or file paths.
               Only aggregated efficiency signals leave your device.{" "}
-              <a href="#" className="trust-link">Read the full collection spec →</a>
+              <a
+                href={`${COLLECTOR_REPO_URL}/tree/main/tools/usage-poc`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="trust-link"
+              >
+                Read the full collection spec →
+              </a>
             </span>
           </div>
         </div>
