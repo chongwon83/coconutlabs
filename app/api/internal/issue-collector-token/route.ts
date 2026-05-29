@@ -1,7 +1,7 @@
 // app/api/internal/issue-collector-token/route.ts — short-lived HMAC token issuance.
 //
-// Issues a single-use collector token bound to a specific kind (burnindex or
-// telemetry). The token is valid for COLLECTOR_TOKEN_TTL_SECONDS (default 300s).
+// Issues a single-use collector token bound to a specific kind (burnindex,
+// telemetry, or emails). Valid for COLLECTOR_TOKEN_TTL_SECONDS (default 300s).
 //
 // Rate-limited per IP: COLLECTOR_TOKEN_ISSUE_RATE_PER_MIN (default 5/min).
 // Fail-closed: Redis unavailability returns 503 rather than issuing tokens freely.
@@ -14,7 +14,7 @@ import { checkRateLimit } from "@/lib/server/burn/rateLimiter";
 
 export const dynamic = "force-dynamic";
 
-const VALID_KINDS: ReadonlySet<string> = new Set(["burnindex", "telemetry"]);
+const VALID_KINDS: ReadonlySet<string> = new Set(["burnindex", "telemetry", "emails"]);
 
 function getClientIp(request: NextRequest): string {
   return (
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const { kind } = body as Record<string, unknown>;
   if (typeof kind !== "string" || !VALID_KINDS.has(kind)) {
-    return Response.json({ error: "Invalid kind. Must be 'burnindex' or 'telemetry'." }, { status: 400 });
+    return Response.json({ error: "Invalid kind. Must be 'burnindex', 'telemetry', or 'emails'." }, { status: 400 });
   }
 
   const ip = getClientIp(request);

@@ -1715,6 +1715,7 @@ textarea.form-input {
   border-top: 1px solid var(--border);
 }
 .drop-author { font-size: 12px; color: var(--fg3); font-family: var(--font-mono); }
+.drop-soon-label { font-size: 12px; color: var(--fg3); font-style: italic; }
 
 /* ============================================================
    Component supplements — fills gaps between component class

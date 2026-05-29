@@ -56,6 +56,11 @@ export const V3_NAV: NavLink[] = [];
 // constant and the copy button stays in sync.
 export const COLLECTOR_REPO_URL = "https://github.com/chongwon83/coconutlabs";
 
+// Single source of truth for the inbound contact address — referenced from the
+// footer "Contact" mailto link. Temporary personal address; swap to a
+// coconutlabs.xyz alias here (one line) once the domain mailbox is set up.
+export const CONTACT_EMAIL = "chongwon5026@gmail.com";
+
 export const V3_BUILDERS: Builder[] = [
   {
     rank: 1,
