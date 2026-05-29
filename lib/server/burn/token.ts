@@ -18,7 +18,7 @@ import { Redis } from "@upstash/redis";
 const DEFAULT_TTL_SECONDS = 300;
 const NONCE_KEY_PREFIX = "burn:token:nonce:";
 
-export type TokenKind = "burnindex" | "telemetry";
+export type TokenKind = "burnindex" | "telemetry" | "emails";
 
 export interface CollectorToken {
   nonce: string;
@@ -65,7 +65,7 @@ export function parseToken(raw: string): CollectorToken | null {
   const kind = parts[2] as TokenKind;
   const hmac = parts.slice(3).join(".");
   const exp = parseInt(expStr, 10);
-  if (!nonce || !Number.isFinite(exp) || !["burnindex", "telemetry"].includes(kind) || !hmac) {
+  if (!nonce || !Number.isFinite(exp) || !["burnindex", "telemetry", "emails"].includes(kind) || !hmac) {
     return null;
   }
   return { nonce, exp, kind, hmac };

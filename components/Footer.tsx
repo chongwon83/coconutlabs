@@ -1,5 +1,7 @@
 "use client";
 
+import { CONTACT_EMAIL } from "@/lib/data";
+
 export function Footer() {
   return (
     <footer className="footer-v3">
@@ -12,6 +14,10 @@ export function Footer() {
           <div className="footer-col">
             <span className="footer-col-head">Product</span>
             <a href="#burn" className="footer-link">Burn Index</a>
+          </div>
+          <div className="footer-col">
+            <span className="footer-col-head">Connect</span>
+            <a href={`mailto:${CONTACT_EMAIL}`} className="footer-link">Contact</a>
           </div>
         </div>
       </div>

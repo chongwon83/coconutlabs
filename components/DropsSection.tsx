@@ -20,11 +20,7 @@ function dropIcon(kind: "readonly" | "config" | "executable") {
   return "flask";
 }
 
-interface DropsProps {
-  onRequest?: () => void;
-}
-
-export function DropsSection({ onRequest }: DropsProps) {
+export function DropsSection() {
   return (
     <section className="section" id="drops">
       <div className="section-inner">
@@ -54,9 +50,7 @@ export function DropsSection({ onRequest }: DropsProps) {
               <div className="drop-card-footer">
                 <span className="drop-author">{d.author}</span>
                 {d.status === "soon" ? (
-                  <Button variant="ghost" size="sm" onClick={onRequest}>
-                    Notify me
-                  </Button>
+                  <span className="drop-soon-label">Coming soon</span>
                 ) : (
                   <Button variant="ghost" size="sm">
                     {d.status === "Free" ? "Get free" : `Get for ${d.status}`}

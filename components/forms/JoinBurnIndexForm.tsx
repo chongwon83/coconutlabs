@@ -477,6 +477,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
         )}
         <PostUploadSurvey
           setupTimeBucket={uploadTimeBucket}
+          handle={fsaHandle.trim()}
           onDone={() => {
             setShowSurvey(false);
             onSuccess?.(`Burn Summary validated — ${fsaHandle.trim()} added to the Burn Index.`);
