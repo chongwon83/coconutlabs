@@ -9,7 +9,13 @@
 // SECURITY: pure projection — no I/O, no env access.
 
 import { describe, it, expect } from "vitest";
-import { topVesEntry, type ImportedEntry } from "@/lib/data";
+import {
+  topVesEntry,
+  topNonzeroVesEntry,
+  hasEnoughVes,
+  VES_REVEAL_THRESHOLD,
+  type ImportedEntry,
+} from "@/lib/data";
 
 function entry(handle: string, ves?: number): ImportedEntry {
   return {
@@ -57,5 +63,46 @@ describe("topVesEntry — highest-VES picker for StatusBar", () => {
     // computeVes(0, cost>0) → 0 is a real score, distinct from absent.
     const entries = [entry("@a", 0)];
     expect(topVesEntry(entries)).toEqual({ ves: 0, handle: "@a" });
+  });
+});
+
+describe("topNonzeroVesEntry — headline picker that skips 0.0", () => {
+  it("returns the MAX entry among nonzero scores", () => {
+    const entries = [entry("@a", 100), entry("@b", 250), entry("@c", 50)];
+    expect(topNonzeroVesEntry(entries)).toEqual({ ves: 250, handle: "@b" });
+  });
+
+  it("ignores a VES of 0 (unlike topVesEntry)", () => {
+    const entries = [entry("@a", 0), entry("@b", 12)];
+    expect(topNonzeroVesEntry(entries)).toEqual({ ves: 12, handle: "@b" });
+  });
+
+  it("returns null when every entry is 0 or absent", () => {
+    expect(topNonzeroVesEntry([entry("@a", 0), entry("@b")])).toBeNull();
+  });
+
+  it("returns null for an empty list", () => {
+    expect(topNonzeroVesEntry([])).toBeNull();
+  });
+});
+
+describe("hasEnoughVes — VES-reveal gate", () => {
+  it("threshold is 2", () => {
+    expect(VES_REVEAL_THRESHOLD).toBe(2);
+  });
+
+  it("is false below the threshold of nonzero scores", () => {
+    // one nonzero is not enough; 0 and absent never count.
+    expect(hasEnoughVes([entry("@a", 5), entry("@b", 0), entry("@c")])).toBe(
+      false,
+    );
+  });
+
+  it("is true once threshold nonzero scores exist", () => {
+    expect(hasEnoughVes([entry("@a", 5), entry("@b", 9)])).toBe(true);
+  });
+
+  it("is false for an empty list", () => {
+    expect(hasEnoughVes([])).toBe(false);
   });
 });

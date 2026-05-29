@@ -198,7 +198,7 @@ export default function LandingApp() {
           stats={stats}
           entries={imported}
         />
-        <Ticker size={SHOW_LEGACY ? "default" : "compact"} />
+        <Ticker size={SHOW_LEGACY ? "default" : "compact"} entries={imported} />
         <BurnIndexSection imported={imported} onJoin={() => setModal("join")} />
         {LegacySections && (
           <LegacySections slot="mid" onJoin={() => setModal("join")} />
