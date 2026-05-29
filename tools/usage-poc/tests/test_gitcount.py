@@ -1,8 +1,10 @@
 """TDD suite for gitcount — the device-local VES numerator.
 
 Builds REAL throwaway git repos in tmp_path (no network, no shared state) so
-the half-open window, exact-author filter, repo dedup, and unknown!=zero
-contract are exercised against actual `git log` output rather than mocks.
+the half-open window, exact-author filter, repo dedup, and the contract
+(non-git/shallow cwds skipped → conservative undercount; only no-verifiable-repo
+or a genuine git error yields unknown=None) are exercised against actual
+`git log` output rather than mocks.
 
 Privacy is structural here: count_commits only ever returns an int or None,
 so there is nothing for a test to assert about leaked cwd/SHA/email — the
@@ -127,15 +129,19 @@ def test_before_since_excluded(tmp_path):
     assert count_commits([str(repo)], ME, SINCE, UNTIL) == 0
 
 
-# --- unknown != zero -----------------------------------------------------
+# --- unknown (no verifiable repo) != zero --------------------------------
+# A cwd we can't attribute (non-git / missing / shallow) is SKIPPED. The count
+# is None only when NOTHING verifiable remains; a real 0 needs a clean repo.
 
 def test_non_git_cwd_is_unknown(tmp_path):
+    # Lone non-git cwd → skipped → no verifiable repo → unknown (None), not 0.
     plain = tmp_path / "not-a-repo"
     plain.mkdir()
     assert count_commits([str(plain)], ME, SINCE, UNTIL) is None
 
 
 def test_missing_cwd_is_unknown(tmp_path):
+    # Lone missing dir → skipped → no verifiable repo → unknown (None).
     missing = tmp_path / "does-not-exist"
     assert count_commits([str(missing)], ME, SINCE, UNTIL) is None
 
@@ -145,16 +151,17 @@ def test_no_cwd_at_all_is_unknown(tmp_path):
     assert count_commits(["", "   " if False else ""], ME, SINCE, UNTIL) is None
 
 
-def test_any_unknown_repo_poisons_to_none(tmp_path):
-    repo = _init_repo(tmp_path / "r")
-    _commit(repo, ME, datetime(2026, 5, 19, 9, 0, tzinfo=UTC), "a")
-    plain = tmp_path / "plain"
-    plain.mkdir()
-    # One good repo + one non-repo cwd → unknown overall, not a partial count.
-    assert count_commits([str(repo), str(plain)], ME, SINCE, UNTIL) is None
+def test_only_non_git_cwds_is_unknown(tmp_path):
+    # Several cwds, none a git repo → no verifiable repo → unknown (None).
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    assert count_commits([str(a), str(b)], ME, SINCE, UNTIL) is None
 
 
 def test_shallow_repo_is_unknown(tmp_path):
+    # Lone shallow clone → skipped (untrusted history) → no verifiable repo → None.
     origin = _init_repo(tmp_path / "origin")
     _commit(origin, ME, datetime(2026, 5, 19, 9, 0, tzinfo=UTC), "a")
     _commit(origin, ME, datetime(2026, 5, 20, 9, 0, tzinfo=UTC), "b")
@@ -165,6 +172,37 @@ def test_shallow_repo_is_unknown(tmp_path):
         check=True, capture_output=True, text=True,
     )
     assert count_commits([str(shallow)], ME, SINCE, UNTIL) is None
+
+
+# --- partial attribution: skip the unattributable, count the verifiable -----
+# Reversal of codex [P1] (2026-05-28): a non-git/shallow cwd alongside a real
+# repo no longer poisons the count — it is skipped, the repo is counted. VES
+# becomes a conservative lower bound rather than perpetually "—".
+
+def test_non_git_cwd_skipped_real_repo_counted(tmp_path):
+    repo = _init_repo(tmp_path / "r")
+    _commit(repo, ME, datetime(2026, 5, 19, 9, 0, tzinfo=UTC), "a")
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    # One good repo + one non-repo cwd (e.g. a workspace parent dir or a removed
+    # worktree) → the non-repo is skipped, the repo's commit IS counted.
+    assert count_commits([str(repo), str(plain)], ME, SINCE, UNTIL) == 1
+
+
+def test_shallow_skipped_real_repo_counted(tmp_path):
+    full = _init_repo(tmp_path / "full")
+    _commit(full, ME, datetime(2026, 5, 19, 9, 0, tzinfo=UTC), "a")
+    origin = _init_repo(tmp_path / "origin")
+    _commit(origin, ME, datetime(2026, 5, 19, 9, 0, tzinfo=UTC), "x")
+    _commit(origin, ME, datetime(2026, 5, 20, 9, 0, tzinfo=UTC), "y")
+    shallow = tmp_path / "shallow"
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1",
+         f"file://{origin}", str(shallow)],
+        check=True, capture_output=True, text=True,
+    )
+    # Shallow (untrusted) is skipped; only the full repo's commit is counted.
+    assert count_commits([str(full), str(shallow)], ME, SINCE, UNTIL) == 1
 
 
 def test_no_author_identity_is_unknown(tmp_path):
@@ -224,3 +262,44 @@ def test_git_error_probing_head_poisons_count_to_none(tmp_path, monkeypatch):
     _commit(repo, ME, datetime(2026, 5, 19, 9, 0, tzinfo=UTC), "a")
     monkeypatch.setattr(gitcount, "_head_state", lambda root: None)
     assert count_commits([str(repo)], ME, SINCE, UNTIL) is None
+
+
+# --- shallow probe is tri-state, not skip-on-error (codex [P1] 2026-05-29) ----
+# _repo_root() is THE resolution gate (its failure = "not a usable repo" = skip).
+# Once a repo HAS resolved, any later git failure on it — including the shallow
+# probe — is a genuine error and must POISON, never silently drop the repo.
+
+def test_is_shallow_git_error_is_none(tmp_path, monkeypatch):
+    """A git error on the shallow probe (unlaunchable or non-0 exit) returns
+    None (poison), not True (which would silently skip a resolved repo)."""
+    repo = _init_repo(tmp_path / "r")
+    monkeypatch.setattr(gitcount, "_run_git", lambda args: None)
+    assert gitcount._is_shallow(str(repo)) is None
+    monkeypatch.setattr(gitcount, "_run_git", lambda args: _FakeProc(128))
+    assert gitcount._is_shallow(str(repo)) is None
+
+
+def test_is_shallow_full_repo_is_false(tmp_path):
+    repo = _init_repo(tmp_path / "r")
+    assert gitcount._is_shallow(str(repo)) is False
+
+
+def test_shallow_probe_error_poisons_even_with_valid_repo(tmp_path, monkeypatch):
+    """The hole codex flagged: a resolved repo whose shallow probe errors must
+    poison the whole count even when ANOTHER valid repo is present — never
+    silently drop the errored repo and emit a misleading partial number."""
+    good = _init_repo(tmp_path / "good")
+    _commit(good, ME, datetime(2026, 5, 19, 9, 0, tzinfo=UTC), "a")
+    bad = _init_repo(tmp_path / "bad")
+    _commit(bad, ME, datetime(2026, 5, 20, 9, 0, tzinfo=UTC), "b")
+    real_is_shallow = gitcount._is_shallow
+
+    def _flaky(root):
+        # Simulate a git error on the shallow probe for the 'bad' repo only,
+        # after it already resolved cleanly at _repo_root().
+        if root.rstrip("/").endswith("bad"):
+            return None
+        return real_is_shallow(root)
+
+    monkeypatch.setattr(gitcount, "_is_shallow", _flaky)
+    assert count_commits([str(good), str(bad)], ME, SINCE, UNTIL) is None

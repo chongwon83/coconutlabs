@@ -26,11 +26,11 @@ _DAY_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 _PERIODS = ("day", "week", "month", "year", "all")
 
 # Sentinel added to the cwd sink for an in-window, token-contributing session
-# that carries NO cwd. We cannot attribute that work to a repo, so the commit
-# numerator is unknowable for the window — build_envelope omits verifiedCommits
-# rather than publishing a partial count (unknown != partial, see gitcount.py).
-# The NUL byte cannot occur in a real filesystem path, so it never collides
-# with a genuine cwd.
+# that carries NO cwd. Such work is unattributable to a repo, so count_commits
+# SKIPS it (the sentinel resolves to no git root) — the numerator counts only
+# the verifiable repos (conservative undercount, see gitcount.py PARTIAL
+# ATTRIBUTION). The NUL byte cannot occur in a real filesystem path, so it
+# never collides with a genuine cwd.
 _UNKNOWN_CWD = "\x00no-cwd"
 
 
@@ -159,10 +159,11 @@ def collect(pricing: dict, salt: str, period: str = "all",
 
     `cwd_sink`, when provided, is populated with the raw `cwd` of every
     in-window session that has one; a token-contributing session that lacks a
-    cwd adds the `_UNKNOWN_CWD` sentinel instead, which poisons the commit
-    numerator (build_envelope then omits verifiedCommits — unknown != partial).
-    The caller uses it ONLY locally to resolve git repo roots for the commit
-    count — cwds never enter the emitted envelope.
+    cwd adds the `_UNKNOWN_CWD` sentinel instead. count_commits SKIPS the
+    sentinel (and any non-git cwd) rather than poisoning — it counts only the
+    verifiable repos (conservative undercount). The caller uses the sink ONLY
+    locally to resolve git repo roots for the commit count — cwds never enter
+    the emitted envelope.
     """
     if now is None:
         now = datetime.now(timezone.utc)
@@ -181,7 +182,8 @@ def collect(pricing: dict, salt: str, period: str = "all",
                 continue
             if cwd_sink is not None:
                 # A contributing session with no cwd is work we can't attribute
-                # to a repo → poison the numerator rather than undercount it.
+                # to a repo → record the _UNKNOWN_CWD sentinel, which
+                # count_commits SKIPS (conservative undercount, not a poison).
                 cwd_sink.add(sp.cwd if sp.cwd else _UNKNOWN_CWD)
             key = (tool, sp.model, sp.project_hash)
             grp = groups.get(key)
@@ -272,11 +274,12 @@ def build_envelope(pricing: dict, salt: str,
     }
     # VES numerator: device-measured commit count over the SAME window.
     # Emitted only when bounded ('all' has no window) and the count is known
-    # (count_commits returns None for unknown — see gitcount.py); a real 0 is
-    # emitted. cwd/SHA/email never leave this process. A _UNKNOWN_CWD sentinel
-    # means some in-window work had no repo signal → the count would be partial,
-    # so omit the field entirely.
-    if window is not None and repo_cwds and _UNKNOWN_CWD not in repo_cwds:
+    # (count_commits returns None when NO cwd resolves to a git repo, or a
+    # resolved repo errors out — see gitcount.py); a real 0 is emitted. Non-git
+    # and cwd-less sessions are skipped inside count_commits (conservative
+    # undercount), so the sentinel no longer gates emission here. cwd/SHA/email
+    # never leave this process.
+    if window is not None and repo_cwds:
         vc = count_commits(repo_cwds, git_author_email(), window[0], window[1])
         if vc is not None:
             envelope["verifiedCommits"] = vc

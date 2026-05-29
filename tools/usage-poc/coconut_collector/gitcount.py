@@ -9,9 +9,18 @@ ONLY locally to compute one integer. None of them are ever emitted into the
 Burn Summary envelope — build_envelope() copies only whitelisted fields and
 attaches at most the bare integer `verifiedCommits`.
 
-UNKNOWN != ZERO: a missing/shallow/unreadable repo, a git error, or no author
-identity yields None ("unknown" → the collector omits the field → UI "—").
-A real 0 means every inspected repo had zero matching commits in the window.
+UNKNOWN != ZERO: when NO working directory resolves to a usable git repo, or
+a confirmed git repo errors out mid-count, or there is no author identity, the
+result is None ("unknown" → the collector omits the field → UI "—"). A real 0
+means at least one repo was inspected cleanly and had zero matching commits.
+
+PARTIAL ATTRIBUTION (conservative undercount): a cwd that is NOT inside a git
+work tree (a non-repo wrapper dir, ~, a removed worktree) or is a shallow clone
+is SKIPPED rather than poisoning the whole count — its commits are simply
+unattributable, so the numerator counts only what the verifiable repos prove.
+This makes the VES numerator a conservative lower bound (denominator/cost still
+covers all work) — understating, never inflating, and non-gameable. A genuine
+git error on a repo that DID resolve still poisons to None (see count_commits).
 
 KNOWN LIMITATION (v1): commits are counted from HEAD only. If the operator made
 in-window commits on a feature branch and checked out another branch before
@@ -30,13 +39,15 @@ _GIT_TIMEOUT = 30  # seconds; a hung git invocation must not stall the CLI run
 
 def _run_git(args: list[str]) -> "subprocess.CompletedProcess | None":
     """Run a git command, returning the completed process or None on failure
-    to even launch (git missing, OS error, timeout)."""
+    to even launch (git missing, OS error, timeout, or an un-launchable arg
+    such as a cwd carrying the _UNKNOWN_CWD NUL sentinel — ValueError). A cwd
+    git cannot even be invoked on is 'unknown' → the caller skips it."""
     try:
         return subprocess.run(
             ["git", *args],
             capture_output=True, text=True, timeout=_GIT_TIMEOUT,
         )
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, ValueError, subprocess.SubprocessError):
         return None
 
 
@@ -62,12 +73,24 @@ def _repo_root(cwd: str) -> str | None:
     return root or None
 
 
-def _is_shallow(root: str) -> bool:
-    """True when `root` is a shallow clone (truncated history) — its commit
-    count cannot be trusted, so the caller treats it as unknown."""
+def _is_shallow(root: str) -> "bool | None":
+    """Tri-state shallow probe of an ALREADY-RESOLVED `root`.
+
+    True  → shallow clone (truncated history) → caller SKIPS this repo
+            (its commit count cannot be trusted → conservative undercount).
+    False → full clone (history is trustworthy) → caller counts it.
+    None  → git errored on a repo that already resolved at _repo_root()
+            → caller POISONS (unknown), per the resolved-repo-error contract.
+
+    The error case must NOT collapse to True (skip): once _repo_root() has
+    proven this is a usable work tree, any later git failure on it is a genuine
+    error, and a genuine error on a resolved repo is "unknown", not a benign
+    skip — otherwise an errored repo would silently drop out of the count while
+    another valid repo emits a misleading partial number (codex [P1] 2026-05-29).
+    """
     proc = _run_git(["-C", root, "rev-parse", "--is-shallow-repository"])
     if proc is None or proc.returncode != 0:
-        return True
+        return None
     return proc.stdout.strip() == "true"
 
 
@@ -150,33 +173,35 @@ def count_commits(repo_cwds, author_email: "str | None",
     across the git repos containing `repo_cwds`.
 
     repo_cwds: iterable of working directories from the in-window sessions.
-      Empty strings are ignored. Distinct repos are counted once even when many
-      sessions share a repo; SHAs are de-duplicated across repos before summing.
+      Empty strings, non-git dirs, and shallow clones are SKIPPED (their commits
+      are unattributable → conservative undercount, never a poison). Distinct
+      repos are counted once even when many sessions share a repo; SHAs are
+      de-duplicated across repos before summing.
 
     Returns None ("unknown", → omit the field) when:
       - author_email is missing (no git identity), or
-      - no usable cwd was supplied at all, or
-      - any supplied cwd is not inside a usable git repo, is a shallow clone,
-        or git errors out.
-    Returns an int (possibly 0) only when EVERY contributing repo was inspected
-    cleanly.
+      - NO supplied cwd resolves to a usable git repo (nothing verifiable), or
+      - a repo that DID resolve errors out while counting (genuine git error).
+    Returns an int (possibly 0) when at least one repo was inspected cleanly —
+    a real 0 means the verifiable repos had no matching commits in the window.
     """
     if not author_email:
         return None
     roots: set[str] = set()
-    saw_cwd = False
     for cwd in repo_cwds:
         if not cwd:
-            continue
-        saw_cwd = True
+            continue  # missing cwd → unattributable, skip (not a poison)
         root = _repo_root(cwd)
         if root is None:
-            return None  # worked in a dir we can't verify → unknown
-        if _is_shallow(root):
-            return None  # truncated history → cannot trust the count
+            continue  # not a git work tree → unattributable, skip
+        shallow = _is_shallow(root)
+        if shallow is None:
+            return None   # resolved repo errored on shallow probe → poison
+        if shallow:
+            continue  # truncated history → cannot trust THIS repo, skip it
         roots.add(root)
-    if not saw_cwd:
-        return None  # no repo signal at all → unknown, not zero
+    if not roots:
+        return None  # nothing verifiable → unknown, not zero
     all_shas: set[str] = set()
     for root in roots:
         shas = _repo_shas(root, author_email, since_utc, until_utc)

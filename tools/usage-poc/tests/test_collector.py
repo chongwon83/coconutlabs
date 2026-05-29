@@ -671,19 +671,22 @@ def test_verified_commits_real_zero_when_inspected(tmp_path, monkeypatch):
     assert env["verifiedCommits"] == 0
 
 
-def test_verified_commits_omitted_when_a_contributing_session_lacks_cwd(
+def test_verified_commits_partial_when_a_session_lacks_cwd(
         tmp_path, monkeypatch):
     """A window mixing a cwd-bearing repo session with a token-contributing
-    session that has NO cwd is unknowable, not partial -> field omitted.
+    session that has NO cwd now emits a CONSERVATIVE count from the verifiable
+    repo — the cwd-less session is skipped, not a poison.
 
-    Regression for codex [P1]: the cwd-less session must poison the numerator
-    instead of being silently dropped (which previously emitted a partial 1)."""
+    Reversal of codex [P1] (2026-05-28): the cwd-less session used to poison the
+    numerator to omission; under the relaxed contract its work is simply
+    unattributable, so the numerator counts the repo it CAN verify (a lower
+    bound). Only a window with NO verifiable repo at all omits the field."""
     repo = _init_repo_with_commit(tmp_path / "repo", "dev@x.io",
                                   "2026-05-19T10:00:00+00:00")
     cx = write_codex_log(tmp_path, "s1", str(repo), "gpt-5.5",
                          ts="2026-05-19T11:00:00Z")
     # The Claude fixture carries no line-level cwd → a contributing session
-    # with no repo signal.
+    # with no repo signal (skipped, not a poison).
     cl = write_claude_log(tmp_path, "proj-a", "claude-opus-4-7",
                           ts="2026-05-20T09:00:00Z")
     monkeypatch.setattr(
@@ -692,6 +695,6 @@ def test_verified_commits_omitted_when_a_contributing_session_lacks_cwd(
     monkeypatch.setattr(collect_mod, "git_author_email", lambda: "dev@x.io")
     env = build_envelope(load_pricing(), SALT,
                          generated_at="2026-05-26T12:00:00Z", period="week")
-    # Both sessions contributed rows, but the cwd-less one poisons the count.
+    # Both sessions contributed rows; the cwd-less one is skipped, the repo counts.
     assert len(env["rows"]) == 2
-    assert "verifiedCommits" not in env
+    assert env["verifiedCommits"] == 1
