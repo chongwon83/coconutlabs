@@ -8,9 +8,10 @@
 // implementation would silently drop @carol from both single-tool tabs.
 //
 // Seed mirrors burn-index-sort.spec.ts so a future test author has one
-// mental model for "the 3-row leaderboard". Default sort is VES desc; ves
-// values are chosen so the visible order equals the old totalTokens-desc order,
-// keeping these filter assertions stable:
+// mental model for "the 3-row leaderboard". This SEED has 2 nonzero-VES rows,
+// so hasEnoughVes() is true → the VES column shows and VES desc is the default
+// sort. ves values are chosen so VES-desc order equals tokens-desc order,
+// keeping these filter assertions stable regardless of the gate:
 //   @alice  toolsUsed=[claude-code]            (ves 200 — top under All + Claude Code)
 //   @bob    toolsUsed=[codex]                  (ves null — bottom under All + Codex)
 //   @carol  toolsUsed=[claude-code, codex]     (ves 150 — appears under BOTH single filters)
@@ -96,6 +97,9 @@ const CLAUDE_ONLY_SEED: ImportedEntry[] = [
 // Legacy seed: pre-B-cycle entry with breakdown:[] and toolsUsed:["claude-code"].
 // The render fallback in sliceForFilter must return the aggregate (not NaN)
 // on the Claude Code tab so tokens and cost are visible rather than "—".
+// Only @alice carries a nonzero VES here (1 < threshold 2) → the VES column is
+// HIDDEN and the default sort falls back to tokens desc. The tokens-desc order
+// matches the old VES-desc order, so this test's row-position assertions hold.
 const LEGACY_SEED: ImportedEntry[] = [
   {
     handle: "@legacy",
@@ -235,8 +239,8 @@ test.describe("BurnIndex leaderboard tool filter", () => {
 
     // Find the @legacy row and verify its token/cost cells are not "—".
     // allTextContents() returns the text of every .lb-col-tokens in DOM order.
-    // After filter+sort (VES desc), @alice (ves 200) ranks first; @legacy
-    // (no ves → sinks) ranks second.
+    // VES column is hidden here (1 nonzero VES) → default sort is tokens desc:
+    // @alice (300k) ranks first; @legacy (150k) ranks second.
     const tokenCells = await page.locator(".lb-row .lb-col-tokens").allTextContents();
     expect(tokenCells[1]).not.toBe("—");
     const costCells = await page.locator(".lb-row .lb-col-cost").allTextContents();

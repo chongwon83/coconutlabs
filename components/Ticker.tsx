@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 import {
   fmtTokensCompact,
   fmtCostShort,
   fmtVes,
   computeVes,
   verifDisplayLabel,
+  hasEnoughVes,
   V3_BUILDERS,
+  type ImportedEntry,
 } from "@/lib/data";
 
 const SHOW_LEGACY = process.env.NEXT_PUBLIC_SHOW_LEGACY_SECTIONS === "true";
@@ -45,53 +47,33 @@ type TickerSize = "default" | "compact";
 
 interface TickerProps {
   size?: TickerSize;
+  // Live leaderboard rows, owned and polled by LandingApp. The Ticker derives
+  // its marquee from these instead of fetching /api/burnindex itself — one poll
+  // feeds StatusBar, Hero, the leaderboard, and this ticker.
+  entries?: ImportedEntry[];
 }
 
-interface LiveEntry {
-  handle: string;
-  totalTokens: number;
-  estimatedCostUsd: number;
-  // Read-time derived by the /api/burnindex GET (only when fixes present).
-  ves?: number;
+// Pure projection of live rows → marquee strings. VES is shown only once the
+// metric has enough real data (hasEnoughVes) AND this row's score is nonzero;
+// otherwise lead with the raw token count so the item still renders honestly.
+function buildLiveTickerItems(
+  entries: ImportedEntry[],
+  showVes: boolean,
+): string[] {
+  return entries.slice(0, 5).map((e) => {
+    const tail =
+      showVes && e.ves != null && e.ves > 0
+        ? `VES ${fmtVes(e.ves)}`
+        : `${fmtTokensCompact(e.totalTokens)} tok`;
+    return `🏆 ${e.handle} · ${tail} · ${fmtCostShort(e.estimatedCostUsd)}`;
+  });
 }
 
-export function Ticker({ size = "default" }: TickerProps) {
-  const [liveItems, setLiveItems] = useState<string[]>([]);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (SHOW_LEGACY) return;
-
-    async function fetchFeed() {
-      try {
-        const res = await fetch("/api/burnindex");
-        if (!res.ok) return;
-        const data = await res.json();
-        const entries: LiveEntry[] = data.entries ?? [];
-        const top = entries.slice(0, 5);
-        if (top.length === 0) return;
-        setLiveItems(
-          top.map((e) => {
-            // VES is the headline metric — show it when derived; otherwise
-            // fall back to the raw token count so the item still renders.
-            const tail =
-              e.ves != null
-                ? `VES ${fmtVes(e.ves)}`
-                : `${fmtTokensCompact(e.totalTokens)} tok`;
-            return `🏆 ${e.handle} · ${tail} · ${fmtCostShort(e.estimatedCostUsd)}`;
-          }),
-        );
-      } catch {
-        // silently ignore — stale items stay if already set
-      }
-    }
-
-    fetchFeed();
-    intervalRef.current = setInterval(fetchFeed, 60_000);
-    return () => {
-      if (intervalRef.current !== null) clearInterval(intervalRef.current);
-    };
-  }, []);
+export function Ticker({ size = "default", entries = [] }: TickerProps) {
+  const liveItems = useMemo(
+    () => buildLiveTickerItems(entries, hasEnoughVes(entries)),
+    [entries],
+  );
 
   if (SHOW_LEGACY) {
     const source = TICKER_ITEMS_FULL;

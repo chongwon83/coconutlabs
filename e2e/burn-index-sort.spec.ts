@@ -24,8 +24,12 @@
 // VES desc → [alice, carol, bob] (bob's null sinks), which intentionally equals
 // the old totalTokens-desc order, so the filter spec's order assertions still hold.
 //
+// Because 2 rows carry a nonzero VES, hasEnoughVes() is true → the VES column is
+// shown and VES desc is the default sort. A row with absent/zero VES renders the
+// muted "Pending" cell (not "—") now that the column gates on real data.
+//
 // This catches: stuck-direction bugs, nullish-to-bottom regression in the ves AND
-// trendPct comparators (incl. the em-dash render for absent ves), and the "new
+// trendPct comparators (incl. the "Pending" render for absent ves), and the "new
 // column resets to type-appropriate default" branch in useColumnSort.toggle
 // (handle→asc, numeric→desc).
 //
@@ -65,7 +69,7 @@ const SEED: ImportedEntry[] = [
     toolsUsed: ["codex"],
     breakdown: [],
     // ves AND trendDir/trendPct intentionally absent — exercises nullish-to-bottom
-    // for both comparators plus the em-dash render for an absent VES.
+    // for both comparators plus the "Pending" render for an absent VES.
   },
   {
     handle: "@carol",
@@ -111,8 +115,8 @@ async function visibleHandles(page: Page): Promise<string[]> {
 }
 
 // VES cell text in row order. Present rows render one decimal (fmtVes → "200.0");
-// absent VES renders the em-dash. Header VES lives in .lb-head, so scoping to
-// .lb-row excludes it (mirrors visibleHandles).
+// absent/zero VES renders the muted "Pending" label. Header VES lives in .lb-head,
+// so scoping to .lb-row excludes it (mirrors visibleHandles).
 async function vesCells(page: Page): Promise<string[]> {
   return await page.locator(".lb-row .lb-col-ves").allTextContents();
 }
@@ -215,18 +219,18 @@ test.describe("BurnIndex leaderboard column sort", () => {
     await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "ascending");
   });
 
-  test("VES default renders one-decimal + em-dash, and null-VES stays at bottom on flip", async ({
+  test("VES default renders one-decimal + Pending, and null-VES stays at bottom on flip", async ({
     page,
   }) => {
-    // Default (VES desc): alice 200.0, carol 150.0, bob has no ves → "—".
-    expect(await vesCells(page)).toEqual(["200.0", "150.0", "—"]);
+    // Default (VES desc): alice 200.0, carol 150.0, bob has no ves → "Pending".
+    expect(await vesCells(page)).toEqual(["200.0", "150.0", "Pending"]);
 
     // Flip to asc — null still sinks (the regression we care about: a naive
-    // comparator would float the em-dash row to the top under asc).
+    // comparator would float the Pending row to the top under asc).
     await sortButton(page, "VES").click();
     expect(await visibleHandles(page)).toEqual(["@carol", "@alice", "@bob"]);
     await expect(sortHeader(page, "VES")).toHaveAttribute("aria-sort", "ascending");
-    expect(await vesCells(page)).toEqual(["150.0", "200.0", "—"]);
+    expect(await vesCells(page)).toEqual(["150.0", "200.0", "Pending"]);
 
     // Flip back to desc — original order restored.
     await sortButton(page, "VES").click();

@@ -189,8 +189,8 @@ export function Hero({ onJoin, onChallenge, stats, entries }: HeroProps) {
             Burn Index · public leaderboard
           </div>
           <h1 className="hero-headline" data-testid="hero-headline">
-            Burn Index puts a number on your{" "}
-            <span className="hero-accent">drag</span>.
+            See what your AI coding actually{" "}
+            <span className="hero-accent">costs</span>.
           </h1>
           <p className="hero-sub" data-testid="hero-sub">
             {SHOW_LEGACY

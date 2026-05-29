@@ -24,6 +24,10 @@
   --young-coconut-dark: #0F766E;
   --young-coconut-soft: rgba(0, 208, 132, 0.10);
   --young-coconut-vivid: #16F2A5;
+  /* Accent for TEXT on white: bright green (#00D084) is ~2.0:1 → fails WCAG AA.
+     Teal (#0F766E) is ~5.5:1 → passes. Use this for any green-colored text;
+     keep --young-coconut for fills/borders that pair with dark text. */
+  --accent-text: var(--young-coconut-dark);
   --coconut-husk: #525252;
   --burn-warm: #525252;
   --verified: #0F766E;
@@ -72,6 +76,7 @@
   --color-fg3: var(--fg3);
   --color-accent: var(--young-coconut);
   --color-accent-dark: var(--young-coconut-dark);
+  --color-accent-text: var(--accent-text);
   --color-verified: var(--verified);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
@@ -1310,7 +1315,7 @@ button { font: inherit; cursor: pointer; }
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.toast-icon { display: flex; align-items: center; color: var(--young-coconut); flex: none; }
+.toast-icon { display: flex; align-items: center; color: var(--accent-text); flex: none; }
 .toast-message { flex: 1; }
 .toast-close {
   background: none; border: none; cursor: pointer;
@@ -1522,7 +1527,7 @@ textarea.form-input {
   color: var(--fg);
   text-decoration: underline;
 }
-.form-link-inline:hover { color: var(--young-coconut); }
+.form-link-inline:hover { color: var(--accent-text); }
 .form-code-block {
   position: relative;
   border: 1px solid var(--border);
@@ -1555,7 +1560,7 @@ textarea.form-input {
   cursor: pointer;
 }
 .form-code-block .form-copy-btn:hover { color: var(--fg); border-color: var(--fg3); }
-.form-code-block .form-copy-btn[data-copied="true"] { color: var(--young-coconut); border-color: var(--young-coconut); }
+.form-code-block .form-copy-btn[data-copied="true"] { color: var(--accent-text); border-color: var(--accent-text); }
 .burn-preview { display: flex; flex-direction: column; gap: 12px; }
 .bp-list {
   border: 1px solid var(--border);
@@ -1697,7 +1702,7 @@ textarea.form-input {
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
-  color: var(--young-coconut);
+  color: var(--accent-text);
 }
 .drop-title { font-size: 15px; font-weight: 600; color: var(--fg); margin: 0; }
 .drop-desc { font-size: 13px; color: var(--fg2); line-height: 1.5; flex: 1; margin: 0; }
@@ -1747,7 +1752,7 @@ textarea.form-input {
   font-weight: 600; letter-spacing: -0.035em; line-height: 1.0;
   margin: 0 0 20px; color: var(--fg);
 }
-.hero-accent { color: var(--young-coconut); }
+.hero-accent { color: var(--accent-text); }
 .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
 .hero-chip {
   padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px;
@@ -1817,7 +1822,7 @@ textarea.form-input {
   text-align: center;
   letter-spacing: 0.01em;
 }
-.product-shot-ves { font-family: var(--font-mono); color: var(--young-coconut); font-weight: 600; text-align: right; }
+.product-shot-ves { font-family: var(--font-mono); color: var(--accent-text); font-weight: 600; text-align: right; }
 .product-shot-cost { font-family: var(--font-mono); color: var(--fg2); text-align: right; }
 .product-shot-body { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .product-shot-title { font-size: 14px; font-weight: 600; color: var(--fg); margin: 0; }
@@ -1834,7 +1839,7 @@ textarea.form-input {
 }
 .product-shot-drop-row:last-child { border-bottom: 0; }
 .product-shot-drop-title { font-weight: 500; color: var(--fg); }
-.product-shot-drop-badge { font-family: var(--font-mono); font-size: 12px; color: var(--young-coconut); font-weight: 600; }
+.product-shot-drop-badge { font-family: var(--font-mono); font-size: 12px; color: var(--accent-text); font-weight: 600; }
 .code-comment { color: #71717A; }
 .code-line { color: var(--fg2); }
 .code-accent { color: var(--young-coconut-vivid); font-weight: 600; }
@@ -1873,7 +1878,7 @@ textarea.form-input {
 .hero-secondary-row + .hero-secondary-row { border-top: 1px solid var(--border); }
 .hero-secondary-label { font-size: 12px; color: var(--fg3); }
 .hero-secondary-value { font-family: var(--font-mono); font-size: 16px; font-weight: 600; color: var(--fg); }
-.hero-secondary-value.accent { color: var(--young-coconut); }
+.hero-secondary-value.accent { color: var(--accent-text); }
 .hero-secondary-footnote {
   margin-top: 8px;
   padding-top: 8px;
@@ -1945,6 +1950,15 @@ textarea.form-input {
   gap: 10px;
   padding: 0 16px;
 }
+/* VES hidden (lb-grid--no-ves on the .lb-v3 ancestor → covers .lb-head + every
+   .lb-row at once): drop the 72px VES track → 6 columns. Higher specificity
+   than the canonical rule, so it wins at every width — which is exactly why the
+   @media breakpoints below MUST restate it. A higher-specificity desktop rule
+   beats a lower-specificity @media rule (media queries add no specificity), so
+   without the restatements the 6-track desktop grid leaks into mobile. */
+.lb-v3.lb-grid--no-ves .lb-head, .lb-v3.lb-grid--no-ves .lb-row {
+  grid-template-columns: 32px 1.4fr 80px 80px 110px 70px;
+}
 .lb-col-rank, .lb-col-builder, .lb-col-ves, .lb-col-tokens, .lb-col-cost,
 .lb-col-models, .lb-col-trend { display: flex; align-items: center; min-width: 0; overflow: hidden; }
 .lb-col-models { gap: 0; flex-wrap: nowrap; align-items: stretch; }
@@ -1952,19 +1966,25 @@ textarea.form-input {
 /* Leaderboard responsive — MUST follow the canonical .lb-v3 grid above so these
    win on source-order ties (the canonical rule is unusually late in the file;
    placing these earlier lets the desktop grid + .lb-col-* display:flex override
-   them, which silently breaks the breakpoints). VES is the headline metric and
-   is protected down to the smallest width. */
+   them, which silently breaks the breakpoints). Each breakpoint also restates
+   the .lb-grid--no-ves variant: that desktop rule has higher specificity than
+   a bare @media rule, so it must be re-declared here or it leaks downward. */
 @media (max-width: 920px) {
-  /* hide Models — #/Builder/VES/Tokens/Cost/Trend */
+  /* Models hidden. VES shown → #/Builder/VES/Tokens/Cost/Trend (6). */
   .lb-v3 .lb-head, .lb-v3 .lb-row { grid-template-columns: 32px 1fr 72px 80px 80px 70px; gap: 10px; padding: 0 14px; }
+  /* VES hidden → #/Builder/Tokens/Cost/Trend (5). */
+  .lb-v3.lb-grid--no-ves .lb-head, .lb-v3.lb-grid--no-ves .lb-row { grid-template-columns: 32px 1fr 80px 80px 70px; }
   .lb-tools { display: none; }
   .lb-col-models { display: none; }
 }
 @media (max-width: 600px) {
-  /* drop Tokens + Cost too — #/Builder/VES/Trend (Models already hidden ≤920) */
-  .lb-v3 .lb-head, .lb-v3 .lb-row { grid-template-columns: 28px 1fr 72px 60px; gap: 8px; padding: 0 12px; }
-  .lb-col-tokens { display: none; }
-  .lb-col-cost { display: none; }
+  /* Real data wins at the narrowest width: show #/Builder/Tokens/Cost/Trend (5)
+     and hide VES — it's the headline column but reads "Pending"/empty for most
+     rows, so it's the one to drop on mobile (Models already hidden ≤920). This
+     replaces the old rule that hid Tokens+Cost and kept the empty VES column. */
+  .lb-v3 .lb-head, .lb-v3 .lb-row { grid-template-columns: 28px 1.3fr 1fr 1fr 52px; gap: 8px; padding: 0 12px; }
+  .lb-v3.lb-grid--no-ves .lb-head, .lb-v3.lb-grid--no-ves .lb-row { grid-template-columns: 28px 1.3fr 1fr 1fr 52px; }
+  .lb-col-ves { display: none; }
 }
 .lb-models-stack {
   display: flex;
@@ -2012,6 +2032,9 @@ textarea.form-input {
 .lb-models-dot--other  { background: var(--fg3); }
 .lb-models-empty { color: var(--fg3); font-size: 12px; }
 .lb-mono { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--fg2); }
+/* VES cell when the column is shown but this row has no nonzero score yet.
+   Muted + smaller so a sea of "Pending" never competes with real numbers. */
+.lb-ves-pending { font-family: var(--font-mono); font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; }
 
 /* Imported builder cell: handle + inline tier chip on row 1, period on row 2.
    Main-grid V3 rows omit the chip — tier section headers already classify them. */
@@ -2226,7 +2249,7 @@ textarea.form-input {
 .activity-row:last-child { border-bottom: 0; }
 .activity-handle { font-weight: 600; color: var(--fg); font-family: var(--font-mono); font-size: 11px; }
 .activity-action { color: var(--fg2); }
-.activity-cost { font-family: var(--font-mono); color: var(--young-coconut); font-size: 11px; text-align: right; }
+.activity-cost { font-family: var(--font-mono); color: var(--accent-text); font-size: 11px; text-align: right; }
 .activity-ago { color: var(--fg3); font-size: 11px; text-align: right; }
 
 /* Trust section new selectors */
@@ -2245,7 +2268,7 @@ textarea.form-input {
   border: 1px solid var(--border); border-radius: var(--r-card);
   font-size: 13px; color: var(--fg2); line-height: 1.5;
 }
-.trust-link { color: var(--young-coconut); text-decoration: none; }
+.trust-link { color: var(--accent-text); text-decoration: none; }
 .trust-link:hover { text-decoration: underline; }
 .trust-item { display: flex; align-items: flex-start; gap: 14px; }
 

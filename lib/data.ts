@@ -323,6 +323,40 @@ export function topVesEntry(
   return best;
 }
 
+// VES is only a credible headline once enough builders post a NONZERO score.
+// Below this threshold the leaderboard hides the VES column entirely and the
+// StatusBar/Ticker suppress VES — surfacing an all-"0.0"/"—" column reads as
+// "no data" and undercuts the "trust the data" pitch. Bump when real verified
+// fixes start landing.
+export const VES_REVEAL_THRESHOLD = 2;
+
+// True once at least VES_REVEAL_THRESHOLD entries have a real (nonzero) VES.
+// Single source of truth for every VES-visibility gate (leaderboard column,
+// StatusBar Top VES, Ticker VES tail) so the surfaces can never disagree.
+export function hasEnoughVes(entries: ImportedEntry[]): boolean {
+  let n = 0;
+  for (const e of entries) {
+    if (e.ves != null && e.ves > 0 && ++n >= VES_REVEAL_THRESHOLD) return true;
+  }
+  return false;
+}
+
+// Top entry among NONZERO-VES builders, for the StatusBar headline. Distinct
+// from topVesEntry, which intentionally treats ves=0 as a valid candidate for
+// other callers/tests — a "Top VES: 0.0" headline is exactly what we avoid.
+export function topNonzeroVesEntry(
+  entries: ImportedEntry[],
+): { ves: number; handle: string } | null {
+  let best: { ves: number; handle: string } | null = null;
+  for (const e of entries) {
+    if (e.ves == null || e.ves <= 0) continue;
+    if (best === null || e.ves > best.ves) {
+      best = { ves: e.ves, handle: e.handle };
+    }
+  }
+  return best;
+}
+
 // Recompute the display verification level from the two orthogonal axes +
 // price confidence. The file's `verification.level` is an untrusted hint —
 // consumers MUST call this rather than read it. See
