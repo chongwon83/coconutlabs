@@ -180,6 +180,7 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
     filtered,
     showVes ? "ves" : "totalTokens",
     "desc",
+    showVes,
   );
 
   return (
