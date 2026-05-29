@@ -188,7 +188,7 @@ export default function LandingApp() {
           userClosedRef={userClosedRef}
         />
       </Suspense>
-      <StatusBar />
+      <StatusBar entries={imported} />
       <Nav
         onJoin={() => setModal("join")}
       />

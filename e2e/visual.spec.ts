@@ -63,11 +63,21 @@ test.describe("Track 4 Step C: visual baseline (3 viewports)", () => {
       // wrapper 2026-05-27); only the 3 stat value spans still need masking
       // because they receive live SWR data. hero-right scope wraps the active
       // ProductShot for any remaining [data-mask="dynamic"] there.
+      //
+      // status-bar (2026-05-29): the always-on top strip now renders the live
+      // Top VES (max over imported). The WHOLE bar is masked, not just the VES
+      // span — the value+handle text length varies, and masking only the span
+      // would let the mask box resize with content and re-introduce flake. The
+      // bar is a single fixed-height row, so masking it keeps everything below
+      // pixel-stable. StatusBar is the DOM's first child, so this mask applies
+      // to both the mobile full-viewport capture AND the desktop sticky-header
+      // clip (clip starts at y:0).
       const mask = [
         page.locator('[data-testid="hero-stat-builders"]'),
         page.locator('[data-testid="hero-stat-tokens"]'),
         page.locator('[data-testid="hero-stat-spend"]'),
         page.locator('[data-testid="hero-right"] [data-mask="dynamic"]'),
+        page.locator('[data-testid="status-bar"]'),
       ];
 
       if (vp.mode === "viewport") {

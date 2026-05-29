@@ -1,6 +1,6 @@
 "use client";
 
-import { V3_BUILDERS } from "@/lib/data";
+import { V3_BUILDERS, computeVes, fmtVes } from "@/lib/data";
 import { Avatar, VerifBadge, Trend, Icon } from "@/components/primitives";
 import { Sparkline } from "@/components/Sparkline";
 
@@ -50,36 +50,47 @@ export function BuildersSection() {
 
         <div className="builders-layout">
           <div className="builder-cards">
-            {V3_BUILDERS.map((b) => (
-              <div key={b.handle} className="builder-card">
-                <div className="builder-card-top">
-                  <Avatar initials={b.avatar} />
-                  <div className="builder-card-meta">
-                    <span className="builder-handle">{b.handle}</span>
-                    <VerifBadge level={b.verif} />
+            {V3_BUILDERS.map((b) => {
+              // Derive VES through the same computeVes/fmtVes path the live
+              // leaderboard uses — no hand-typed VES literal in the seed.
+              const ves = computeVes(b.fixes, b.costUsd);
+              return (
+                <div key={b.handle} className="builder-card">
+                  <div className="builder-card-top">
+                    <Avatar initials={b.avatar} />
+                    <div className="builder-card-meta">
+                      <span className="builder-handle">{b.handle}</span>
+                      <VerifBadge level={b.verif} />
+                    </div>
+                    <Sparkline handle={b.handle} width={56} height={20} />
                   </div>
-                  <Sparkline handle={b.handle} width={56} height={20} />
+                  <div className="builder-card-stats">
+                    <div className="builder-stat">
+                      <span className="builder-stat-val">
+                        {ves == null ? "—" : fmtVes(ves)}
+                      </span>
+                      <span className="builder-stat-lbl">VES</span>
+                    </div>
+                    <div className="builder-stat">
+                      <span className="builder-stat-val">
+                        {b.fixes.toLocaleString()}
+                      </span>
+                      <span className="builder-stat-lbl">fixes</span>
+                    </div>
+                    <div className="builder-stat">
+                      <span className="builder-stat-val">
+                        ${b.costUsd.toFixed(2)}
+                      </span>
+                      <span className="builder-stat-lbl">spent</span>
+                    </div>
+                  </div>
+                  <div className="builder-card-footer">
+                    <Trend dir={b.trend} value={b.trendVal} />
+                    <span className="builder-rank">#{b.rank} this week</span>
+                  </div>
                 </div>
-                <div className="builder-card-stats">
-                  <div className="builder-stat">
-                    <span className="builder-stat-val">{b.ves}</span>
-                    <span className="builder-stat-lbl">VES</span>
-                  </div>
-                  <div className="builder-stat">
-                    <span className="builder-stat-val">{b.fixes}</span>
-                    <span className="builder-stat-lbl">fixes</span>
-                  </div>
-                  <div className="builder-stat">
-                    <span className="builder-stat-val">{b.cost}</span>
-                    <span className="builder-stat-lbl">spent</span>
-                  </div>
-                </div>
-                <div className="builder-card-footer">
-                  <Trend dir={b.trend} value={b.trendVal} />
-                  <span className="builder-rank">#{b.rank} this week</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <ActivityFeed />

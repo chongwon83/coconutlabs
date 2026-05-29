@@ -7,10 +7,13 @@ export interface Builder {
   rank: number;
   handle: string;
   verif: VerifLevel;
-  tokens: string;
-  cost: string;
-  fixes: string;
-  ves: string;
+  // Numeric-first: display strings + VES are derived in BuildersSection via the
+  // canonical formatters (fmtTokensCompact / fmtVes / computeVes), so the demo
+  // seed has a single VES computation path shared with the live leaderboard
+  // (no hand-typed VES literal that can drift from fixes ÷ cost).
+  tokens: number;
+  costUsd: number;
+  fixes: number;
   trend: TrendDir;
   trendVal: string;
   avatar: string;
@@ -58,10 +61,9 @@ export const V3_BUILDERS: Builder[] = [
     rank: 1,
     handle: "@shellcoder",
     verif: "Device-synced",
-    tokens: "2.1M",
-    cost: "$4.20",
-    fixes: "847",
-    ves: "201.7",
+    tokens: 2_100_000,
+    costUsd: 4.2,
+    fixes: 847,
     trend: "up",
     trendVal: "+12%",
     avatar: "SC",
@@ -70,10 +72,9 @@ export const V3_BUILDERS: Builder[] = [
     rank: 2,
     handle: "@tinyshipper",
     verif: "Provider-synced",
-    tokens: "1.8M",
-    cost: "$3.60",
-    fixes: "712",
-    ves: "197.8",
+    tokens: 1_800_000,
+    costUsd: 3.6,
+    fixes: 712,
     trend: "up",
     trendVal: "+8%",
     avatar: "TS",
@@ -82,10 +83,9 @@ export const V3_BUILDERS: Builder[] = [
     rank: 3,
     handle: "@coconutfix",
     verif: "Self-reported",
-    tokens: "3.2M",
-    cost: "$9.60",
-    fixes: "1,024",
-    ves: "106.7",
+    tokens: 3_200_000,
+    costUsd: 9.6,
+    fixes: 1024,
     trend: "down",
     trendVal: "-3%",
     avatar: "CF",
@@ -94,10 +94,9 @@ export const V3_BUILDERS: Builder[] = [
     rank: 4,
     handle: "@noor",
     verif: "Device-synced",
-    tokens: "1.1M",
-    cost: "$2.20",
-    fixes: "430",
-    ves: "195.5",
+    tokens: 1_100_000,
+    costUsd: 2.2,
+    fixes: 430,
     trend: "up",
     trendVal: "+2%",
     avatar: "NO",
@@ -106,10 +105,9 @@ export const V3_BUILDERS: Builder[] = [
     rank: 5,
     handle: "@4ndres",
     verif: "Provider-synced",
-    tokens: "980K",
-    cost: "$1.96",
-    fixes: "378",
-    ves: "192.9",
+    tokens: 980_000,
+    costUsd: 1.96,
+    fixes: 378,
     trend: "up",
     trendVal: "+1%",
     avatar: "4N",
@@ -305,6 +303,24 @@ export interface ImportedEntry {
 export function computeVes(verifiedFixes: number, costUsd: number): number | null {
   if (costUsd <= 0) return null;
   return verifiedFixes / costUsd;
+}
+
+// Pick the single highest-VES entry for headline surfaces (StatusBar). Only
+// entries whose VES was derived (fixes present) qualify; ties keep the
+// first seen. Returns null when no entry has VES yet → the caller shows a
+// "be first" empty state. NOTE: `imported` is ordered newest-first, so this
+// MUST scan for the MAX rather than read entries[0].
+export function topVesEntry(
+  entries: ImportedEntry[],
+): { ves: number; handle: string } | null {
+  let best: { ves: number; handle: string } | null = null;
+  for (const e of entries) {
+    if (e.ves == null) continue;
+    if (best === null || e.ves > best.ves) {
+      best = { ves: e.ves, handle: e.handle };
+    }
+  }
+  return best;
 }
 
 // Recompute the display verification level from the two orthogonal axes +
