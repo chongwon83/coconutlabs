@@ -353,6 +353,7 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
 
         <p className="section-note">
           VES = verified fixes ÷ AI cost (USD). Higher is better.
+          Verified fixes come from your own git commits, counted on-device.
           Evidence order: {verifDisplayLabel("Provider-synced")} &gt;{" "}
           {verifDisplayLabel("Device-synced")} &gt;{" "}
           {verifDisplayLabel("Estimated")} &gt;{" "}
