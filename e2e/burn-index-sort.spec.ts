@@ -16,10 +16,12 @@
 // prop, so a single GET interception fully seeds the table.
 //
 // Rows are calibrated so EVERY sort produces a different visible order. VES is
-// the default sort (desc) and @bob has no VES — it doubles as the null-VES case:
-//   @alice  ves=200  totalTokens=300  cost=$3.00  trendPct=+15  toolsUsed=[claude]
-//   @bob    ves=null totalTokens=100  cost=$1.00  trendPct=null toolsUsed=[codex]
-//   @carol  ves=150  totalTokens=200  cost=$2.00  trendPct=-5   toolsUsed=[both]
+// the default sort (desc) and @bob has no VES — it doubles as the null-VES case.
+// ves values are RAW ratios (commits ÷ cost); the cell renders them via fmtVes
+// as "commits per $1k" (raw × 1000), so 0.0396 → "39.6", 0.0124 → "12.4":
+//   @alice  ves=0.0396  totalTokens=300  cost=$3.00  trendPct=+15  toolsUsed=[claude]
+//   @bob    ves=null    totalTokens=100  cost=$1.00  trendPct=null toolsUsed=[codex]
+//   @carol  ves=0.0124  totalTokens=200  cost=$2.00  trendPct=-5   toolsUsed=[both]
 //
 // VES desc → [alice, carol, bob] (bob's null sinks), which intentionally equals
 // the old totalTokens-desc order, so the filter spec's order assertions still hold.
@@ -46,7 +48,7 @@ const SEED: ImportedEntry[] = [
     verif: "Device-synced",
     totalTokens: 300_000,
     estimatedCostUsd: 3.0,
-    ves: 200,
+    ves: 0.0396, // renders "39.6" (commits per $1k)
     period: "week",
     since: "2026-05-18T00:00:00Z",
     until: "2026-05-25T00:00:00Z",
@@ -77,7 +79,7 @@ const SEED: ImportedEntry[] = [
     verif: "Device-synced",
     totalTokens: 200_000,
     estimatedCostUsd: 2.0,
-    ves: 150,
+    ves: 0.0124, // renders "12.4" (commits per $1k)
     period: "week",
     since: "2026-05-18T00:00:00Z",
     until: "2026-05-25T00:00:00Z",
@@ -114,9 +116,10 @@ async function visibleHandles(page: Page): Promise<string[]> {
   return await page.locator(".lb-row .lb-handle").allTextContents();
 }
 
-// VES cell text in row order. Present rows render one decimal (fmtVes → "200.0");
-// absent/zero VES renders the muted "Pending" label. Header VES lives in .lb-head,
-// so scoping to .lb-row excludes it (mirrors visibleHandles).
+// VES cell text in row order. Present rows render "commits per $1k" via fmtVes
+// (raw 0.0396 → "39.6"); absent/zero VES renders the muted "Pending" label.
+// Header VES lives in .lb-head, so scoping to .lb-row excludes it (mirrors
+// visibleHandles).
 async function vesCells(page: Page): Promise<string[]> {
   return await page.locator(".lb-row .lb-col-ves").allTextContents();
 }
@@ -146,7 +149,7 @@ test.describe("BurnIndex leaderboard column sort", () => {
   });
 
   test("default order is VES desc", async ({ page }) => {
-    // alice 200, carol 150, bob null → null sinks: [alice, carol, bob].
+    // alice 0.0396, carol 0.0124, bob null → null sinks: [alice, carol, bob].
     expect(await visibleHandles(page)).toEqual(["@alice", "@carol", "@bob"]);
     await expect(sortHeader(page, "VES")).toHaveAttribute("aria-sort", "descending");
     // Every other column reports aria-sort="none" until clicked.
@@ -219,18 +222,18 @@ test.describe("BurnIndex leaderboard column sort", () => {
     await expect(sortHeader(page, "Tokens")).toHaveAttribute("aria-sort", "ascending");
   });
 
-  test("VES default renders one-decimal + Pending, and null-VES stays at bottom on flip", async ({
+  test("VES default renders per-$1k + Pending, and null-VES stays at bottom on flip", async ({
     page,
   }) => {
-    // Default (VES desc): alice 200.0, carol 150.0, bob has no ves → "Pending".
-    expect(await vesCells(page)).toEqual(["200.0", "150.0", "Pending"]);
+    // Default (VES desc): alice "39.6", carol "12.4", bob has no ves → "Pending".
+    expect(await vesCells(page)).toEqual(["39.6", "12.4", "Pending"]);
 
     // Flip to asc — null still sinks (the regression we care about: a naive
     // comparator would float the Pending row to the top under asc).
     await sortButton(page, "VES").click();
     expect(await visibleHandles(page)).toEqual(["@carol", "@alice", "@bob"]);
     await expect(sortHeader(page, "VES")).toHaveAttribute("aria-sort", "ascending");
-    expect(await vesCells(page)).toEqual(["150.0", "200.0", "Pending"]);
+    expect(await vesCells(page)).toEqual(["12.4", "39.6", "Pending"]);
 
     // Flip back to desc — original order restored.
     await sortButton(page, "VES").click();

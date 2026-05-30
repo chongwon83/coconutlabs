@@ -16,10 +16,10 @@
 //   trendPct         → desc (steepest gainers first)
 //
 // Nullish handling: ves and trendPct can be absent (ves: browser/pre-v3 imports
-// with no device-measured fixes, or zero-cost rows; trendPct: <2 weeks of
+// with no device-measured commits, or zero-cost rows; trendPct: <2 weeks of
 // history). They sort to the bottom regardless of direction so an empty row
 // never displaces a data row when the user toggles. A *zero* VES is treated the
-// same as null: it renders as "Pending" (no verified fixes yet), so it must
+// same as null: it renders as "Pending" (no verified commits yet), so it must
 // sink with the other Pending rows rather than floating to the top under an
 // ascending sort.
 //

@@ -1,6 +1,6 @@
 // e2e/burn-index-ves-gate.spec.ts — VES de-emphasis gate (2026-05-29).
 //
-// What this exists for: VES (= verified fixes ÷ AI cost) is the structural
+// What this exists for: VES (= verified commits per $1k AI spend) is the structural
 // headline of the product, but it renders empty (0.0 / no score) for almost
 // every live row because the verified-fixes numerator is ≈0 in reality.
 // Headlining an empty metric undercuts a "trust the data" product, so the VES
@@ -24,9 +24,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import type { ImportedEntry } from "@/lib/data";
 
-// dave=120 (nonzero), erin=0 (zero → not counted), finn=absent. Only 1 nonzero
-// VES → hasEnoughVes() === false → column hidden, default sort = tokens desc.
-// Tokens: dave 300k > erin 200k > finn 100k, so tokens-desc → [dave, erin, finn].
+// dave=0.0396 (nonzero), erin=0 (zero → not counted), finn=absent. Only 1
+// nonzero VES → hasEnoughVes() === false → column hidden, default sort = tokens
+// desc. Tokens: dave 300k > erin 200k > finn 100k, so tokens-desc → [dave, erin, finn].
 const SEED: ImportedEntry[] = [
   {
     handle: "@dave",
@@ -34,7 +34,7 @@ const SEED: ImportedEntry[] = [
     verif: "Device-synced",
     totalTokens: 300_000,
     estimatedCostUsd: 3.0,
-    ves: 120,
+    ves: 0.0396, // raw ratio; nonzero so it counts toward the gate (column stays hidden at 1 nonzero)
     period: "week",
     since: "2026-05-18T00:00:00Z",
     until: "2026-05-25T00:00:00Z",

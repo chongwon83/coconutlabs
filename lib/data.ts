@@ -61,14 +61,22 @@ export const COLLECTOR_REPO_URL = "https://github.com/chongwon83/coconutlabs";
 // coconutlabs.xyz alias here (one line) once the domain mailbox is set up.
 export const CONTACT_EMAIL = "chongwon5026@gmail.com";
 
+// Demo/marketing seed for BuildersSection + the legacy Ticker. VES is DERIVED
+// (computeVes/fmtVes), never hand-typed — so these tokens/cost/fixes must read
+// as a believable WEEK of heavy AI-assisted work. Cost is a realistic weekly
+// spend (hundreds–low-thousands of $) at a ~$5 / 1M-token blended rate, and
+// fixes/cost lands the displayed VES ("commits per $1k") in a credible 30–90
+// range — bracketing real operator data (153 / $3860 = 39.6). The old seed
+// implied $4/week spend (VES 200k under the per-$1k display): indefensible.
+// Ordered rank 1→5 by descending VES so the demo matches the live default sort.
 export const V3_BUILDERS: Builder[] = [
   {
     rank: 1,
     handle: "@shellcoder",
     verif: "Device-synced",
-    tokens: 2_100_000,
-    costUsd: 4.2,
-    fixes: 847,
+    tokens: 148_000_000,
+    costUsd: 740,
+    fixes: 64, // 64 / $740 → VES 86.5
     trend: "up",
     trendVal: "+12%",
     avatar: "SC",
@@ -77,9 +85,9 @@ export const V3_BUILDERS: Builder[] = [
     rank: 2,
     handle: "@tinyshipper",
     verif: "Provider-synced",
-    tokens: 1_800_000,
-    costUsd: 3.6,
-    fixes: 712,
+    tokens: 138_000_000,
+    costUsd: 690,
+    fixes: 51, // 51 / $690 → VES 73.9
     trend: "up",
     trendVal: "+8%",
     avatar: "TS",
@@ -88,9 +96,9 @@ export const V3_BUILDERS: Builder[] = [
     rank: 3,
     handle: "@coconutfix",
     verif: "Self-reported",
-    tokens: 3_200_000,
-    costUsd: 9.6,
-    fixes: 1024,
+    tokens: 264_000_000,
+    costUsd: 1320,
+    fixes: 86, // 86 / $1320 → VES 65.2
     trend: "down",
     trendVal: "-3%",
     avatar: "CF",
@@ -99,9 +107,9 @@ export const V3_BUILDERS: Builder[] = [
     rank: 4,
     handle: "@noor",
     verif: "Device-synced",
-    tokens: 1_100_000,
-    costUsd: 2.2,
-    fixes: 430,
+    tokens: 142_000_000,
+    costUsd: 710,
+    fixes: 37, // 37 / $710 → VES 52.1
     trend: "up",
     trendVal: "+2%",
     avatar: "NO",
@@ -110,9 +118,9 @@ export const V3_BUILDERS: Builder[] = [
     rank: 5,
     handle: "@4ndres",
     verif: "Provider-synced",
-    tokens: 980_000,
-    costUsd: 1.96,
-    fixes: 378,
+    tokens: 176_000_000,
+    costUsd: 880,
+    fixes: 28, // 28 / $880 → VES 31.8
     trend: "up",
     trendVal: "+1%",
     avatar: "4N",
@@ -302,9 +310,11 @@ export interface ImportedEntry {
   trendSeries?: number[];
 }
 
-// VES — Verified Efficiency Score: verified fixes per dollar of AI spend.
-// Returns null when cost is non-positive (cannot divide), so a free or
-// zero-cost card shows "—" rather than Infinity.
+// VES — Verified Efficiency Score: the RAW ratio verifiedFixes / costUsd
+// (commits per dollar). This stays raw so sort comparators and unit tests
+// keep a stable unit; the human-facing rescale to "commits per $1k" lives in
+// fmtVes(). Returns null when cost is non-positive (cannot divide), so a free
+// or zero-cost card shows "—" rather than Infinity.
 export function computeVes(verifiedFixes: number, costUsd: number): number | null {
   if (costUsd <= 0) return null;
   return verifiedFixes / costUsd;
@@ -498,10 +508,27 @@ export function fmtCostShort(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
-// VES (Verified Efficiency Score) for the leaderboard cell: one decimal — 201.7.
-// Absent VES renders "—" at the call site, never 0; this only formats a number.
+// VES (Verified Efficiency Score) for the leaderboard cell. `n` is the RAW
+// ratio from computeVes (verified commits ÷ AI-cost-USD). Real weekly spend
+// dwarfs commit counts (e.g. 153 / $3860 = 0.0396), so the raw ratio collapses
+// to "0.0" under one-decimal rounding — useless on a headline metric. We
+// display it as **commits per $1k of AI spend** (raw × 1000 → 39.6), which
+// keeps real scores in a readable two-digit range while computeVes stays the
+// pure ratio (so its unit tests and the sort comparators are untouched).
+// Adaptive precision: tiny scores keep 2 decimals so they don't re-collapse to
+// 0, mid scores get 1, and large scores round with thousands separators. A
+// positive-but-sub-0.005 score would still round to "0.00" (the same misleading
+// zero this metric is fixing), so it gets an explicit "<0.01" floor. Non-finite
+// input never comes from computeVes (null-guards cost ≤ 0) but is mapped to "—"
+// rather than rendering a literal "NaN" on a headline cell.
 export function fmtVes(n: number): string {
-  return n.toFixed(1);
+  const score = n * 1000; // raw commits/USD → commits per $1k spend
+  if (!Number.isFinite(score)) return "—";
+  if (score <= 0) return "0"; // exact zero, plus a guard against impossible negatives
+  if (score < 0.005) return "<0.01"; // positive but rounds to 0.00 → show a floor, never a false zero
+  if (score < 10) return score.toFixed(2);
+  if (score < 1000) return score.toFixed(1);
+  return Math.round(score).toLocaleString("en-US");
 }
 
 // Pick the entry whose `since` is the most recent and return its [since, until)

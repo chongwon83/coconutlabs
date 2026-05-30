@@ -12,9 +12,9 @@
 // so hasEnoughVes() is true → the VES column shows and VES desc is the default
 // sort. ves values are chosen so VES-desc order equals tokens-desc order,
 // keeping these filter assertions stable regardless of the gate:
-//   @alice  toolsUsed=[claude-code]            (ves 200 — top under All + Claude Code)
+//   @alice  toolsUsed=[claude-code]            (ves 0.0396 → "39.6" — top under All + Claude Code)
 //   @bob    toolsUsed=[codex]                  (ves null — bottom under All + Codex)
-//   @carol  toolsUsed=[claude-code, codex]     (ves 150 — appears under BOTH single filters)
+//   @carol  toolsUsed=[claude-code, codex]     (ves 0.0124 → "12.4" — appears under BOTH single filters)
 //
 // Empty-state branch: a second seed (only claude-code rows) → clicking Codex
 // triggers the "No results in this tab" copy — distinct from
@@ -40,7 +40,7 @@ const SEED: ImportedEntry[] = [
     verif: "Device-synced",
     totalTokens: 300_000,
     estimatedCostUsd: 3.0,
-    ves: 200,
+    ves: 0.0396, // raw ratio; renders "39.6" (commits per $1k)
     period: "week",
     since: "2026-05-18T00:00:00Z",
     until: "2026-05-25T00:00:00Z",
@@ -69,7 +69,7 @@ const SEED: ImportedEntry[] = [
     verif: "Device-synced",
     totalTokens: 200_000,
     estimatedCostUsd: 2.0,
-    ves: 150,
+    ves: 0.0124, // raw ratio; renders "12.4" (commits per $1k)
     period: "week",
     since: "2026-05-18T00:00:00Z",
     until: "2026-05-25T00:00:00Z",
