@@ -17,7 +17,7 @@
 // SECURITY: pure projection — no I/O, no env access.
 
 import { describe, it, expect } from "vitest";
-import { buildImportedEntry, computeVes } from "@/lib/data";
+import { buildImportedEntry, computeVes, fmtVes } from "@/lib/data";
 import type { BurnSummary, BurnSummaryEnvelope } from "@/lib/data";
 
 const baseTokenCount = {
@@ -184,5 +184,44 @@ describe("computeVes — verified commits per dollar", () => {
   it("returns null when cost is non-positive (avoids Infinity/NaN → '—')", () => {
     expect(computeVes(5, 0)).toBeNull();
     expect(computeVes(5, -1)).toBeNull();
+  });
+});
+
+describe("fmtVes — display as commits per $1k of AI spend", () => {
+  it("rescales the raw ratio by 1000 (raw 0.0396 → '39.6')", () => {
+    // Real operator data: 153 commits / $3860 = 0.0396 raw → 39.6 per $1k.
+    expect(fmtVes(0.0396)).toBe("39.6");
+    expect(fmtVes(0.0124)).toBe("12.4");
+  });
+
+  it("keeps 2 decimals for tiny scores so they don't collapse to 0", () => {
+    // Without per-$1k + 2-decimal handling this is the old '0.0' bug.
+    expect(fmtVes(0.00375)).toBe("3.75"); // 3 commits / $800
+    expect(fmtVes(0.009)).toBe("9.00");
+  });
+
+  it("uses 1 decimal in the mid range and rounds with separators when large", () => {
+    expect(fmtVes(0.0865)).toBe("86.5"); // demo @shellcoder 64 / $740
+    expect(fmtVes(2)).toBe("2,000"); // 100 commits / $50 → 2000 per $1k
+    expect(fmtVes(1.2345)).toBe("1,235");
+  });
+
+  it("renders an exact zero as '0', never '0.00'", () => {
+    expect(fmtVes(0)).toBe("0");
+  });
+
+  it("floors a positive-but-sub-0.005 score to '<0.01' instead of a false '0.00'", () => {
+    // raw 0.000004 → 0.004 per $1k: positive real data that would otherwise
+    // round to "0.00" — the exact misleading zero this metric exists to kill.
+    expect(fmtVes(0.000004)).toBe("<0.01");
+    expect(fmtVes(0.0000049)).toBe("<0.01");
+    // Just above the floor renders a real 2-decimal value, not the floor.
+    expect(fmtVes(0.00001)).toBe("0.01");
+  });
+
+  it("maps non-finite or negative input to '—'/'0', never 'NaN' on a headline cell", () => {
+    expect(fmtVes(Number.NaN)).toBe("—");
+    expect(fmtVes(Number.POSITIVE_INFINITY)).toBe("—");
+    expect(fmtVes(-0.5)).toBe("0"); // impossible from computeVes, but never render a negative VES
   });
 });

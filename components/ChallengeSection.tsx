@@ -31,7 +31,7 @@ function CodePanel() {
           <span className="code-kw">def</span>{" "}
           <span className="code-fn">score</span>
           <span className="code-punc">(</span>
-          <span className="code-param">fixes</span>
+          <span className="code-param">commits</span>
           <span className="code-punc">: </span>
           <span className="code-type">int</span>
           <span className="code-punc">, </span>
@@ -43,23 +43,25 @@ function CodePanel() {
           <span className="code-punc">:</span>{"\n"}
           {"    "}
           <span className="code-kw">return</span>{" "}
-          <span className="code-param">fixes</span>
+          <span className="code-param">commits</span>
           <span className="code-punc"> / </span>
-          <span className="code-param">cost</span>{"\n"}
+          <span className="code-param">cost</span>
+          <span className="code-punc"> * </span>
+          <span className="code-num">1000</span>{"\n"}
           {"\n"}
           <span className="code-comment"># Example from this week</span>{"\n"}
           <span className="code-fn">score</span>
           <span className="code-punc">(</span>
-          <span className="code-num">fixes</span>
+          <span className="code-num">commits</span>
           <span className="code-punc">=</span>
-          <span className="code-num">847</span>
+          <span className="code-num">64</span>
           <span className="code-punc">, </span>
           <span className="code-num">cost</span>
           <span className="code-punc">=</span>
-          <span className="code-num">4.20</span>
+          <span className="code-num">740.00</span>
           <span className="code-punc">)</span>{" "}
           <span className="code-comment"># → </span>
-          <span className="code-accent">201.7</span>{"\n"}
+          <span className="code-accent">86.5</span>{"\n"}
         </code>
       </pre>
     </div>
@@ -79,8 +81,8 @@ export function ChallengeSection({ onInvite }: ChallengeSectionProps) {
           Compete on verified efficiency.
         </h2>
         <p className="section-sub">
-          Every challenge is judged by VES — independently verified fixes divided by
-          your total AI spend. No vanity metrics.
+          Every challenge is judged by VES — independently verified commits per $1k
+          of your AI spend. No vanity metrics.
         </p>
 
         <div className="challenge-layout">

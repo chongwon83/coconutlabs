@@ -108,8 +108,8 @@ function ProductShot({ tab, entries }: { tab: HeroTab; entries: ImportedEntry[] 
           <p className="product-shot-title">Fix a real Lighthouse regression</p>
           <p className="product-shot-meta">14 participants · 48h remaining</p>
           <div className="product-shot-code">
-            <span className="code-comment"># VES = verified fixes / AI cost USD</span>
-            <span className="code-line">score(fixes=847, cost=4.20) → <span className="code-accent">201.7</span></span>
+            <span className="code-comment"># VES = verified commits per $1k AI spend</span>
+            <span className="code-line">score(commits=64, cost=740.00) → <span className="code-accent">86.5</span></span>
           </div>
         </div>
       </div>

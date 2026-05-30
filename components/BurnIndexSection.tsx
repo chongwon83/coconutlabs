@@ -288,7 +288,7 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
                   e.ves == null || e.ves === 0 ? (
                     <span
                       className="lb-col-ves lb-ves-pending"
-                      title="Pending verified fixes"
+                      title="Pending verified commits"
                     >
                       Pending
                     </span>
@@ -373,8 +373,8 @@ export function BurnIndexSection({ imported = [], onJoin }: BurnIndexSectionProp
         </div>
 
         <p className="section-note">
-          VES = verified fixes ÷ AI cost (USD). Higher is better.
-          Verified fixes come from your own git commits, counted on-device.
+          VES = verified commits per $1k of AI spend. Higher is better.
+          Verified commits come from your own git commits, counted on-device.
           Evidence order: {verifDisplayLabel("Provider-synced")} &gt;{" "}
           {verifDisplayLabel("Device-synced")} &gt;{" "}
           {verifDisplayLabel("Estimated")} &gt;{" "}
