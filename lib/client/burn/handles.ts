@@ -4,9 +4,17 @@
 // across browser sessions so the FSA picker does not re-prompt on every visit.
 // Permission must be re-verified on every page load — the browser revokes it
 // after a navigation. Use ensurePermission() before any directory iteration.
+//
+// `kind` is a free-form string key in a schemaless object store, so adding a
+// kind needs no schema bump. C2 (VES browser numerator) adds "repos" for the
+// granted repo-parent folder used to count verified commits in-browser.
 
 const DB_NAME = "coconutlabs.handles";
 const STORE_NAME = "handles";
+
+// The handle kinds persisted in the schemaless store. claude/codex are the log
+// folders scanned for token usage; "repos" is the C2 repo-parent grant.
+export type HandleKind = "claude" | "codex" | "repos";
 
 function openHandlesDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -49,7 +57,7 @@ function withHandleStore<T>(
 // claude and codex handles are independent — the user can update one without
 // affecting the other.
 export async function saveHandle(
-  kind: "claude" | "codex",
+  kind: HandleKind,
   handle: FileSystemDirectoryHandle,
 ): Promise<void> {
   await withHandleStore("readwrite", (s) => s.put(handle, kind));
@@ -59,7 +67,7 @@ export async function saveHandle(
 // The returned handle is still permission-revoked after navigation — call
 // ensurePermission() before iterating any entries.
 export async function loadHandle(
-  kind: "claude" | "codex",
+  kind: HandleKind,
 ): Promise<FileSystemDirectoryHandle | null> {
   const result = await withHandleStore<FileSystemDirectoryHandle | undefined>(
     "readonly",

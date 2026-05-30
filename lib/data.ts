@@ -259,9 +259,16 @@ export interface BurnSummaryEnvelope {
   grandTotal: { totalTokens: number; estimatedCostUsd: number };
   // Device-measured count of the operator's own git commits within
   // periodWindow — the VES numerator. Optional: the CLI emits it (a real 0
-  // included) when the count is known, and omits it when unknown; the browser
-  // FSA path always omits it (it can't run git). See gitcount.py.
+  // included) when the count is known, and omits it when unknown. The browser
+  // FSA path now also emits it via isomorphic-git over a granted directory
+  // handle (see lib/client/burn/gitcount.ts). See gitcount.py for CLI parity.
   verifiedCommits?: number;
+  // Provenance of verifiedCommits: "cli" = Python collector, "browser-fsa" =
+  // in-browser isomorphic-git count. Drives the server-side precedence merge
+  // (cli outranks browser-fsa) so a later browser upload cannot clobber or
+  // lower a CLI count. Only meaningful when verifiedCommits is present; a
+  // present count with absent source is treated as "cli" (back-compat).
+  verifiedCommitsSource?: "cli" | "browser-fsa";
 }
 
 // Per-tool×model breakdown inside an ImportedEntry. Allows the leaderboard to
@@ -302,6 +309,13 @@ export interface ImportedEntry {
   // per tool filter and show model proportion chips (see BurnIndexSection).
   breakdown: ImportedEntryBreakdown[];
   fixes?: number;
+  // Provenance of `fixes`, mirrored from envelope.verifiedCommitsSource at
+  // import time. Used by the burnStore precedence merge so a later
+  // numerator-absent or browser-fsa upload cannot clobber/lower a CLI count.
+  // Legacy rows persisted before this field have `fixes` set but no
+  // `fixesSource` — each store's hydrateEntry backfills "cli" on read, and the
+  // merge ranks fixes-present + source-absent as CLI (see mergeNumerator).
+  fixesSource?: "cli" | "browser-fsa";
   ves?: number;
   // trend, filled by the /api/burnindex GET from each handle's weekly import
   // history (see lib/server/trend.ts). Absent until 2 weekly imports — renders "—".
@@ -489,9 +503,14 @@ export function buildImportedEntry(
     breakdown: aggregateBreakdown(env.rows),
   };
   // The single point where the device-measured numerator enters entry state.
-  // Stored only when the CLI measured it (a real 0 is stored); ves is left to
-  // read-time derivation in the GET route. Browser uploads omit it → "—".
-  if (env.verifiedCommits != null) entry.fixes = env.verifiedCommits;
+  // Stored when measured (a real 0 is stored); ves is left to read-time
+  // derivation in the GET route. Both CLI and the browser FSA path may supply
+  // it now. fixesSource defaults to "cli" when a count is present without an
+  // explicit source (back-compat with pre-provenance CLI envelopes).
+  if (env.verifiedCommits != null) {
+    entry.fixes = env.verifiedCommits;
+    entry.fixesSource = env.verifiedCommitsSource ?? "cli";
+  }
   return entry;
 }
 

@@ -63,6 +63,35 @@ describe("validateSummary — schema invariants", () => {
     expect(validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: "3" })).ok).toBe(false);
   });
 
+  // verifiedCommitsSource (VES Part B provenance): present only alongside a
+  // numerator, value constrained to the two known producers. A browser upload
+  // that counted commits in-browser stamps "browser-fsa"; CLI stamps "cli".
+  it('verifiedCommitsSource "cli"/"browser-fsa" passes when paired with verifiedCommits', () => {
+    expect(
+      validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: 7, verifiedCommitsSource: "cli" })).ok,
+    ).toBe(true);
+    expect(
+      validateSummary(
+        JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: 7, verifiedCommitsSource: "browser-fsa" }),
+      ).ok,
+    ).toBe(true);
+  });
+
+  it("verifiedCommitsSource without verifiedCommits is rejected (orphan source)", () => {
+    const res = validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommitsSource: "cli" }));
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toContain("verifiedCommits");
+  });
+
+  it("verifiedCommitsSource with an unknown value is rejected", () => {
+    expect(
+      validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: 7, verifiedCommitsSource: "github" })).ok,
+    ).toBe(false);
+    expect(
+      validateSummary(JSON.stringify({ ...BASE_ENVELOPE, verifiedCommits: 7, verifiedCommitsSource: 1 })).ok,
+    ).toBe(false);
+  });
+
   it("missing required root field (rows) fails", () => {
     const { rows: _rows, ...rest } = BASE_ENVELOPE;
     expect(validateSummary(JSON.stringify(rest)).ok).toBe(false);

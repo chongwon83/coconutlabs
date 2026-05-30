@@ -17,6 +17,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { ImportedEntry } from "@/lib/data";
 import { withLock, atomicWriteJson } from "@/lib/server/atomic";
+import { mergeNumerator } from "@/lib/server/burnStore/mergeNumerator";
 import type {
   BurnStore,
   ImportHistoryPoint,
@@ -40,14 +41,21 @@ async function readArray<T>(filePath: string): Promise<T[]> {
   }
 }
 
-// JSON blobs written before A.1 (toolsUsed) or B (breakdown) will deserialize
-// without the respective field — coerce to `[]` before any consumer reads it.
+// JSON blobs written before A.1 (toolsUsed), B (breakdown), or the VES
+// provenance field (fixesSource) will deserialize missing those fields. Coerce
+// toolsUsed/breakdown to `[]`, and backfill fixesSource="cli" when a numerator
+// is present without a source — legacy rows carried a CLI count before the
+// field existed, so the precedence merge must rank them as CLI (see
+// mergeNumerator). Keep this backfill in lockstep across all three stores.
 function hydrateEntry(e: ImportedEntry): ImportedEntry {
-  if (Array.isArray(e.toolsUsed) && Array.isArray(e.breakdown)) return e;
+  const needsArrays = !Array.isArray(e.toolsUsed) || !Array.isArray(e.breakdown);
+  const needsSource = e.fixes != null && e.fixesSource == null;
+  if (!needsArrays && !needsSource) return e;
   return {
     ...e,
     toolsUsed: Array.isArray(e.toolsUsed) ? e.toolsUsed : [],
     breakdown: Array.isArray(e.breakdown) ? e.breakdown : [],
+    ...(needsSource ? { fixesSource: "cli" as const } : {}),
   };
 }
 
@@ -74,9 +82,14 @@ export class FileBurnStore implements BurnStore {
   async upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
     return withLock(STORE_PATH, async () => {
       const prev = (await readArray<ImportedEntry>(STORE_PATH)).map(hydrateEntry);
-      const next = [entry, ...prev.filter((e) => e.handle !== entry.handle)];
+      // Card/denominator fields take the incoming import; only the VES numerator
+      // is precedence-merged so a later browser-fsa or numerator-absent upload
+      // cannot clobber/lower a CLI count (see mergeNumerator).
+      const existing = prev.find((e) => e.handle === entry.handle);
+      const merged = { ...entry, ...mergeNumerator(existing, entry) };
+      const next = [merged, ...prev.filter((e) => e.handle !== entry.handle)];
       next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
-      await this.#recordHistory(entry);
+      await this.#recordHistory(merged);
       await atomicWriteJson(STORE_PATH, next);
       return next;
     });

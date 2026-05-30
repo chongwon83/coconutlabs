@@ -276,6 +276,16 @@ export interface CollectInputs {
   salt: string;
   now?: Date;
   period?: Period;
+  // C1 (VES browser numerator) — a LOCAL-ONLY sink for the raw directory
+  // slugs / cwds seen during the walk. These are privacy-sensitive: a codex
+  // `cwd` is a real absolute path; a claude project dir name is a path-encoded
+  // slug (dashes-for-slashes). They are surfaced solely so the form can locate
+  // the operator's own git repos for in-browser commit counting, then discard
+  // them. They MUST NEVER enter the envelope, the POST body, or any log — the
+  // hashing path already guarantees only the 12-char hex tail crosses back.
+  // `source` lets the caller distinguish a decodable codex cwd from a lossy
+  // claude slug.
+  onRawCwd?: (raw: string, source: "claude" | "codex") => void;
 }
 
 // Internal: walk handles, parse each session, group by (tool, model, phash).
@@ -285,13 +295,26 @@ async function collectGroups(
 ): Promise<Map<string, Group> & { __keys: Map<string, [string, string, string]> }> {
   const groups = new Map<string, Group>();
   const keyMap = new Map<string, [string, string, string]>();
-  const { claudeProjectsHandle, codexSessionsHandle, salt } = inputs;
+  const { claudeProjectsHandle, codexSessionsHandle, salt, onRawCwd } = inputs;
 
   // Closure-scoped hash callback. Raw slugs never leave the parser layer —
   // they enter as directory names or `cwd` strings, get hashed here, and
   // only the 12-char hex tail crosses back into collect.ts. The salt is
   // captured by this closure and never written into envelope output.
   const hashSlug = (slug: string): Promise<string> => projectHash(slug, salt);
+
+  // C1: optional local sidechannel. When the form supplies `onRawCwd`, we emit
+  // the raw slug/cwd to it AT THE MOMENT OF HASHING (same call site), tagged by
+  // source, then hash as usual. The raw value still never enters any group, row,
+  // or the returned envelope — it only reaches the caller's component-local
+  // state, which is used for repo discovery and discarded after counting. When
+  // no sink is supplied this is a transparent passthrough (identical to before).
+  const recordingHash = onRawCwd === undefined
+    ? (_source: "claude" | "codex") => hashSlug
+    : (source: "claude" | "codex") => (slug: string): Promise<string> => {
+        onRawCwd(slug, source);
+        return hashSlug(slug);
+      };
 
   async function ingest(
     sp: SessionParse<SessionTokens>,
@@ -323,7 +346,7 @@ async function collectGroups(
   }
 
   if (claudeProjectsHandle) {
-    const entries = await findClaudeLogs(claudeProjectsHandle, hashSlug);
+    const entries = await findClaudeLogs(claudeProjectsHandle, recordingHash("claude"));
     for (const entry of entries) {
       let sp: SessionParse<ClaudeTokens>;
       try {
@@ -342,7 +365,7 @@ async function collectGroups(
     for (const entry of entries) {
       let sp: SessionParse<CodexTokens>;
       try {
-        sp = await parseCodexFile(entry.file, hashSlug);
+        sp = await parseCodexFile(entry.file, recordingHash("codex"));
       } catch {
         continue;
       }
@@ -485,8 +508,12 @@ export async function buildEnvelope(
         until: formatGenerated(window[1]),
       };
   return {
-    // Browser FSA path can't run git, so verifiedCommits is always omitted
-    // here → the imported entry renders "—". Only the Python CLI emits it.
+    // buildEnvelope never sets verifiedCommits: the scan produces the cost
+    // denominator only. When the browser counts commits (Part B, in-form
+    // gitcount), the form attaches `verifiedCommits` + `verifiedCommitsSource:
+    // "browser-fsa"` to this object AFTER the scan, then re-validates before
+    // upload. Absent that, the imported entry renders "—" (as the CLI-only
+    // path always did).
     schemaVersion: "3",
     generatedAt,
     periodWindow,

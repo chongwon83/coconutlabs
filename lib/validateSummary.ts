@@ -22,7 +22,7 @@ export type ValidationResult =
 
 const ENVELOPE_KEYS = [
   "schemaVersion", "generatedAt", "periodWindow", "rows", "grandTotal",
-  "verifiedCommits",
+  "verifiedCommits", "verifiedCommitsSource",
 ];
 const PERIOD_WINDOW_KEYS = ["period", "since", "until"];
 const PERIODS = ["day", "week", "month", "year", "all"];
@@ -174,6 +174,16 @@ export function validateSummary(raw: string): ValidationResult {
   // non-negative integer; when absent the entry's fixes/ves stay undefined.
   if (parsed.verifiedCommits !== undefined && !isIntAtLeastZero(parsed.verifiedCommits))
     return { ok: false, error: "verifiedCommits must be an integer ≥ 0 when present." };
+
+  // verifiedCommitsSource (provenance for the merge) is optional and only
+  // meaningful alongside a count. It must be one of the two known sources, and
+  // it cannot appear without verifiedCommits (a dangling source is malformed).
+  if (parsed.verifiedCommitsSource !== undefined) {
+    if (parsed.verifiedCommits === undefined)
+      return { ok: false, error: "verifiedCommitsSource requires verifiedCommits." };
+    if (parsed.verifiedCommitsSource !== "cli" && parsed.verifiedCommitsSource !== "browser-fsa")
+      return { ok: false, error: 'verifiedCommitsSource must be "cli" or "browser-fsa".' };
+  }
 
   const pwErr = checkPeriodWindow(parsed.periodWindow);
   if (pwErr) return { ok: false, error: pwErr };

@@ -11,6 +11,8 @@ import { saveHandle, loadHandle, ensurePermission } from "@/lib/client/burn/hand
 import { loadOrCreateSalt, importSalt } from "@/lib/client/burn/hashing";
 import { runImport, type RunImportArgs } from "@/lib/client/burn/import";
 import type { Period } from "@/lib/client/burn/collect";
+import { groupRepos, type RepoGroup } from "@/lib/client/burn/repoGroups";
+import { countCommits, discoverAuthors, createFsaFs } from "@/lib/client/burn/gitcount";
 import {
   makeAutoDetectStartedEvent,
   makeAutoDetectCompletedEvent,
@@ -43,6 +45,25 @@ const QUICKSTART_COMMANDS = [
   "",
   "# 3. Upload burn-summary.json below ↓",
 ].join("\n");
+
+// Derive the half-open commit window [since, until) from the scan's envelope so
+// the numerator is counted over the SAME period as the cost denominator (VES is
+// "commits in period ÷ cost in period"). Period "all" has null bounds → count
+// everything up to the snapshot instant.
+function windowFromEnvelope(env: BurnSummaryEnvelope): { since: Date; until: Date } {
+  const pw = env.periodWindow;
+  if (pw.since && pw.until) return { since: new Date(pw.since), until: new Date(pw.until) };
+  return { since: new Date(0), until: new Date(env.generatedAt) };
+}
+
+// Remove the VES numerator fields from an envelope (used when a recount fails so
+// a stale browser count never rides along with the upload).
+function stripNumerator(env: BurnSummaryEnvelope): BurnSummaryEnvelope {
+  const rest = { ...env };
+  delete rest.verifiedCommits;
+  delete rest.verifiedCommitsSource;
+  return rest;
+}
 
 // Burn Index import. The user runs the CoconutLabs collector on their own
 // machine, then uploads or pastes the resulting Burn Summary JSON. It is
@@ -92,6 +113,50 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saltInput, setSaltInput] = useState("");
   const [saltMsg, setSaltMsg] = useState("");
+
+  // C2/C3/C4 — VES browser numerator. Count the operator's own commits across a
+  // granted repo-parent folder, in-browser, and attach the tally to the
+  // envelope. Everything here is LOCAL-ONLY until the integer count is attached:
+  // the raw cwds (rawCwdsRef) and the selected author emails NEVER enter the
+  // envelope, the POST body, or any log — only the resulting verifiedCommits
+  // integer + its "browser-fsa" provenance do.
+  const rawCwdsRef = useRef<{ raw: string; source: "claude" | "codex" }[]>([]);
+  // Monotonic token for the in-flight count. Any invalidation (selection change,
+  // re-grant, scan reset) bumps it; a count whose token is stale when it resolves
+  // must NOT reattach — it was computed for a since-superseded author/repo set.
+  const countGenRef = useRef(0);
+  const [repoGroups, setRepoGroups] = useState<RepoGroup[]>([]);
+  const [reposHandle, setReposHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [activeGroup, setActiveGroup] = useState<RepoGroup | null>(null);
+  const [authorChips, setAuthorChips] = useState<string[]>([]); // candidate emails to offer
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]); // chosen (local only)
+  const [counting, setCounting] = useState(false);
+  const [verifiedCount, setVerifiedCount] = useState<number | null>(null);
+  const [numeratorError, setNumeratorError] = useState("");
+
+  // Reset all numerator state — called when (re)scanning or "Scan again", so a
+  // grant/count from a previous scan never leaks into a fresh one.
+  function resetNumerator() {
+    rawCwdsRef.current = [];
+    countGenRef.current++; // invalidate any in-flight count
+    setRepoGroups([]);
+    setReposHandle(null);
+    setActiveGroup(null);
+    setAuthorChips([]);
+    setSelectedEmails([]);
+    setVerifiedCount(null);
+    setNumeratorError("");
+  }
+
+  // Invalidate just the counted numerator (keep the grant + chips). A count is
+  // valid ONLY for the exact (repo, author-set) it was taken over, so any change
+  // to that selection — and every non-success recount path — must clear the
+  // count AND strip it from the envelope, or a stale value rides the next POST.
+  function clearCount() {
+    countGenRef.current++; // supersede any in-flight count so it can't reattach
+    setVerifiedCount(null);
+    setFsaEnvelope((prev) => (prev ? stripNumerator(prev) : prev));
+  }
 
   // Telemetry state (Axes 2–3)
   const durationTimerRef = useRef<(() => DurationBucket) | null>(null);
@@ -266,6 +331,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
     setFsaError("");
     setFsaEnvelope(null);
     setFsaLoading(true);
+    resetNumerator();
 
     // Telemetry: mark flow start and begin duration timer.
     sendTelemetryEvent(makeAutoDetectStartedEvent(true));
@@ -286,14 +352,22 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
           return;
         }
       }
+      // C1: capture raw cwds/slugs locally during the walk so C2 can group them
+      // into a grantable repo-parent folder. This sink is the ONLY place the raw
+      // values surface, and they stay in this component (rawCwdsRef) — never the
+      // envelope or POST.
+      rawCwdsRef.current = [];
       const args: RunImportArgs = {
         claudeHandle: claudeHandle,
         codexHandle: codexHandle,
         salt,
         period: fsaPeriod,
+        onRawCwd: (raw, source) => rawCwdsRef.current.push({ raw, source }),
       };
       const result = await runImport(args);
       setFsaEnvelope(result);
+      // C2: group the captured cwds by parent folder for a single-grant prompt.
+      setRepoGroups(groupRepos(rawCwdsRef.current).groups);
     } catch (e) {
       const bucket = durationTimerRef.current?.() ?? "0-1m";
       sendTelemetryEvent(makeAutoDetectFailedEvent(bucket, "parse_failed", "parse"));
@@ -349,6 +423,128 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
       setShowSuccess(false);
     } finally {
       setFsaSubmitting(false);
+    }
+  }
+
+  // C2 — grant the repo-parent folder for one group. The picker returns a leaf
+  // handle exposing only its name; we verify it matches the group's basename so
+  // the user can't accidentally grant the wrong folder (createFsaFs then resolves
+  // child repos by name). On success we discover candidate authors (C3).
+  async function pickRepoFolder(group: RepoGroup) {
+    setNumeratorError("");
+    let h: FileSystemDirectoryHandle;
+    try {
+      const picker = (window as Window & typeof globalThis & {
+        showDirectoryPicker(opts?: { mode?: string; id?: string }): Promise<FileSystemDirectoryHandle>;
+      }).showDirectoryPicker;
+      h = await picker({ mode: "read", id: "coconut-repos-parent" });
+    } catch (e) {
+      // AbortError = user cancelled the picker; stay silent (Invariant #4: name only).
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setNumeratorError(
+        "Couldn't open the folder picker. Check the site's file permissions and try again.",
+      );
+      return;
+    }
+    if (h.name !== group.rootName) {
+      setNumeratorError(
+        `You picked "${h.name}". Grant the folder named "${group.rootName}" (${group.root}) to count its repos.`,
+      );
+      return;
+    }
+    // A (re)grant changes the repo set under the count → invalidate any prior
+    // numerator before discovering the new identity set.
+    clearCount();
+    setReposHandle(h);
+    setActiveGroup(group);
+    // Best-effort persistence (non-fatal, mirrors pickFolder Invariant #5).
+    saveHandle("repos", h).catch(() => {});
+    await runDiscoverAuthors(h, group);
+  }
+
+  // C3 — surface candidate author emails for the chip picker: locally configured
+  // user.email(s) are preselected, recent HEAD authors are offered. Read-only and
+  // best-effort — a discovery failure just yields no chips (count stays disabled).
+  async function runDiscoverAuthors(h: FileSystemDirectoryHandle, group: RepoGroup) {
+    try {
+      const fs = createFsaFs(h, group.root);
+      const { configured, recent } = await discoverAuthors({ fs, repoDirs: group.repos });
+      // Configured first (preselected), then any recent authors not already listed.
+      const chips = [...new Set([...configured, ...recent])];
+      setAuthorChips(chips);
+      setSelectedEmails(configured);
+    } catch {
+      setAuthorChips([]);
+      setSelectedEmails([]);
+    }
+  }
+
+  function toggleEmail(email: string) {
+    setSelectedEmails((prev) =>
+      prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email],
+    );
+    // The author set just changed → any prior count is for the wrong identity.
+    // Strip it so the user must recount before the new selection can upload.
+    clearCount();
+  }
+
+  // C4 — count the operator's commits in-browser over the granted repos and
+  // attach the integer to the envelope (verifiedCommitsSource "browser-fsa").
+  // A null count (shallow clone / no matching author / unreadable) is NOT zero:
+  // we surface guidance and strip any stale numerator so VES stays "Pending"
+  // rather than asserting a wrong value.
+  async function handleCountCommits() {
+    if (!reposHandle || !activeGroup || !fsaEnvelope) return;
+    if (selectedEmails.length === 0) {
+      setNumeratorError("Select at least one author email — counting needs your git identity.");
+      return;
+    }
+    setNumeratorError("");
+    setCounting(true);
+    // Strip any prior count up front (clearCount also bumps the generation
+    // token): the moment a (re)count begins the old value is stale, so every
+    // non-success path below (denied / null / throw) leaves the numerator
+    // cleared rather than letting a wrong count ride the next upload.
+    clearCount();
+    // This count owns the current generation. The author set and repo grant are
+    // snapshotted into the closure now; if the user changes either while the
+    // async count is in flight, that mutation calls clearCount() and bumps the
+    // token — we then DROP this result instead of reattaching a count computed
+    // for the superseded selection.
+    const gen = countGenRef.current;
+    try {
+      const perm = await ensurePermission(reposHandle);
+      if (perm !== "granted") {
+        setNumeratorError("Read permission was denied for that folder. Re-grant it and try again.");
+        return;
+      }
+      const fs = createFsaFs(reposHandle, activeGroup.root);
+      const { since, until } = windowFromEnvelope(fsaEnvelope);
+      const count = await countCommits({
+        fs,
+        repoDirs: activeGroup.repos,
+        authorEmails: selectedEmails,
+        since,
+        until,
+      });
+      // Superseded mid-flight (selection changed / re-grant / scan reset) → the
+      // count is for a stale author/repo set; drop it (clearCount already
+      // stripped the envelope, so the numerator stays absent).
+      if (countGenRef.current !== gen) return;
+      if (count === null) {
+        setNumeratorError(
+          "Couldn't verify commits in those repos (shallow clone, unreadable history, or no commits by the selected author in this period). Your upload will skip the commit count.",
+        );
+        return;
+      }
+      setVerifiedCount(count);
+      setFsaEnvelope((prev) =>
+        prev ? { ...prev, verifiedCommits: count, verifiedCommitsSource: "browser-fsa" } : prev,
+      );
+    } catch {
+      setNumeratorError("Commit counting failed. You can still upload without the count.");
+    } finally {
+      setCounting(false);
     }
   }
 
@@ -584,6 +780,113 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
           <>
             <BurnIndexPreviewCard envelope={fsaEnvelope} />
 
+            {/* Step 3 (optional) — VES browser numerator. Only shown when the
+                scan found a groupable set of repos. Counting is entirely local;
+                only the resulting integer count joins the upload. */}
+            {repoGroups.length > 0 && !showSuccess && (
+              <div className="form-step form-fsa-numerator">
+                <div className="form-step-label">
+                  Step 3 · Count verified commits{" "}
+                  <span className="form-note">(optional — sharpens your VES)</span>
+                </div>
+                <p className="form-step-desc">
+                  Grant read access to the folder holding your repos so we can
+                  count your own commits in this period — entirely in your
+                  browser. Nothing about your code or file paths leaves this
+                  page; only the commit count is added to your upload.
+                </p>
+
+                {!activeGroup ? (
+                  <div className="form-fsa-repo-grants">
+                    {repoGroups.slice(0, 3).map((g) => (
+                      <div key={g.root} className="form-fsa-repo-grant">
+                        <button
+                          type="button"
+                          className="form-fsa-picker"
+                          onClick={() => pickRepoFolder(g)}
+                        >
+                          Grant <code>{g.rootName}/</code> — count {g.repos.length}{" "}
+                          repo{g.repos.length === 1 ? "" : "s"}
+                        </button>
+                        <span className="form-note">{g.root}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <p className="form-note">
+                      ✓ Granted <code>{activeGroup.rootName}/</code> (
+                      {activeGroup.repos.length} repo
+                      {activeGroup.repos.length === 1 ? "" : "s"})
+                    </p>
+
+                    {authorChips.length > 0 ? (
+                      <>
+                        <div className="form-step-desc">
+                          Which commit authors are you? (preselected from your
+                          local git config)
+                        </div>
+                        <div className="form-fsa-author-chips">
+                          {authorChips.map((email) => {
+                            const on = selectedEmails.includes(email);
+                            return (
+                              <button
+                                key={email}
+                                type="button"
+                                aria-pressed={on}
+                                // Locked while a count is in flight: the count is
+                                // taken over this exact author set, so mutating it
+                                // mid-count would desync the result (the generation
+                                // guard in handleCountCommits is the backstop).
+                                disabled={counting}
+                                className={`form-fsa-chip${on ? " form-fsa-chip--selected" : ""}`}
+                                onClick={() => toggleEmail(email)}
+                              >
+                                {on ? "✓ " : ""}
+                                {email}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="form-note">
+                        No author identity found in those repos — counting needs
+                        at least one email from your git history.
+                      </p>
+                    )}
+
+                    {verifiedCount !== null && (
+                      <p className="form-fsa-count-result">
+                        ✓ {verifiedCount} verified commit
+                        {verifiedCount === 1 ? "" : "s"} in this period — added to
+                        your upload
+                      </p>
+                    )}
+
+                    {authorChips.length > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        type="button"
+                        onClick={handleCountCommits}
+                        disabled={counting || selectedEmails.length === 0}
+                        aria-busy={counting}
+                      >
+                        {counting
+                          ? "Counting…"
+                          : verifiedCount === null
+                            ? "Count my commits"
+                            : "Recount"}
+                      </Button>
+                    )}
+                  </>
+                )}
+
+                {numeratorError && <p className="form-error">{numeratorError}</p>}
+              </div>
+            )}
+
             <div className="form-field">
               <label className="form-label" htmlFor="jbi-fsa-handle">
                 GitHub / X handle <span className="form-note">(required)</span>
@@ -634,7 +937,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
               <button
                 type="button"
                 className="form-link"
-                onClick={() => { setFsaEnvelope(null); setFsaError(""); }}
+                onClick={() => { setFsaEnvelope(null); setFsaError(""); resetNumerator(); }}
               >
                 Scan again
               </button>
