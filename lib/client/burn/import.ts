@@ -21,6 +21,13 @@ export interface RunImportArgs {
   codexHandle: FileSystemDirectoryHandle | null;
   salt: string;
   period: Period;
+  // C1 (VES browser numerator) — optional LOCAL-ONLY sink for the raw
+  // slugs/cwds seen during the walk, forwarded verbatim to collect.ts. The
+  // form uses these to discover the operator's git repos for in-browser
+  // commit counting, then discards them. They never enter the returned
+  // envelope (validateSummary's `additionalProperties: false` would reject
+  // them anyway) or the eventual POST body.
+  onRawCwd?: (raw: string, source: "claude" | "codex") => void;
 }
 
 // Orchestrate the full FSA import flow for the browser UI.
@@ -41,6 +48,7 @@ export async function runImport(
     codexSessionsHandle: args.codexHandle,
     salt: args.salt,
     period: args.period,
+    onRawCwd: args.onRawCwd,
   });
 
   // Serialize and re-validate via validateSummary to enforce

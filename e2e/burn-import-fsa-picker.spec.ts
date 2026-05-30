@@ -193,6 +193,50 @@ function injectHappyPathPicker(jsonl: string) {
   };
 }
 
+/**
+ * Stub showDirectoryPicker with a projects handle whose two project dirs are
+ * claude slugs that decode to sibling repos under one parent
+ * ("-Users-e2e-work-repoA" / "-Users-e2e-work-repoB" → /Users/e2e/work/{repoA,repoB}).
+ * groupRepos() then yields ONE group rooted at /Users/e2e/work (2 repos ≥ the
+ * default threshold), so the optional Step 3 (VES browser numerator) block must
+ * surface a grant button for it after the scan. This is the render-surface
+ * regression net for C2's grant UI; the count itself needs a real .git tree and
+ * is unit-tested in gitcount.test.ts.
+ */
+function injectGroupablePicker(jsonl: string) {
+  return async ({ jsonl: content }: { jsonl: string }) => {
+    const slugs = ["-Users-e2e-work-repoA", "-Users-e2e-work-repoB"];
+    const makeProj = (slug: string) => ({
+      name: slug,
+      kind: "directory",
+      queryPermission: async () => "granted",
+      requestPermission: async () => "granted",
+      entries: async function* () {
+        yield [
+          "session-2026-05-15.jsonl",
+          {
+            name: "session-2026-05-15.jsonl",
+            kind: "file",
+            getFile: async () =>
+              new File([content], "session-2026-05-15.jsonl", { type: "text/plain" }),
+          },
+        ];
+      },
+    });
+    const fakeProjectsHandle = {
+      name: "projects",
+      kind: "directory",
+      queryPermission: async () => "granted",
+      requestPermission: async () => "granted",
+      entries: async function* () {
+        for (const slug of slugs) yield [slug, makeProj(slug)];
+      },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).showDirectoryPicker = async () => fakeProjectsHandle;
+  };
+}
+
 /** Stub browser's showDirectoryPicker with a handle that has the wrong name. */
 function injectRejectPicker() {
   return () => {
@@ -338,6 +382,64 @@ test.describe("FSA burn import — picker flow", () => {
           `"${forbidden}"`,
         );
       }
+    },
+  );
+
+  // ── Step 3 (VES browser numerator) render surface ────────────────────────────
+
+  test(
+    "scan with groupable repos surfaces the Step 3 numerator grant button",
+    async ({ page }) => {
+      await page.addInitScript(injectFakeHandlesIDB());
+      await page.addInitScript(injectGroupablePicker(FIXTURE_JSONL), {
+        jsonl: FIXTURE_JSONL,
+      });
+      await page.route("**/api/internal/issue-collector-token", async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ token: "test-token-for-e2e" }),
+        });
+      });
+      // Let GETs pass through to the memory store; no POST is exercised here.
+      await page.route("**/api/burnindex", async (route) => {
+        if (route.request().method() !== "POST") {
+          await route.continue();
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ entries: [] }),
+        });
+      });
+
+      await page.goto("/?auto-detect=1");
+      await expect(page.locator(".modal-overlay")).toBeVisible({ timeout: 2_000 });
+      await page
+        .getByRole("button", { name: "Select .claude/projects folder" })
+        .click();
+      await expect(page.getByRole("button", { name: /✓ projects/ })).toBeVisible({
+        timeout: 5_000,
+      });
+      await page.getByRole("button", { name: "Scan & preview" }).click();
+      await expect(
+        page.getByRole("button", { name: "Upload to leaderboard" }),
+      ).toBeVisible({ timeout: 15_000 });
+
+      // The two slugs decode to /Users/e2e/work/{repoA,repoB} → one group at
+      // /Users/e2e/work. The optional Step 3 block must offer to grant it.
+      await expect(page.getByText("Count verified commits")).toBeVisible();
+      const grant = page.getByRole("button", {
+        name: /Grant\s+work\/\s+—\s+count\s+2\s+repos/,
+      });
+      await expect(grant).toBeVisible();
+      // The absolute parent path is shown only as a local hint, never uploaded.
+      await expect(page.getByText("/Users/e2e/work")).toBeVisible();
+
+      // "Scan again" tears the numerator UI back down (resetNumerator).
+      await page.getByRole("button", { name: "Scan again" }).click();
+      await expect(page.getByText("Count verified commits")).toHaveCount(0);
     },
   );
 

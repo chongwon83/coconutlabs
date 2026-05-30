@@ -128,6 +128,31 @@ describe("buildImportedEntry — verifiedCommits → fixes mapping (store-at-imp
     expect(entry.ves).toBeUndefined();
   });
 
+  it('defaults fixesSource to "cli" when a numerator arrives without a source (CLI back-compat)', () => {
+    // The Python CLI was deliberately not changed (D3): it sends verifiedCommits
+    // but no verifiedCommitsSource. The server defaults the provenance to "cli"
+    // so the precedence merge ranks these as CLI-measured counts.
+    const env = { ...envelope([row("claude-code")]), verifiedCommits: 12 };
+    const entry = buildImportedEntry(env, "@heidi");
+    expect(entry.fixesSource).toBe("cli");
+  });
+
+  it('carries verifiedCommitsSource "browser-fsa" through to fixesSource', () => {
+    const env = {
+      ...envelope([row("claude-code")]),
+      verifiedCommits: 40,
+      verifiedCommitsSource: "browser-fsa" as const,
+    };
+    const entry = buildImportedEntry(env, "@heidi");
+    expect(entry.fixes).toBe(40);
+    expect(entry.fixesSource).toBe("browser-fsa");
+  });
+
+  it("leaves fixesSource undefined when there is no numerator", () => {
+    const entry = buildImportedEntry(envelope([row("claude-code")]), "@judy");
+    expect(entry.fixesSource).toBeUndefined();
+  });
+
   it("stores a genuine 0 (inspected, no commits) as fixes: 0", () => {
     const env = { ...envelope([row("claude-code")]), verifiedCommits: 0 };
     const entry = buildImportedEntry(env, "@ivan");

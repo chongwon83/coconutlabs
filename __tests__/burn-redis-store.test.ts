@@ -18,9 +18,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { RedisBurnStore } from "@/lib/server/burnStore/redisStore";
 import type { ImportedEntry } from "@/lib/data";
 
-// Minimal recording Redis stub. eval/hgetall/hkeys are the only methods
+// Minimal recording Redis stub. eval/hgetall/hkeys/hget are the only methods
 // RedisBurnStore touches; everything else is intentionally absent so any
-// accidental new dependency surfaces as a TypeError immediately.
+// accidental new dependency surfaces as a TypeError immediately. hget reads the
+// same backing hash as hgetall (faithful to Upstash semantics) so upsertEntry's
+// numerator precedence merge sees the seeded leaderboard row.
 function makeRedisStub() {
   const calls: { method: string; args: unknown[] }[] = [];
   const stub = {
@@ -35,6 +37,11 @@ function makeRedisStub() {
     async hgetall<T>(key: string): Promise<T | null> {
       calls.push({ method: "hgetall", args: [key] });
       return this.hgetallReturn as T | null;
+    },
+    async hget<T>(key: string, field: string): Promise<T | null> {
+      calls.push({ method: "hget", args: [key, field] });
+      const map = this.hgetallReturn as Record<string, unknown> | null;
+      return (map == null ? null : map[field] ?? null) as T | null;
     },
     async hkeys(key: string): Promise<string[]> {
       calls.push({ method: "hkeys", args: [key] });
@@ -128,11 +135,13 @@ describe("RedisBurnStore.upsertEntry — atomic Lua EVAL contract", () => {
     const entryJson = argv[1] as string;
     const stored = JSON.parse(entryJson);
 
-    // Allowed: 10 required (incl. toolsUsed from A.1) + 5 optional = 15 known keys
+    // Allowed: 11 required (incl. toolsUsed/breakdown) + 6 optional (fixes,
+    // fixesSource, ves, trend*) known keys. fixesSource is persisted when a
+    // numerator is present (here VALID_ENTRY.fixes=5 → merge backfills "cli").
     const allowed = new Set([
       "handle", "avatar", "verif", "totalTokens", "estimatedCostUsd",
       "period", "since", "until", "importedAt", "toolsUsed", "breakdown",
-      "fixes", "ves", "trendDir", "trendPct", "trendSeries",
+      "fixes", "fixesSource", "ves", "trendDir", "trendPct", "trendSeries",
     ]);
     for (const key of Object.keys(stored)) {
       expect(allowed.has(key)).toBe(true);

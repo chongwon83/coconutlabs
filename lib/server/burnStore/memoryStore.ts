@@ -14,6 +14,7 @@
 // Concurrency: single Node process + single worker → no lock needed.
 
 import type { ImportedEntry } from "@/lib/data";
+import { mergeNumerator } from "@/lib/server/burnStore/mergeNumerator";
 import type {
   BurnStore,
   ImportHistoryPoint,
@@ -22,15 +23,19 @@ import type {
 const KEEP_PER_HANDLE = 12;
 
 // Mirrors fileStore.hydrateEntry — legacy entries missing toolsUsed/breakdown
-// must not crash BurnIndexSection filter or model chip paths. Three-store
-// defensive contract; add new fields here in lockstep with fileStore and
-// redisStore when ImportedEntry gains required fields.
+// must not crash BurnIndexSection filter or model chip paths, and a numerator
+// present without fixesSource backfills "cli" so the precedence merge ranks it
+// as CLI. Three-store defensive contract; keep this in lockstep with fileStore
+// and redisStore when ImportedEntry gains fields.
 function hydrateEntry(e: ImportedEntry): ImportedEntry {
-  if (Array.isArray(e.toolsUsed) && Array.isArray(e.breakdown)) return e;
+  const needsArrays = !Array.isArray(e.toolsUsed) || !Array.isArray(e.breakdown);
+  const needsSource = e.fixes != null && e.fixesSource == null;
+  if (!needsArrays && !needsSource) return e;
   return {
     ...e,
     toolsUsed: Array.isArray(e.toolsUsed) ? e.toolsUsed : [],
     breakdown: Array.isArray(e.breakdown) ? e.breakdown : [],
+    ...(needsSource ? { fixesSource: "cli" as const } : {}),
   };
 }
 
@@ -49,9 +54,13 @@ export class MemoryBurnStore implements BurnStore {
   async upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
     const hydrated = hydrateEntry(entry);
     const prev = this.#entries.map(hydrateEntry);
-    const next = [hydrated, ...prev.filter((e) => e.handle !== hydrated.handle)];
+    // Only the VES numerator is precedence-merged; card/denominator fields take
+    // the incoming import (see mergeNumerator + fileStore for the rationale).
+    const existing = prev.find((e) => e.handle === hydrated.handle);
+    const merged = { ...hydrated, ...mergeNumerator(existing, hydrated) };
+    const next = [merged, ...prev.filter((e) => e.handle !== merged.handle)];
     next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
-    this.#recordHistory(hydrated);
+    this.#recordHistory(merged);
     this.#entries = next;
     return [...next];
   }

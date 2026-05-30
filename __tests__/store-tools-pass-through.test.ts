@@ -109,6 +109,13 @@ function makeRedisStub() {
       calls.push({ method: "hgetall", args: [key] });
       return this.hgetallReturn as T | null;
     },
+    // upsertEntry HGETs the stored row for the numerator precedence merge.
+    // Read from the same backing hash as hgetall (faithful to Upstash).
+    async hget<T>(key: string, field: string): Promise<T | null> {
+      calls.push({ method: "hget", args: [key, field] });
+      const map = this.hgetallReturn as Record<string, unknown> | null;
+      return (map == null ? null : map[field] ?? null) as T | null;
+    },
     async hkeys(key: string): Promise<string[]> {
       calls.push({ method: "hkeys", args: [key] });
       return this.hkeysReturn;

@@ -7,8 +7,14 @@
 //
 // CONCURRENCY: fileStore relied on withLock (an in-process promise chain) to
 // make read-modify-write safe. That does not survive multiple instances. Here
-// the leaderboard + history write is one atomic Lua EVAL — no read-modify-write
-// race exists because the script runs indivisibly on the Redis server.
+// the leaderboard + history write is one atomic Lua EVAL — that pairing has no
+// read-modify-write race because the script runs indivisibly on the server.
+// The one exception is the VES numerator precedence merge (upsertEntry): it
+// does an HGET before the EVAL to merge against the stored count in TS, so that
+// read-then-write step is NOT atomic. We accept it deliberately — cjson is not
+// a documented Upstash builtin (so we will not merge inside Lua), and for this
+// workload (one operator re-importing their own data) two same-handle writes
+// never interleave. See mergeNumerator for the merge rules.
 //
 // SECURITY: persists ONLY the derived ImportedEntry / ImportHistoryPoint
 // shapes. Every value written below is an explicit JSON.stringify of a typed
@@ -18,6 +24,7 @@
 
 import type { Redis } from "@upstash/redis";
 import type { ImportedEntry } from "@/lib/data";
+import { mergeNumerator } from "@/lib/server/burnStore/mergeNumerator";
 import type {
   BurnStore,
   ImportHistoryPoint,
@@ -78,6 +85,7 @@ function projectEntry(e: ImportedEntry): ImportedEntry {
     breakdown: e.breakdown ?? [],
   };
   if (e.fixes !== undefined) stored.fixes = e.fixes;
+  if (e.fixesSource !== undefined) stored.fixesSource = e.fixesSource;
   if (e.ves !== undefined) stored.ves = e.ves;
   if (e.trendDir !== undefined) stored.trendDir = e.trendDir;
   if (e.trendPct !== undefined) stored.trendPct = e.trendPct;
@@ -85,15 +93,20 @@ function projectEntry(e: ImportedEntry): ImportedEntry {
   return stored;
 }
 
-// Hydrate one entry read from Redis. Blobs may predate A.1 (no toolsUsed) or
-// the B cycle (no breakdown). Coerce both missing values to `[]` before the
-// entry hits any UI consumer or filter path.
+// Hydrate one entry read from Redis. Blobs may predate A.1 (no toolsUsed), the
+// B cycle (no breakdown), or the VES provenance field (no fixesSource). Coerce
+// the arrays to `[]`, and backfill fixesSource="cli" when a numerator is
+// present without a source so the precedence merge ranks legacy rows as CLI.
+// Keep in lockstep with fileStore and memoryStore.
 function hydrateEntry(e: ImportedEntry): ImportedEntry {
-  if (Array.isArray(e.toolsUsed) && Array.isArray(e.breakdown)) return e;
+  const needsArrays = !Array.isArray(e.toolsUsed) || !Array.isArray(e.breakdown);
+  const needsSource = e.fixes != null && e.fixesSource == null;
+  if (!needsArrays && !needsSource) return e;
   return {
     ...e,
     toolsUsed: Array.isArray(e.toolsUsed) ? e.toolsUsed : [],
     breakdown: Array.isArray(e.breakdown) ? e.breakdown : [],
+    ...(needsSource ? { fixesSource: "cli" as const } : {}),
   };
 }
 
@@ -118,24 +131,37 @@ export class RedisBurnStore implements BurnStore {
   // point — one atomic Lua EVAL (see UPSERT_LUA). Returns the full leaderboard
   // (newest first) read back after the write.
   async upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
-    const isWeek = entry.period === "week" && entry.since != null;
-    const weekKey = isWeek ? (entry.since as string) : "";
+    // Precedence-merge the VES numerator against the stored card BEFORE the
+    // atomic write. This read-merge happens in TS (HGET → mergeNumerator), not
+    // inside Lua — see the CONCURRENCY note at the top of this file. Only the
+    // numerator (fixes/fixesSource) is merged; the merged blob then flows into
+    // the SAME unchanged Lua EVAL, which still pairs leaderboard + history
+    // writes indivisibly.
+    const stored = await this.#redis.hget<ImportedEntry>(
+      LEADERBOARD_KEY,
+      entry.handle,
+    );
+    const existing = stored == null ? undefined : hydrateEntry(stored);
+    const merged: ImportedEntry = { ...entry, ...mergeNumerator(existing, entry) };
+
+    const isWeek = merged.period === "week" && merged.since != null;
+    const weekKey = isWeek ? (merged.since as string) : "";
     // Build the history point as a typed object — never spread `entry`.
     const point: ImportHistoryPoint | null = isWeek
       ? {
-          handle: entry.handle,
+          handle: merged.handle,
           weekKey,
-          totalTokens: entry.totalTokens,
-          importedAt: entry.importedAt,
+          totalTokens: merged.totalTokens,
+          importedAt: merged.importedAt,
         }
       : null;
 
     await this.#redis.eval(
       UPSERT_LUA,
-      [LEADERBOARD_KEY, histKey(entry.handle)],
+      [LEADERBOARD_KEY, histKey(merged.handle)],
       [
-        entry.handle,
-        JSON.stringify(projectEntry(entry)),
+        merged.handle,
+        JSON.stringify(projectEntry(merged)),
         isWeek ? "1" : "0",
         weekKey,
         point == null ? "" : JSON.stringify(point),
