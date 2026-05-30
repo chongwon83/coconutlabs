@@ -145,3 +145,103 @@ export function groupRepos(
   ungrouped.sort();
   return { groups, ungrouped, skipped };
 }
+
+// ── single-repo orphan path ───────────────────────────────────────────────────
+//
+// groupRepos only emits a group for a parent holding >= threshold repos, so a
+// developer with one repo (or several repos each under a distinct parent) gets
+// groups:[] — and the grant UI, gated on having cards, never appeared, leaving
+// their VES permanently 0.0/Pending. The helpers below make that path reachable
+// while preserving the "conservative undercount, never overcount" invariant.
+
+/** Shape one repo cwd into a grantable group using the REPO-AS-ROOT model: the
+ *  user grants the project folder itself and we count that one repo as the root
+ *  (tighter grant than the parent-grant the multi-repo `groups` use, and matches
+ *  the "grant your project folder" mental model). Feeds createFsaFs(root) /
+ *  countCommits(repos) identically to a `groups` entry.
+ *
+ *  DEFENSIVE: returns null unless `repoPath` cleans to an absolute POSIX path
+ *  other than "/". "/" has no grantable folder (Chrome blocks granting the
+ *  filesystem root — the $HOME-collapse hazard); a non-absolute value is not a
+ *  cwd we can map to a handle. We do NOT assume the caller pre-normalized.
+ *  PURE. */
+export function singleRepoGroup(repoPath: string): RepoGroup | null {
+  if (!repoPath || !repoPath.startsWith("/")) return null;
+  const clean = cleanPosix(repoPath);
+  if (clean === "/") return null;
+  return { root: clean, rootName: posixBasename(clean), repos: [clean] };
+}
+
+/** The grant cards to offer after a scan. Groups-first: when the scan found
+ *  groupable parents we offer ONLY those (the multi-repo flow is unchanged, and
+ *  a "count a single repo too" affordance is deliberately deferred). When there
+ *  are no groups — the single-repo developer — synthesize one card per
+ *  discovered repo so VES counting is reachable. Un-grantable entries (e.g. a
+ *  literal "/") drop out. PURE. */
+export function grantCards(result: GroupReposResult): RepoGroup[] {
+  if (result.groups.length > 0) return result.groups;
+  return result.ungrouped
+    .map(singleRepoGroup)
+    .filter((g): g is RepoGroup => g !== null);
+}
+
+export interface GrantResolution {
+  /** True → use `group`; false → show `message` and let the user re-pick. */
+  ok: boolean;
+  /** The group to count over (the original, or a single-repo group re-rooted at
+   *  a real ancestor of the logged cwd). Present iff ok. */
+  group?: RepoGroup;
+  /** Why the picked folder was rejected. Present iff !ok. */
+  message?: string;
+}
+
+/** Walk UP from `cwd` and return the absolute path of the nearest STRICT
+ *  ancestor directory whose basename === name, or null. "/" is never returned
+ *  (no grantable filesystem root). Pure. */
+function ancestorByBasename(cwd: string, name: string): string | null {
+  let p = posixDirname(cleanPosix(cwd)); // start at the parent (strict ancestor)
+  while (p !== "/") {
+    if (posixBasename(p) === name) return p;
+    const parent = posixDirname(p);
+    if (parent === p) break;
+    p = parent;
+  }
+  return null;
+}
+
+/** Decide which group a just-granted folder should count over. The picker hands
+ *  back only the folder's `name`, so we verify it before walking it.
+ *
+ *  - Exact match (name === group.rootName): use the group as-is (the common
+ *    case for both multi-repo groups and a single-repo card granted directly).
+ *  - Single-repo card, name mismatch: the synthesized card may have named a
+ *    NESTED subdir of the repo (the captured cwd sat below the repo root). Allow
+ *    re-rooting — but ONLY onto a real ANCESTOR of the logged cwd, and keep
+ *    `repos` as the original cwd so findRoot walks up to that ancestor inside the
+ *    grant. This recovers the nested-cwd case WITHOUT letting the user re-root
+ *    onto an unrelated folder: counting a different repo's commits against this
+ *    cwd's AI-spend would inflate VES (a gaming path). Non-ancestor → reject.
+ *  - Multi-repo group, name mismatch: re-rooting would drop the child repo names
+ *    we resolve under the grant, so keep the strict check and tell the user
+ *    which folder to grant.
+ *
+ *  PURE — the form does the actual createFsaFs/count with the returned group. */
+export function resolveGrant(group: RepoGroup, pickedName: string): GrantResolution {
+  if (pickedName === group.rootName) return { ok: true, group };
+
+  if (group.repos.length === 1) {
+    const cwd = group.repos[0];
+    const ancestor = ancestorByBasename(cwd, pickedName);
+    if (ancestor !== null) {
+      return { ok: true, group: { root: ancestor, rootName: pickedName, repos: [cwd] } };
+    }
+  }
+
+  return {
+    ok: false,
+    message:
+      `You picked "${pickedName}". Grant your project or repository root — ` +
+      `the folder named "${group.rootName}" (or a folder above it that contains it) ` +
+      `— to count its commits.`,
+  };
+}

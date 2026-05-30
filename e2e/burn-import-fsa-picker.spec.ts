@@ -237,6 +237,55 @@ function injectGroupablePicker(jsonl: string) {
   };
 }
 
+/**
+ * Stub showDirectoryPicker with a projects handle holding ONE project dir whose
+ * claude slug decodes to a single repo under a parent that no sibling shares
+ * ("-Users-e2e-work-soloRepo" → /Users/e2e/work/soloRepo). groupRepos() then
+ * yields groups:[] (one repo < the default threshold of 2) and
+ * ungrouped:[/Users/e2e/work/soloRepo].
+ *
+ * This is the SINGLE-REPO ORPHAN regression net (PR1). Before the grantCards()
+ * fix the Step 3 render gate was `repoGroups.length > 0`, so a groups:[] scan
+ * left a solo developer with NO grant card and a permanently 0.0/Pending VES —
+ * the core bug. With grantCards() the ungrouped repo is synthesized into one
+ * repo-as-root card, so the numerator step must now surface for the single repo
+ * too. The count itself needs a real .git tree (unit-tested in gitcount.test.ts);
+ * this only pins that the card RENDERS.
+ */
+function injectSingleRepoPicker(jsonl: string) {
+  return async ({ jsonl: content }: { jsonl: string }) => {
+    const slug = "-Users-e2e-work-soloRepo";
+    const fakeProj = {
+      name: slug,
+      kind: "directory",
+      queryPermission: async () => "granted",
+      requestPermission: async () => "granted",
+      entries: async function* () {
+        yield [
+          "session-2026-05-15.jsonl",
+          {
+            name: "session-2026-05-15.jsonl",
+            kind: "file",
+            getFile: async () =>
+              new File([content], "session-2026-05-15.jsonl", { type: "text/plain" }),
+          },
+        ];
+      },
+    };
+    const fakeProjectsHandle = {
+      name: "projects",
+      kind: "directory",
+      queryPermission: async () => "granted",
+      requestPermission: async () => "granted",
+      entries: async function* () {
+        yield [slug, fakeProj];
+      },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).showDirectoryPicker = async () => fakeProjectsHandle;
+  };
+}
+
 /** Stub browser's showDirectoryPicker with a handle that has the wrong name. */
 function injectRejectPicker() {
   return () => {
@@ -436,6 +485,64 @@ test.describe("FSA burn import — picker flow", () => {
       await expect(grant).toBeVisible();
       // The absolute parent path is shown only as a local hint, never uploaded.
       await expect(page.getByText("/Users/e2e/work")).toBeVisible();
+
+      // "Scan again" tears the numerator UI back down (resetNumerator).
+      await page.getByRole("button", { name: "Scan again" }).click();
+      await expect(page.getByText("Count verified commits")).toHaveCount(0);
+    },
+  );
+
+  // ── Single-repo orphan: groups:[] still surfaces a grant card (PR1) ──────────
+
+  test(
+    "scan with a single repo (no group) still surfaces the Step 3 numerator grant card",
+    async ({ page }) => {
+      await page.addInitScript(injectFakeHandlesIDB());
+      await page.addInitScript(injectSingleRepoPicker(FIXTURE_JSONL), {
+        jsonl: FIXTURE_JSONL,
+      });
+      await page.route("**/api/internal/issue-collector-token", async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ token: "test-token-for-e2e" }),
+        });
+      });
+      await page.route("**/api/burnindex", async (route) => {
+        if (route.request().method() !== "POST") {
+          await route.continue();
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ entries: [] }),
+        });
+      });
+
+      await page.goto("/?auto-detect=1");
+      await expect(page.locator(".modal-overlay")).toBeVisible({ timeout: 2_000 });
+      await page
+        .getByRole("button", { name: "Select .claude/projects folder" })
+        .click();
+      await expect(page.getByRole("button", { name: /✓ projects/ })).toBeVisible({
+        timeout: 5_000,
+      });
+      await page.getByRole("button", { name: "Scan & preview" }).click();
+      await expect(
+        page.getByRole("button", { name: "Upload to leaderboard" }),
+      ).toBeVisible({ timeout: 15_000 });
+
+      // The lone slug decodes to /Users/e2e/work/soloRepo → groups:[] (below the
+      // threshold). PRE-PR1 this left NO card; the synthesized repo-as-root card
+      // must now appear with a SINGULAR "count 1 repo" label (not "repos").
+      await expect(page.getByText("Count verified commits")).toBeVisible();
+      const grant = page.getByRole("button", {
+        name: /Grant\s+soloRepo\/\s+—\s+count\s+1\s+repo(?!s)/,
+      });
+      await expect(grant).toBeVisible();
+      // The repo-as-root absolute path is shown only as a local hint, never uploaded.
+      await expect(page.getByText("/Users/e2e/work/soloRepo")).toBeVisible();
 
       // "Scan again" tears the numerator UI back down (resetNumerator).
       await page.getByRole("button", { name: "Scan again" }).click();

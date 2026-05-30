@@ -11,7 +11,13 @@ import { saveHandle, loadHandle, ensurePermission } from "@/lib/client/burn/hand
 import { loadOrCreateSalt, importSalt } from "@/lib/client/burn/hashing";
 import { runImport, type RunImportArgs } from "@/lib/client/burn/import";
 import type { Period } from "@/lib/client/burn/collect";
-import { groupRepos, type RepoGroup } from "@/lib/client/burn/repoGroups";
+import {
+  groupRepos,
+  grantCards,
+  resolveGrant,
+  type RepoGroup,
+  type GroupReposResult,
+} from "@/lib/client/burn/repoGroups";
 import { countCommits, discoverAuthors, createFsaFs } from "@/lib/client/burn/gitcount";
 import {
   makeAutoDetectStartedEvent,
@@ -125,7 +131,10 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
   // re-grant, scan reset) bumps it; a count whose token is stale when it resolves
   // must NOT reattach — it was computed for a since-superseded author/repo set.
   const countGenRef = useRef(0);
-  const [repoGroups, setRepoGroups] = useState<RepoGroup[]>([]);
+  // Full scan result (groups + ungrouped), not just `.groups`: a single-repo
+  // developer produces groups:[] and must still reach the grant step via the
+  // synthesized single cards in `grantCards` (else their VES stays 0.0/Pending).
+  const [repoScan, setRepoScan] = useState<GroupReposResult | null>(null);
   const [reposHandle, setReposHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [activeGroup, setActiveGroup] = useState<RepoGroup | null>(null);
   const [authorChips, setAuthorChips] = useState<string[]>([]); // candidate emails to offer
@@ -139,7 +148,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
   function resetNumerator() {
     rawCwdsRef.current = [];
     countGenRef.current++; // invalidate any in-flight count
-    setRepoGroups([]);
+    setRepoScan(null);
     setReposHandle(null);
     setActiveGroup(null);
     setAuthorChips([]);
@@ -367,7 +376,9 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
       const result = await runImport(args);
       setFsaEnvelope(result);
       // C2: group the captured cwds by parent folder for a single-grant prompt.
-      setRepoGroups(groupRepos(rawCwdsRef.current).groups);
+      // Keep the FULL result — grantCards() falls back to synthesized single-repo
+      // cards when no parent reaches the grouping threshold (the orphan path).
+      setRepoScan(groupRepos(rawCwdsRef.current));
     } catch (e) {
       const bucket = durationTimerRef.current?.() ?? "0-1m";
       sendTelemetryEvent(makeAutoDetectFailedEvent(bucket, "parse_failed", "parse"));
@@ -446,20 +457,28 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
       );
       return;
     }
-    if (h.name !== group.rootName) {
+    // Verify the picked folder against the group. For a single-repo card whose
+    // synthesized name was a nested subdir, resolveGrant re-roots onto a real
+    // ANCESTOR of the logged cwd (recovering the nested-cwd case) — but rejects
+    // an unrelated folder, which could count a different repo's commits and
+    // inflate VES. Multi-repo groups keep the strict name check.
+    const resolution = resolveGrant(group, h.name);
+    if (!resolution.ok || !resolution.group) {
       setNumeratorError(
-        `You picked "${h.name}". Grant the folder named "${group.rootName}" (${group.root}) to count its repos.`,
+        resolution.message ??
+          `You picked "${h.name}". Grant the folder named "${group.rootName}" (${group.root}) to count its repos.`,
       );
       return;
     }
+    const grantedGroup = resolution.group;
     // A (re)grant changes the repo set under the count → invalidate any prior
     // numerator before discovering the new identity set.
     clearCount();
     setReposHandle(h);
-    setActiveGroup(group);
+    setActiveGroup(grantedGroup);
     // Best-effort persistence (non-fatal, mirrors pickFolder Invariant #5).
     saveHandle("repos", h).catch(() => {});
-    await runDiscoverAuthors(h, group);
+    await runDiscoverAuthors(h, grantedGroup);
   }
 
   // C3 — surface candidate author emails for the chip picker: locally configured
@@ -533,7 +552,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
       if (countGenRef.current !== gen) return;
       if (count === null) {
         setNumeratorError(
-          "Couldn't verify commits in those repos (shallow clone, unreadable history, or no commits by the selected author in this period). Your upload will skip the commit count.",
+          "Couldn't verify commits there (no git history under the folder you granted — try granting your repository root, the one with .git — or a shallow clone, or no commits by the selected author in this period). Your upload will skip the commit count and your VES stays Pending.",
         );
         return;
       }
@@ -683,6 +702,11 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
     );
   }
 
+  // Grant cards for the VES count step: the scan's groups, or — when no parent
+  // reached the grouping threshold (the single-repo developer) — one synthesized
+  // card per discovered repo, so the count step is reachable rather than hidden.
+  const repoCards = repoScan ? grantCards(repoScan) : [];
+
   if (autoDetect) {
     return (
       <div className="form-card">
@@ -780,25 +804,29 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
           <>
             <BurnIndexPreviewCard envelope={fsaEnvelope} />
 
-            {/* Step 3 (optional) — VES browser numerator. Only shown when the
-                scan found a groupable set of repos. Counting is entirely local;
-                only the resulting integer count joins the upload. */}
-            {repoGroups.length > 0 && !showSuccess && (
+            {/* Step 3 (optional) — VES browser numerator. Shown whenever the scan
+                surfaced any grantable repo — a multi-repo parent group OR a
+                single discovered repo. Counting is entirely local; only the
+                resulting integer count joins the upload. */}
+            {repoCards.length > 0 && !showSuccess && (
               <div className="form-step form-fsa-numerator">
                 <div className="form-step-label">
                   Step 3 · Count verified commits{" "}
                   <span className="form-note">(optional — sharpens your VES)</span>
                 </div>
                 <p className="form-step-desc">
-                  Grant read access to the folder holding your repos so we can
-                  count your own commits in this period — entirely in your
-                  browser. Nothing about your code or file paths leaves this
-                  page; only the commit count is added to your upload.
+                  Grant read access to your project or repository root folder
+                  (the one holding your <code>.git</code>) so we can count your
+                  own commits in this period — entirely in your browser. If we
+                  can&apos;t find git history under what you grant, your VES just
+                  stays Pending — we never guess a number. Nothing about your
+                  code or file paths leaves this page; only the commit count is
+                  added to your upload.
                 </p>
 
                 {!activeGroup ? (
                   <div className="form-fsa-repo-grants">
-                    {repoGroups.slice(0, 3).map((g) => (
+                    {repoCards.slice(0, 3).map((g) => (
                       <div key={g.root} className="form-fsa-repo-grant">
                         <button
                           type="button"

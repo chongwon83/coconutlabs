@@ -12,7 +12,13 @@
 //   - output shape feeds createFsaFs(root) / countCommits(repos) directly.
 
 import { describe, it, expect } from "vitest";
-import { groupRepos, normalizeRaw } from "@/lib/client/burn/repoGroups";
+import {
+  groupRepos,
+  normalizeRaw,
+  singleRepoGroup,
+  grantCards,
+  resolveGrant,
+} from "@/lib/client/burn/repoGroups";
 
 const codex = (raw: string) => ({ raw, source: "codex" as const });
 const claude = (raw: string) => ({ raw, source: "claude" as const });
@@ -169,5 +175,167 @@ describe("groupRepos — deterministic ordering", () => {
 
   it("returns empty results for no inputs", () => {
     expect(groupRepos([])).toEqual({ groups: [], ungrouped: [], skipped: [] });
+  });
+});
+
+// ── PR1: single-repo orphan fix ───────────────────────────────────────────────
+//
+// A developer with no parent holding >= threshold(2) repos gets groups:[], so
+// the form's grant step (gated on grantCards(scan).length > 0) never showed and
+// their VES stayed permanently 0.0/Pending. These three pure helpers make the
+// single-repo path reachable AND keep it honest:
+//   - singleRepoGroup: one cwd → a grantable REPO-AS-ROOT group (grant the
+//     project folder itself, count it as the root). Defensive: null unless the
+//     path is absolute POSIX and not "/".
+//   - grantCards: groups-first (multi-repo flow unchanged); only synthesize
+//     single cards when there are NO groups (the orphan case).
+//   - resolveGrant: basename-mismatch fallback bounded to a REAL ANCESTOR of the
+//     logged cwd — so a nested-cwd grant recovers, but a user can never re-root
+//     onto an unrelated repo (which would count commits that don't match the
+//     AI-spend cwd → inflated VES, a gaming path).
+
+describe("singleRepoGroup — one cwd → a grantable repo-as-root group", () => {
+  it("turns a normal repo cwd into a group rooted at the repo itself", () => {
+    expect(singleRepoGroup("/Users/me/work/repoA")).toEqual({
+      root: "/Users/me/work/repoA",
+      rootName: "repoA",
+      repos: ["/Users/me/work/repoA"],
+    });
+  });
+
+  it("uses the cwd's own basename as rootName (caller grants the project folder)", () => {
+    // A cwd that is actually a nested subdir is taken at face value here — it is
+    // resolveGrant's job (not this pure shaper's) to recover the real repo root
+    // when the user grants an ancestor.
+    expect(singleRepoGroup("/Users/me/repoA/src/components")).toEqual({
+      root: "/Users/me/repoA/src/components",
+      rootName: "components",
+      repos: ["/Users/me/repoA/src/components"],
+    });
+  });
+
+  it("normalizes a trailing/duplicate slash", () => {
+    expect(singleRepoGroup("/Users/me/work/repoA/")).toEqual({
+      root: "/Users/me/work/repoA",
+      rootName: "repoA",
+      repos: ["/Users/me/work/repoA"],
+    });
+  });
+
+  it("grants a repo directly under '/' AS ITSELF (not '/', which Chrome blocks)", () => {
+    // groupRepos rejects parent "/" → such a repo lands in ungrouped; as a
+    // single-repo card it is grantable as the repo folder itself.
+    expect(singleRepoGroup("/repoA")).toEqual({
+      root: "/repoA",
+      rootName: "repoA",
+      repos: ["/repoA"],
+    });
+  });
+
+  it("returns null for the filesystem root and the empty string", () => {
+    expect(singleRepoGroup("/")).toBeNull();
+    expect(singleRepoGroup("")).toBeNull();
+    expect(singleRepoGroup("///")).toBeNull();
+  });
+
+  it("returns null for a non-absolute path (defensive — never trust the caller)", () => {
+    expect(singleRepoGroup("foo")).toBeNull();
+    expect(singleRepoGroup("relative/path")).toBeNull();
+    expect(singleRepoGroup("C:\\Users\\me\\repo")).toBeNull();
+  });
+});
+
+describe("grantCards — groups-first, synthesize singles only when no groups", () => {
+  it("returns groups verbatim when any exist (multi-repo flow unchanged, no singles)", () => {
+    const group = { root: "/Users/me/work", rootName: "work", repos: ["/Users/me/work/a", "/Users/me/work/b"] };
+    const cards = grantCards({ groups: [group], ungrouped: ["/Users/me/solo/only"], skipped: [] });
+    expect(cards).toEqual([group]);
+  });
+
+  it("synthesizes one single-repo card per ungrouped repo when there are NO groups", () => {
+    const cards = grantCards({
+      groups: [],
+      ungrouped: ["/Users/me/work/repoA", "/Users/me/solo/repoB"],
+      skipped: [],
+    });
+    expect(cards).toEqual([
+      { root: "/Users/me/work/repoA", rootName: "repoA", repos: ["/Users/me/work/repoA"] },
+      { root: "/Users/me/solo/repoB", rootName: "repoB", repos: ["/Users/me/solo/repoB"] },
+    ]);
+  });
+
+  it("filters out an ungrouped entry that has no grantable folder (a literal '/')", () => {
+    expect(grantCards({ groups: [], ungrouped: ["/"], skipped: [] })).toEqual([]);
+  });
+
+  it("returns [] when there is nothing to grant", () => {
+    expect(grantCards({ groups: [], ungrouped: [], skipped: [] })).toEqual([]);
+  });
+
+  it("end-to-end: a single discovered repo flows groupRepos → grantCards → one card", () => {
+    // The regression that broke single-repo devs: groupRepos returns groups:[]
+    // for one repo, and the OLD form kept only .groups → no card → no VES.
+    const scan = groupRepos([{ raw: "/Users/me/work/repoA", source: "codex" }]);
+    expect(scan.groups).toEqual([]); // pins the orphan condition
+    expect(grantCards(scan)).toEqual([
+      { root: "/Users/me/work/repoA", rootName: "repoA", repos: ["/Users/me/work/repoA"] },
+    ]);
+  });
+});
+
+describe("resolveGrant — basename-mismatch fallback bounded to a real ancestor", () => {
+  const singleNested = {
+    root: "/Users/me/repoA/src/components",
+    rootName: "components",
+    repos: ["/Users/me/repoA/src/components"],
+  };
+  const multi = {
+    root: "/Users/me/work",
+    rootName: "work",
+    repos: ["/Users/me/work/a", "/Users/me/work/b"],
+  };
+
+  it("accepts an exact basename match and keeps the original group", () => {
+    const g = { root: "/a/repoA", rootName: "repoA", repos: ["/a/repoA"] };
+    expect(resolveGrant(g, "repoA")).toEqual({ ok: true, group: g });
+  });
+
+  it("re-roots a single-repo grant onto a REAL ANCESTOR of the logged cwd", () => {
+    // Card named the nested subdir "components/", but the user (correctly) grants
+    // the repo root "repoA/". repoA IS an ancestor of the cwd → allowed; repos
+    // stays the original cwd so findRoot walks up to repoA inside the grant.
+    expect(resolveGrant(singleNested, "repoA")).toEqual({
+      ok: true,
+      group: {
+        root: "/Users/me/repoA",
+        rootName: "repoA",
+        repos: ["/Users/me/repoA/src/components"],
+      },
+    });
+  });
+
+  it("REJECTS a single-repo grant onto a non-ancestor folder (anti-gaming guard)", () => {
+    // "Downloads" is not on the path from / down to the logged cwd. Re-rooting
+    // there could count an unrelated repo's commits → inflated VES. Reject.
+    const res = resolveGrant(singleNested, "Downloads");
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain("Downloads");
+  });
+
+  it("does NOT re-root a multi-repo group on mismatch (strict check preserved)", () => {
+    const res = resolveGrant(multi, "Downloads");
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain("Downloads");
+  });
+
+  it("accepts an exact match on a multi-repo group", () => {
+    expect(resolveGrant(multi, "work")).toEqual({ ok: true, group: multi });
+  });
+
+  it("never re-roots onto '/' even if a path segment basename were empty", () => {
+    // A repo directly under root: cwd "/repoA", grant something that is not an
+    // ancestor → reject (there is no grantable ancestor above "/repoA").
+    const single = { root: "/repoA", rootName: "repoA", repos: ["/repoA"] };
+    expect(resolveGrant(single, "Users").ok).toBe(false);
   });
 });
