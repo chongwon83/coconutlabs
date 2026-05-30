@@ -1724,6 +1724,11 @@ textarea.form-input {
 
 /* Nav v3 */
 .nav-v3 { position: sticky; top: 0; z-index: 30; background: #FFFFFF; border-bottom: 1px solid var(--border); }
+/* Bar/border stay full-bleed; constrain contents to the same content column as
+   .status-bar-inner (above) and .hero-inner (below) so logo + CTA align to the
+   page grid instead of the viewport edges. Scoped to nav-v3 to leave the legacy
+   .nav-inner (line ~130) untouched. */
+.nav-v3 .nav-inner { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter); }
 .nav-logo { font-weight: 600; font-size: 14px; color: var(--fg); letter-spacing: -0.01em; text-decoration: none; }
 .nav-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
