@@ -56,6 +56,8 @@ import {
   planFromFile,
   buildFileState,
   writeFileState,
+  clearClaim,
+  isMigrationComplete,
   type RedisLike,
 } from "@/lib/server/burnStore/migrateExec";
 
@@ -187,8 +189,12 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function snapshotDirFor(prefix: string): string {
+  return resolve(`./tmp/${prefix}-${nowIso().replace(/[:.]/g, "-")}`);
+}
+
 function autoSnapshotDir(): string {
-  return resolve(`./tmp/migrate-pre-${nowIso().replace(/[:.]/g, "-")}`);
+  return snapshotDirFor("migrate-pre");
 }
 
 async function dryRun(target: Target): Promise<void> {
@@ -202,6 +208,18 @@ async function dryRun(target: Target): Promise<void> {
   }
 }
 
+// H1 re-apply guard: once the migration is complete (no raw aliases left to
+// collapse), a re-run only (re)writes legacy-locks — which would CLOBBER a
+// deliberately-cleared claim (Gate B owner self-reclaim). Refuse unless forced.
+function reapplyBlockedMessage(): string {
+  return (
+    "[migrate] BLOCKED: migration already complete (zero raw aliases to collapse). " +
+    "Re-applying would only (re)write legacy-locks and could CLOBBER a deliberately-cleared " +
+    "claim (Gate B owner self-reclaim). Set MIGRATE_FORCE=1 to override — only if you are SURE " +
+    "no claim was intentionally cleared."
+  );
+}
+
 async function apply(target: Target): Promise<void> {
   if (process.env.MIGRATE_APPROVED !== "1") {
     console.error(
@@ -209,15 +227,20 @@ async function apply(target: Target): Promise<void> {
     );
     process.exit(1);
   }
-  const snapDir = autoSnapshotDir();
-  mkdirSync(snapDir, { recursive: true });
 
   if (target === "redis") {
     const redis = makeRedis();
+    const plan = await planFromRedis(asRedisLike(redis));
+    if (isMigrationComplete(plan) && process.env.MIGRATE_FORCE !== "1") {
+      console.error(reapplyBlockedMessage());
+      process.exit(1);
+    }
+
+    const snapDir = autoSnapshotDir();
+    mkdirSync(snapDir, { recursive: true });
     // Auto-snapshot the full blast radius BEFORE any write.
     writeRedisSnapshot(join(snapDir, "redis-snapshot.json"), await snapshotRedis(redis));
 
-    const plan = await planFromRedis(asRedisLike(redis));
     console.log(renderPlan(plan).join("\n"));
     const ops = planRedisOps(plan);
     console.log(`\n[migrate] executing ${ops.length} redis ops...`);
@@ -225,13 +248,83 @@ async function apply(target: Target): Promise<void> {
     console.log(`[migrate] redis apply complete. Restore with: --restore ${join(snapDir, "redis-snapshot.json")} redis`);
   } else {
     const cwd = process.cwd();
+    const { plan, snapshot } = await planFromFile(cwd);
+    if (isMigrationComplete(plan) && process.env.MIGRATE_FORCE !== "1") {
+      console.error(reapplyBlockedMessage());
+      process.exit(1);
+    }
+
+    const snapDir = autoSnapshotDir();
+    mkdirSync(snapDir, { recursive: true });
     snapshotFile(snapDir); // auto-snapshot .data
 
-    const { plan, snapshot } = await planFromFile(cwd);
     console.log(renderPlan(plan).join("\n"));
     const state = buildFileState(plan, snapshot, nowIso());
     await writeFileState(cwd, state);
     console.log(`[migrate] .data apply complete. Restore with: --restore ${snapDir} file`);
+  }
+}
+
+// ── Gate B: --clear-claim <handle> (owner self-reclaim, redis only) ────────────
+//
+// Clears ONE legacy-locked claim so the owner's first post-flip browser upload
+// mints the claim from their own token (201) and owns the row going forward. The
+// card + history are untouched (clearClaim HDELs only the CLAIMS_KEY field). Gated
+// by double-entry: CLEAR_CLAIM_APPROVED must canonical-match the --clear-claim arg
+// (prevents clearing the wrong row), and auto-snapshots the full
+// claims+leaderboard+hist blast radius first.
+async function clearClaimCmd(handle: string | undefined, target: Target): Promise<void> {
+  if (!handle) usage();
+  if (target !== "redis") {
+    console.error("[clear-claim] redis only (prod Upstash claims hash); the file store is not supported");
+    process.exit(1);
+  }
+  // DOUBLE-ENTRY confirmation (closes the no-allowlist hazard): the approval env
+  // must NAME the same canonical handle passed to --clear-claim, so a single
+  // fat-fingered CLI arg (e.g. `mpapa` instead of `chongwon83`) can never clear
+  // the wrong row. Both sides are canonicalized before compare.
+  const approved = canonicalHandle(process.env.CLEAR_CLAIM_APPROVED ?? "");
+  const canonicalArg = canonicalHandle(handle);
+  if (approved == null || canonicalArg == null || approved !== canonicalArg) {
+    console.error(
+      "[clear-claim] BLOCKED: set CLEAR_CLAIM_APPROVED=<handle> in your shell (NOT .env) to the SAME " +
+        "handle you pass to --clear-claim, e.g.\n" +
+        "  CLEAR_CLAIM_APPROVED=chongwon83 ... --clear-claim chongwon83\n" +
+        "This double-entry prevents clearing the wrong row. It HDELs one legacy-locked claim so the " +
+        "owner can self-reclaim their row post-flip (Gate B).",
+    );
+    process.exit(1);
+  }
+
+  const redis = makeRedis();
+  // Auto-snapshot the full blast radius BEFORE the HDEL (restore safety-net).
+  const snapDir = snapshotDirFor("clear-claim-pre");
+  mkdirSync(snapDir, { recursive: true });
+  const snapPath = join(snapDir, "redis-snapshot.json");
+  writeRedisSnapshot(snapPath, await snapshotRedis(redis));
+
+  try {
+    const result = await clearClaim(asRedisLike(redis), handle);
+    console.log(
+      `[clear-claim] HDEL burn:claims:v1["${result.canonical}"] done — ` +
+        "was \"legacy-locked\", now ABSENT (owner self-reclaims on next upload).",
+    );
+    const remaining = Object.entries(result.after)
+      .map(([h, v]) => `${h}=${v}`)
+      .sort();
+    console.log(
+      `[clear-claim] remaining claims (${remaining.length}): ${remaining.join(", ") || "(none)"}`,
+    );
+    console.log(`[clear-claim] restore with: --restore ${snapPath} redis`);
+    console.log(
+      "[clear-claim] ⚠️  migration is COMPLETE — do NOT re-run --apply (now guarded by MIGRATE_FORCE). " +
+        "A post-clear --dry-run showing this handle as `migrate/legacy-lock` is EXPECTED (claim=none) — do NOT 'fix' it.",
+    );
+  } catch (err) {
+    // Pre-check / post-check refusal: NO mutation happened. The snapshot above is
+    // a harmless read-dump.
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
 }
 
@@ -251,6 +344,8 @@ function usage(): never {
       "  pnpm dlx tsx scripts/migrate-legacy-locks.ts --dry-run [redis|file]\n" +
       "  pnpm dlx tsx scripts/migrate-legacy-locks.ts --snapshot <path|dir> [redis|file]\n" +
       "  MIGRATE_APPROVED=1 pnpm dlx tsx scripts/migrate-legacy-locks.ts --apply [redis|file]\n" +
+      "    (refused once migration is complete — set MIGRATE_FORCE=1 to override)\n" +
+      "  CLEAR_CLAIM_APPROVED=<handle> pnpm dlx tsx scripts/migrate-legacy-locks.ts --clear-claim <handle>   (Gate B; redis only; env must match the handle arg)\n" +
       "  pnpm dlx tsx scripts/migrate-legacy-locks.ts --restore <path|dir> [redis|file]",
   );
   process.exit(1);
@@ -271,6 +366,9 @@ async function main(): Promise<void> {
       break;
     case "--apply":
       await apply(target);
+      break;
+    case "--clear-claim":
+      await clearClaimCmd(pathArg, target);
       break;
     case "--restore":
       if (!pathArg) usage();
