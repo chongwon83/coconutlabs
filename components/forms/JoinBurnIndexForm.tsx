@@ -28,6 +28,7 @@ import {
   type DurationBucket,
 } from "@/lib/client/burn/telemetry";
 import { fetchCollectorToken } from "@/lib/client/burn/token";
+import { loadOrCreateClaimToken } from "@/lib/client/burn/claimToken";
 
 interface JoinBurnIndexFormProps {
   onSuccess?: (msg: string) => void;
@@ -401,6 +402,20 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
     setFsaSubmitting(true);
     try {
       const raw = JSON.stringify(fsaEnvelope);
+      // Mint/load the per-handle claim token BEFORE the upload. If IDB is
+      // unavailable (private mode, blocked storage) we must NOT POST without it:
+      // a token-less upload either 400s (unclaimed) or mints a competing claim
+      // that locks the user out of their own re-upload. Abort with a clear msg.
+      let claimToken: string;
+      try {
+        claimToken = await loadOrCreateClaimToken(trimmed);
+      } catch {
+        setFsaError(
+          "Couldn't prepare your device claim — browser storage is blocked. " +
+            "Turn off private/incognito mode (or allow site storage) and retry.",
+        );
+        return;
+      }
       const burnToken = await fetchCollectorToken("burnindex");
       const res = await fetch("/api/burnindex", {
         method: "POST",
@@ -408,7 +423,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
           "Content-Type": "application/json",
           "Authorization": `Bearer ${burnToken}`,
         },
-        body: JSON.stringify({ handle: trimmed, raw }),
+        body: JSON.stringify({ handle: trimmed, raw, claimToken }),
       });
       const data: { entries?: ImportedEntry[]; error?: string } = await res
         .json()
@@ -637,6 +652,18 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
       // the manual-upload path on the same canonical-form contract as the
       // FSA path (lib/client/burn/import.ts also POSTs JSON.stringify).
       const canonicalRaw = JSON.stringify(envelope);
+      // Mint/load the per-handle claim token BEFORE the upload — same contract as
+      // the FSA path: never POST token-less (would 400 or mint a competing claim).
+      let claimToken: string;
+      try {
+        claimToken = await loadOrCreateClaimToken(trimmed);
+      } catch {
+        setError(
+          "Couldn't prepare your device claim — browser storage is blocked. " +
+            "Turn off private/incognito mode (or allow site storage) and retry.",
+        );
+        return;
+      }
       const burnToken = await fetchCollectorToken("burnindex");
       const res = await fetch("/api/burnindex", {
         method: "POST",
@@ -644,7 +671,7 @@ export function JoinBurnIndexForm({ onSuccess, onImport, onClose }: JoinBurnInde
           "Content-Type": "application/json",
           "Authorization": `Bearer ${burnToken}`,
         },
-        body: JSON.stringify({ handle: trimmed, raw: canonicalRaw }),
+        body: JSON.stringify({ handle: trimmed, raw: canonicalRaw, claimToken }),
       });
       const data: { entries?: ImportedEntry[]; error?: string } = await res
         .json()
