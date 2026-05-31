@@ -18,6 +18,14 @@
 //
 // APPROVAL GATE: --apply requires BACKFILL_APPROVED=1 in the shell env (NOT .env).
 //
+// CLAIM-BYPASS GATE (A4, post-PR2): --apply and --restore HSET burn:leaderboard
+//   directly, bypassing the canonical-key + claim system. They refuse unless
+//   ALLOW_CLAIM_BYPASS=1 (shell env). A --restore of a pre-migration snapshot
+//   resurrects raw split rows; AFTER it, re-run migrate-legacy-locks.ts --apply
+//   to re-collapse them (do NOT feed this FLAT snapshot to migrate-legacy-
+//   locks.ts --restore — it expects a different shape and would del+crash). This
+//   gate exists so that footgun is never silent.
+//
 // ROLLBACK: --restore writes the snapshot file back to Redis. Keep the snapshot
 //           until the on-call window closes (typically 48h after backfill).
 //
@@ -62,6 +70,44 @@ function makeRedis(): Redis {
 }
 
 const LEADERBOARD_KEY = "burn:leaderboard";
+
+// Inline mirror of lib/server/handle.ts canonicalHandle — kept self-contained
+// (this script deliberately inlines its types to avoid Next.js path resolution).
+// Strips leading @(s), trims, lowercases, validates the GitHub-ish charset.
+const CANONICAL_HANDLE_RE = /^[a-z0-9](?:[a-z0-9-]{0,38})$/;
+function canonicalHandle(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const stripped = raw.trim().replace(/^@+/, "").toLowerCase();
+  return CANONICAL_HANDLE_RE.test(stripped) ? stripped : null;
+}
+
+// A4 guard: every write path here HSETs burn:leaderboard directly, bypassing the
+// canonical-key + claim system added in PR2 (route claimAndUpsert). Post-PR2
+// this is dangerous — a --restore of a PRE-migration snapshot resurrects raw
+// split rows (@Foo alongside canonical foo), undoing migrate-legacy-locks; any
+// write lands past the claim gate with no token check. Refuse unless the
+// operator sets ALLOW_CLAIM_BYPASS=1 (shell env, NOT .env) after reading this.
+function requireClaimBypass(command: string): void {
+  if (process.env.ALLOW_CLAIM_BYPASS === "1") {
+    console.warn(
+      `[backfill] ⚠ ALLOW_CLAIM_BYPASS=1 — ${command} writing past the PR2 ` +
+        `claim/canonical system. You own the canonical-key + claim consequences.`,
+    );
+    return;
+  }
+  console.error(
+    [
+      `[backfill] BLOCKED: ${command} bypasses the PR2 claim + canonical-key system.`,
+      "  • --restore of a pre-migration snapshot resurrects raw split rows",
+      "    (@Foo beside canonical foo) and undoes migrate-legacy-locks.",
+      "  • any write lands past the claim gate (no token verification).",
+      "  After a pre-migration --restore, re-run migrate-legacy-locks.ts --apply to re-collapse",
+      "  (do NOT pass this flat snapshot to migrate-legacy-locks.ts --restore — different shape).",
+      "  Set ALLOW_CLAIM_BYPASS=1 in your shell (NOT .env) only if you understand this.",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
 
 // --- Core synthesis logic (mirrors backfill-breakdown.test.ts) ---
 
@@ -158,6 +204,7 @@ async function apply(): Promise<void> {
     );
     process.exit(1);
   }
+  requireClaimBypass("--apply");
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
   const logPath = resolve(`./tmp/backfill-${ts}.log`);
@@ -190,6 +237,23 @@ async function apply(): Promise<void> {
 async function restore(snapshotPath: string): Promise<void> {
   const absPath = resolve(snapshotPath);
   const raw: Record<string, string> = JSON.parse(readFileSync(absPath, "utf-8"));
+
+  // Surface the resurrection risk BEFORE the bypass gate: how many snapshot keys
+  // are non-canonical (raw aliases the migration would have collapsed). The gate
+  // then refuses unless ALLOW_CLAIM_BYPASS=1.
+  const nonCanonical = Object.keys(raw).filter((k) => canonicalHandle(k) !== k);
+  if (nonCanonical.length > 0) {
+    console.warn(
+      `[backfill] ⚠ snapshot has ${nonCanonical.length} non-canonical key(s) ` +
+        `(e.g. ${nonCanonical.slice(0, 3).join(", ")}). Restoring re-introduces ` +
+        `raw split rows that migrate-legacy-locks collapsed. AFTER this restore, ` +
+        `re-run \`migrate-legacy-locks.ts --apply\` to re-collapse them. Do NOT pass ` +
+        `this FLAT {handle:blob} snapshot to migrate-legacy-locks.ts --restore — it ` +
+        `expects a rich {leaderboard,claims,hist} shape and would del+crash.`,
+    );
+  }
+  requireClaimBypass("--restore");
+
   const redis = makeRedis();
   // Merge-restore: HSET overwrites snapshot handles without DEL so entries
   // submitted after the snapshot are preserved (not lost). Codex P2 fix.
