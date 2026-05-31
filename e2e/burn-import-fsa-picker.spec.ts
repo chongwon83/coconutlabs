@@ -341,6 +341,8 @@ test.describe("FSA burn import — picker flow", () => {
       // fetch). Only intercept POSTs — let GETs pass through so the GET
       // doesn't crash the handler with a null postDataJSON body.
       let capturedRaw: string | null = null;
+      let capturedClaimToken: string | null = null;
+      let capturedReqHeaders: Record<string, string> = {};
       let postCount = 0;
       await page.route("**/api/burnindex", async (route) => {
         if (route.request().method() !== "POST") {
@@ -350,8 +352,11 @@ test.describe("FSA burn import — picker flow", () => {
         const body = route.request().postDataJSON() as {
           handle: string;
           raw: string;
+          claimToken?: string;
         };
         capturedRaw = body.raw;
+        capturedClaimToken = body.claimToken ?? null;
+        capturedReqHeaders = route.request().headers();
         postCount++;
         await route.fulfill({
           status: 200,
@@ -431,6 +436,23 @@ test.describe("FSA burn import — picker flow", () => {
           `"${forbidden}"`,
         );
       }
+
+      // ── PR2: claim token (browser-upload-with-token, real-IDB proof) ───────
+      // The upload must carry a per-handle claim token that loadOrCreateClaimToken
+      // minted with the real browser crypto.getRandomValues + btoa AND durably
+      // persisted via real IndexedDB (the unit tests defer this round-trip — no
+      // node IDB shim). It must match the server's isValidTokenFormat gate exactly
+      // (^[A-Za-z0-9_-]{43}$, lib/server/claim.ts) or the upload would 400 before
+      // the claim logic runs.
+      expect(capturedClaimToken).not.toBeNull();
+      expect(capturedClaimToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+
+      // I2 leak guard: the token is a BODY-only bearer secret. It must NOT ride
+      // any request header (the only Authorization header is the collector token,
+      // a different secret) nor the URL. A header/URL leak is the spec §2.10 line.
+      const headerBlob = JSON.stringify(capturedReqHeaders);
+      expect(headerBlob).not.toContain(capturedClaimToken!);
+      expect(page.url()).not.toContain(capturedClaimToken!);
     },
   );
 

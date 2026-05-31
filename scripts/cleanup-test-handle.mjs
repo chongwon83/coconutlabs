@@ -16,6 +16,14 @@
 //   2. DEL  burn:hist:<H>                   — weekly history hash
 //   3. LREM burn:challenges 0 <each-row>    — every ChallengeRecord whose
 //                                             handle === <H> (each round-trip)
+//   4. HDEL burn:claims:v1 <canonical(H)>   — the PR2 claim record, keyed by the
+//                                             CANONICAL handle. Without this a
+//                                             purged handle stays legacy-locked
+//                                             and can never be re-claimed.
+//
+// NOTE: keys 1-3 use the RAW handle (the pre-migration storage form). Key 4
+// (claims) is ALWAYS canonical. This script targets Upstash Redis only; the
+// local FileBurnStore's .data/claims.json is handled by migrate-legacy-locks.ts.
 //
 // DEFAULT DRY-RUN: writes happen ONLY with --apply. Without it the CLI prints
 // readback + "would HDEL/DEL/LREM" lines and exits 0.
@@ -33,7 +41,39 @@ import { Redis } from "@upstash/redis";
 // Mirror of redisStore.ts constants — keep in sync if either changes.
 const LEADERBOARD_KEY = "burn:leaderboard";
 const CHALLENGES_KEY = "burn:challenges";
+const CLAIMS_KEY = "burn:claims:v1";
 const histKey = (handle) => `burn:hist:${handle}`;
+
+// Inline mirror of lib/server/handle.ts canonicalHandle — this .mjs runs under
+// plain node and cannot import the TS module. Keep in sync. Strips leading @(s),
+// trims, lowercases, validates the GitHub-ish charset (NO underscore); returns
+// null when the handle cannot be canonicalized (→ no claim key can exist).
+const CANONICAL_HANDLE_RE = /^[a-z0-9](?:[a-z0-9-]{0,38})$/;
+function canonicalHandle(raw) {
+  if (typeof raw !== "string") return null;
+  const stripped = raw.trim().replace(/^@+/, "").toLowerCase();
+  return CANONICAL_HANDLE_RE.test(stripped) ? stripped : null;
+}
+
+// Inline mirror of lib/server/handle.ts displayFormFor — case-preserving, @-stripped.
+// Pre-migration leaderboard/hist could be keyed under this form (e.g. a user POSTed
+// "Foo" with no @, before canonicalization existed), so a full purge must sweep it
+// alongside the raw arg and the canonical key (codex finding: no-@ display residue).
+function displayFormFor(raw) {
+  return typeof raw === "string" ? raw.trim().replace(/^@+/, "") : "";
+}
+
+// Classify a claims value for display WITHOUT leaking it. The value is either
+// "legacy-locked" or "sha256-v1:<hex>" (a one-way hash of the token, not the
+// token itself — but we surface only the scheme to stay minimal-disclosure).
+function describeClaim(value) {
+  if (value == null) return "absent";
+  if (value === "legacy-locked") return "legacy-locked (handle frozen)";
+  if (typeof value === "string" && value.startsWith("sha256-")) {
+    return "ACTIVE claim (hashed token present)";
+  }
+  return "present (unrecognized scheme)";
+}
 
 // Reserved owner handle that does not require the extra confirmation prompt.
 // All other handles (including any future test bots) need an explicit --force
@@ -91,6 +131,7 @@ function usage() {
       "  1. HDEL burn:leaderboard <handle>",
       "  2. DEL  burn:hist:<handle>",
       "  3. LREM burn:challenges 0 <each-matching-row>",
+      "  4. HDEL burn:claims:v1 <canonical(handle)>  (PR2 claim record)",
       "",
       "Env required: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN",
       "Default: dry-run (no writes). Pass --apply to commit.",
@@ -128,26 +169,79 @@ function logEnvFingerprint() {
 // post-apply readback. Returns the three measured quantities so the caller
 // can both display and assert on them.
 async function readState(redis, handle) {
-  // HGET returns the stored entry value (object thanks to @upstash/redis JSON
-  // auto-parse) or null if the field is absent.
-  const entry = await redis.hget(LEADERBOARD_KEY, handle);
-  const histLen = await redis.hlen(histKey(handle));
-  // Read the whole challenges list and count handle matches. CHALLENGES_CAP is
-  // 500; pulling all is cheap enough for a one-off CLI and avoids subtle
-  // pagination bugs (LRANGE 0 -1 returns the full list).
+  const canonicalKey = canonicalHandle(handle);
+  // Sweep EVERY form the handle could be stored under: the raw arg (@Coconut-…),
+  // its @-stripped display form (Coconut-…, case preserved), AND its canonical
+  // key (coconut-…). Pre-migration, leaderboard/hist are keyed RAW — and "raw"
+  // historically meant any of those three (a user could POST "@Foo", "Foo", or
+  // "foo" before canonicalization existed). AFTER migrate-legacy-locks they are
+  // keyed CANONICAL. Targeting only the typed-raw form would leave a migrated
+  // canonical row (or a no-@ display row) behind while still HDEL'ing the
+  // canonical claim — a half-purge that falsely reports "clean" (codex finding).
+  // HDEL/DEL of an absent form is a harmless no-op, so we sweep the whole set.
+  const forms = [
+    ...new Set(
+      [handle, displayFormFor(handle), canonicalKey].filter(
+        (h) => h != null && h !== "",
+      ),
+    ),
+  ];
+  const leaderboard = {};
+  const histLen = {};
+  for (const f of forms) {
+    // HGET returns the stored entry value (object thanks to @upstash/redis JSON
+    // auto-parse) or null if the field is absent.
+    leaderboard[f] = await redis.hget(LEADERBOARD_KEY, f);
+    histLen[f] = await redis.hlen(histKey(f));
+  }
+  // Read the whole challenges list and count matches against ANY form.
+  // CHALLENGES_CAP is 500; pulling all is cheap enough for a one-off CLI and
+  // avoids subtle pagination bugs (LRANGE 0 -1 returns the full list).
   const allChallenges = await redis.lrange(CHALLENGES_KEY, 0, -1);
-  const matchingChallenges = allChallenges.filter((r) => r?.handle === handle);
-  return { entry, histLen, allChallenges, matchingChallenges };
+  const formSet = new Set(forms);
+  const matchingChallenges = allChallenges.filter((r) => formSet.has(r?.handle));
+  // PR2 claim record, ALWAYS keyed by the CANONICAL handle (null if
+  // uncanonicalizable, e.g. an underscore the canonical charset rejects → no
+  // claim can exist). The claim is canonical-only; never @-prefixed/raw.
+  const claim =
+    canonicalKey != null ? await redis.hget(CLAIMS_KEY, canonicalKey) : null;
+  return {
+    handle,
+    canonicalKey,
+    forms,
+    leaderboard,
+    histLen,
+    allChallenges,
+    matchingChallenges,
+    claim,
+  };
 }
 
-function fmtState(label, state, handle) {
-  const present = state.entry != null ? "PRESENT" : "absent";
-  return [
-    `[${label}]`,
-    `  burn:leaderboard[${handle}]: ${present}`,
-    `  burn:hist:${handle}:        ${state.histLen} weekKey(s)`,
+// True when ANY form still holds a leaderboard field / hist key. Used by both
+// the noop early-exit and the AFTER "clean" assertion.
+function anyEntry(state) {
+  return state.forms.some((f) => state.leaderboard[f] != null);
+}
+function anyHist(state) {
+  return state.forms.some((f) => state.histLen[f] > 0);
+}
+
+function fmtState(label, state) {
+  const lines = [`[${label}]`];
+  for (const f of state.forms) {
+    const present = state.leaderboard[f] != null ? "PRESENT" : "absent";
+    lines.push(`  burn:leaderboard[${f}]: ${present}`);
+    lines.push(`  burn:hist:${f}: ${state.histLen[f]} weekKey(s)`);
+  }
+  lines.push(
     `  burn:challenges matches:    ${state.matchingChallenges.length} / ${state.allChallenges.length} total`,
-  ].join("\n");
+  );
+  const claimKey =
+    state.canonicalKey != null
+      ? `burn:claims:v1[${state.canonicalKey}]`
+      : "burn:claims:v1[n/a — non-canonical]";
+  lines.push(`  ${claimKey}: ${describeClaim(state.claim)}`);
+  return lines.join("\n");
 }
 
 async function main() {
@@ -177,36 +271,52 @@ async function main() {
   // 1. Readback BEFORE — owner reads this to confirm we are pointed at the
   //    right environment and the handle actually exists.
   const before = await readState(redis, args.handle);
-  console.log(fmtState("BEFORE", before, args.handle));
+  console.log(fmtState("BEFORE", before));
 
   if (
-    before.entry == null &&
-    before.histLen === 0 &&
-    before.matchingChallenges.length === 0
+    !anyEntry(before) &&
+    !anyHist(before) &&
+    before.matchingChallenges.length === 0 &&
+    before.claim == null
   ) {
     console.log(
-      `\n[noop] handle "${args.handle}" has no traces in any of the 3 keys. Exiting.`,
+      `\n[noop] handle "${args.handle}" has no traces in any of the 4 keys. Exiting.`,
     );
     return;
   }
 
-  // 2. Show the plan (dry-run by default).
+  // 2. Show the plan (dry-run by default). Leaderboard + hist are swept for
+  //    EVERY form (raw + canonical) so a migrated canonical row is removed, not
+  //    just the raw alias (codex finding 1).
   console.log("\n[plan]");
+  let step = 1;
+  for (const f of before.forms) {
+    console.log(
+      `  ${step++}. HDEL ${LEADERBOARD_KEY} ${f}        ` +
+        (before.leaderboard[f] != null
+          ? "(will remove 1 field)"
+          : "(no-op, absent)"),
+    );
+    console.log(
+      `  ${step++}. DEL  ${histKey(f)}                  ` +
+        (before.histLen[f] > 0
+          ? `(will remove ${before.histLen[f]} weekKey(s))`
+          : "(no-op, absent)"),
+    );
+  }
   console.log(
-    `  1. HDEL ${LEADERBOARD_KEY} ${args.handle}        ` +
-      (before.entry != null ? "(will remove 1 field)" : "(no-op, absent)"),
-  );
-  console.log(
-    `  2. DEL  ${histKey(args.handle)}                  ` +
-      (before.histLen > 0
-        ? `(will remove ${before.histLen} weekKey(s))`
-        : "(no-op, absent)"),
-  );
-  console.log(
-    `  3. LREM ${CHALLENGES_KEY} 0 <row>                ` +
+    `  ${step++}. LREM ${CHALLENGES_KEY} 0 <row>                ` +
       (before.matchingChallenges.length > 0
         ? `(will remove ${before.matchingChallenges.length} row(s))`
         : "(no-op, none match)"),
+  );
+  console.log(
+    `  ${step++}. HDEL ${CLAIMS_KEY} ${before.canonicalKey ?? "(n/a)"}        ` +
+      (before.claim != null
+        ? `(will remove claim: ${describeClaim(before.claim)})`
+        : before.canonicalKey == null
+          ? "(no-op, handle not canonicalizable)"
+          : "(no-op, absent)"),
   );
 
   if (!args.apply) {
@@ -220,18 +330,19 @@ async function main() {
   //    of what landed vs. what is still pending.
   console.log("\n[apply]");
 
-  if (before.entry != null) {
-    const r = await redis.hdel(LEADERBOARD_KEY, args.handle);
-    console.log(`  ✓ HDEL ${LEADERBOARD_KEY} ${args.handle} → removed=${r}`);
-  } else {
-    console.log(`  - HDEL skipped (absent)`);
-  }
-
-  if (before.histLen > 0) {
-    const r = await redis.del(histKey(args.handle));
-    console.log(`  ✓ DEL  ${histKey(args.handle)} → removed=${r}`);
-  } else {
-    console.log(`  - DEL  skipped (absent)`);
+  for (const f of before.forms) {
+    if (before.leaderboard[f] != null) {
+      const r = await redis.hdel(LEADERBOARD_KEY, f);
+      console.log(`  ✓ HDEL ${LEADERBOARD_KEY} ${f} → removed=${r}`);
+    } else {
+      console.log(`  - HDEL ${LEADERBOARD_KEY} ${f} skipped (absent)`);
+    }
+    if (before.histLen[f] > 0) {
+      const r = await redis.del(histKey(f));
+      console.log(`  ✓ DEL  ${histKey(f)} → removed=${r}`);
+    } else {
+      console.log(`  - DEL  ${histKey(f)} skipped (absent)`);
+    }
   }
 
   // LREM removes by EXACT element value. @upstash/redis returns the stored row
@@ -263,15 +374,23 @@ async function main() {
     console.log(`  - LREM skipped (no matching rows)`);
   }
 
+  if (before.claim != null && before.canonicalKey != null) {
+    const r = await redis.hdel(CLAIMS_KEY, before.canonicalKey);
+    console.log(`  ✓ HDEL ${CLAIMS_KEY} ${before.canonicalKey} → removed=${r}`);
+  } else {
+    console.log(`  - HDEL claims skipped (absent or non-canonical handle)`);
+  }
+
   // 4. Readback AFTER — must be all-zero. If not, surface clearly so the
   //    operator can investigate (e.g. an LREM stringification mismatch).
   const after = await readState(redis, args.handle);
-  console.log("\n" + fmtState("AFTER", after, args.handle));
+  console.log("\n" + fmtState("AFTER", after));
 
   const clean =
-    after.entry == null &&
-    after.histLen === 0 &&
-    after.matchingChallenges.length === 0;
+    !anyEntry(after) &&
+    !anyHist(after) &&
+    after.matchingChallenges.length === 0 &&
+    after.claim == null;
   if (clean) {
     console.log(`\n[ok] handle "${args.handle}" fully purged.`);
   } else {

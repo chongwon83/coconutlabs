@@ -134,6 +134,14 @@ const FORBIDDEN_FIELDS: Record<string, unknown>[] = [
   { metadata: { anything: true } },
   { context: "some context" },
   { extra: {} },
+  // Bearer/identity secrets — the per-handle CLAIM token is body-only and must
+  // NEVER reach a telemetry/analytics payload (spec §2.10). Banned even though
+  // no typed constructor can emit it (defence in depth).
+  { claimToken: "k6ihhNs2AAvWxH2dJwmWcrw8KKZs9AtlLQOeSM7pJqc" },
+  { token: "k6ihhNs2AAvWxH2dJwmWcrw8KKZs9AtlLQOeSM7pJqc" },
+  { authorization: "Bearer abc" },
+  { secret: "deadbeef" },
+  { nonce: "collector-nonce-xyz" },
 ];
 
 describe("validateTelemetryEvent — forbidden fields rejected", () => {

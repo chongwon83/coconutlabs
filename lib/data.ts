@@ -290,7 +290,13 @@ export interface ImportedEntryBreakdown {
 // source of truth. An entry with no measured count keeps `fixes` undefined and
 // renders "—".
 export interface ImportedEntry {
+  // CANONICAL handle (spec §2.6): @-prefix + casing collapsed to one key via
+  // canonicalHandle(). The leaderboard dedupe / history / claim key.
   handle: string;
+  // Case-preserving original, persisted ONLY when it differs from `handle`
+  // (e.g. handle "foo", displayHandle "Foo"). Render-only — NEVER a store key.
+  // Absent for already-canonical handles; UI falls back to `handle`.
+  displayHandle?: string;
   avatar: string;
   verif: VerifLevel;
   totalTokens: number;
@@ -478,10 +484,15 @@ function aggregateBreakdown(rows: BurnSummary[]): ImportedEntryBreakdown[] {
   );
 }
 
-// Collapse a validated envelope into a single leaderboard card.
+// Collapse a validated envelope into a single leaderboard card. `handle` MUST
+// be the CANONICAL key (the route canonicalizes before calling). `displayHandle`
+// is the case-preserving original; it is persisted ONLY when it differs from the
+// canonical key, so already-canonical handles add no redundant field and the
+// avatar stays keyed off the canonical handle (stable across casing variants).
 export function buildImportedEntry(
   env: BurnSummaryEnvelope,
   handle: string,
+  displayHandle?: string,
 ): ImportedEntry {
   // Unique tools that produced rows in this envelope. Sorted for stable
   // serialization (Set iteration order is insertion-based; sort gives
@@ -502,6 +513,12 @@ export function buildImportedEntry(
     toolsUsed,
     breakdown: aggregateBreakdown(env.rows),
   };
+  // Persist the case-preserving display form ONLY when it actually differs from
+  // the canonical key — an already-canonical handle carries no redundant field
+  // (keeps stored blobs minimal and snapshot-stable).
+  if (displayHandle != null && displayHandle !== handle) {
+    entry.displayHandle = displayHandle;
+  }
   // The single point where the device-measured numerator enters entry state.
   // Stored when measured (a real 0 is stored); ves is left to read-time
   // derivation in the GET route. Both CLI and the browser FSA path may supply

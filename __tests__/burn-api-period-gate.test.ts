@@ -14,7 +14,11 @@ import type { ImportedEntry } from "@/lib/data";
 
 vi.mock("@/lib/server/store", () => ({
   readEntries: vi.fn().mockResolvedValue([] as ImportedEntry[]),
-  upsertEntry: vi.fn().mockResolvedValue([] as ImportedEntry[]),
+  // PR2: the write path is claimAndUpsert; mock a successful claim so the
+  // accepted-week case reaches 201. Period-gate rejections never call it.
+  claimAndUpsert: vi
+    .fn()
+    .mockResolvedValue({ status: "claimed", entries: [] as ImportedEntry[] }),
 }));
 vi.mock("@/lib/server/trend", () => ({
   trendByHandle: vi.fn().mockResolvedValue(new Map()),
@@ -75,6 +79,9 @@ function makeRequest(handle: string, envelope: object): NextRequest {
 describe("POST /api/burnindex — period gate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Exercise the enforcing write path so an accepted week envelope reaches 201
+    // (readonly would short-circuit to 503 before the period gate's 201 case).
+    process.env.CLAIM_MODE = "claims_enforcing";
   });
 
   it("week envelope is accepted (201)", async () => {
@@ -119,9 +126,9 @@ describe("POST /api/burnindex — period gate", () => {
   });
 
   it("store is not called when period gate rejects", async () => {
-    const { upsertEntry } = await import("@/lib/server/store");
+    const { claimAndUpsert } = await import("@/lib/server/store");
     const env = makeEnvelope("day", "2026-05-19T00:00:00Z", "2026-05-20T00:00:00Z");
     await POST(makeRequest("@testuser", env));
-    expect(upsertEntry).not.toHaveBeenCalled();
+    expect(claimAndUpsert).not.toHaveBeenCalled();
   });
 });

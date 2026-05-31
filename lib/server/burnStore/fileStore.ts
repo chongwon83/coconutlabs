@@ -18,14 +18,22 @@ import path from "node:path";
 import type { ImportedEntry } from "@/lib/data";
 import { withLock, atomicWriteJson } from "@/lib/server/atomic";
 import { mergeNumerator } from "@/lib/server/burnStore/mergeNumerator";
+import { decideClaim } from "@/lib/server/claim";
+import type { ClaimRecord } from "@/lib/server/claim";
 import type {
   BurnStore,
+  ClaimUpsertResult,
   ImportHistoryPoint,
 } from "@/lib/server/burnStore/types";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const STORE_PATH = path.join(DATA_DIR, "leaderboard.json");
 const HIST_PATH = path.join(DATA_DIR, "import-history.json");
+// Per-handle claim records, keyed by the CANONICAL handle. Holds the FULL
+// ClaimRecord union (spec A2 — the file store keeps `createdAt`/`collision`,
+// unlike Redis's metadata-thin string). A JSON object map (not an array) so a
+// claim lookup is O(1) by handleKey and a re-claim can't duplicate a row.
+const CLAIMS_PATH = path.join(DATA_DIR, "claims.json");
 
 const KEEP_PER_HANDLE = 12; // > trend WINDOW(7), caps history file growth
 
@@ -38,6 +46,21 @@ async function readArray<T>(filePath: string): Promise<T[]> {
     return Array.isArray(parsed) ? (parsed as T[]) : [];
   } catch {
     return [];
+  }
+}
+
+// Read the claims map. A missing/corrupt/non-object file yields {} — never
+// throws (same fail-safe-to-empty contract as readArray). An empty map means
+// "nothing claimed yet", so every handle is mintable.
+async function readClaims(): Promise<Record<string, ClaimRecord>> {
+  try {
+    const raw = await fs.readFile(CLAIMS_PATH, "utf-8");
+    const parsed: unknown = JSON.parse(raw);
+    return parsed != null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, ClaimRecord>)
+      : {};
+  } catch {
+    return {};
   }
 }
 
@@ -80,19 +103,67 @@ export class FileBurnStore implements BurnStore {
   // of the same (handle, week) overwrites the history point and re-runs this
   // upsert (both idempotent by handle).
   async upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
+    return withLock(STORE_PATH, () => this.#upsertLocked(entry));
+  }
+
+  // Claim-gated upsert (spec §2.3). Runs the claim decision AND the card write
+  // under ONE withLock(STORE_PATH) so a concurrent upsert/claim can't interleave
+  // (claims.json is only written from here, so the leaderboard lock guards it
+  // too). On a rejected claim (mismatch/legacyLocked/invalid) NOTHING is written
+  // — no card, no claim — so an impostor leaves no trace. On a mint the claim is
+  // persisted BEFORE the card: a crash with claim-but-no-card self-heals, since a
+  // re-upload with the same token then decides "ok" and writes the missing card.
+  async claimAndUpsert(
+    entry: ImportedEntry,
+    presentedToken: string | undefined,
+  ): Promise<ClaimUpsertResult> {
     return withLock(STORE_PATH, async () => {
-      const prev = (await readArray<ImportedEntry>(STORE_PATH)).map(hydrateEntry);
-      // Card/denominator fields take the incoming import; only the VES numerator
-      // is precedence-merged so a later browser-fsa or numerator-absent upload
-      // cannot clobber/lower a CLI count (see mergeNumerator).
-      const existing = prev.find((e) => e.handle === entry.handle);
-      const merged = { ...entry, ...mergeNumerator(existing, entry) };
-      const next = [merged, ...prev.filter((e) => e.handle !== entry.handle)];
-      next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
-      await this.#recordHistory(merged);
-      await atomicWriteJson(STORE_PATH, next);
-      return next;
+      const handleKey = entry.handle; // already canonical (interface contract)
+      const claims = await readClaims();
+      const existing = claims[handleKey] ?? null;
+      const now = new Date().toISOString();
+      const decision = decideClaim(existing, presentedToken, { handleKey, now });
+
+      if (
+        decision.status === "mismatch" ||
+        decision.status === "legacyLocked" ||
+        decision.status === "invalid"
+      ) {
+        return { status: decision.status };
+      }
+
+      if (decision.status === "claimed") {
+        claims[handleKey] = decision.record; // mint BEFORE the card write
+        await atomicWriteJson(CLAIMS_PATH, claims);
+      }
+      const entries = await this.#upsertLocked(entry);
+      return { status: decision.status, entries };
     });
+  }
+
+  // The leaderboard + history read-modify-write, WITHOUT the lock. Callers
+  // (upsertEntry, claimAndUpsert) MUST already hold withLock(STORE_PATH) — never
+  // call withLock in here or it deadlocks against the holder (atomic.ts chains
+  // per key, so a nested same-key lock waits on its own outer promise forever).
+  //
+  // The two files are not transactionally atomic: if the history write throws,
+  // the leaderboard write below is skipped and both stay unwritten; if history
+  // succeeds but the leaderboard write fails, history holds a point the
+  // leaderboard lacks. That window is rare and self-heals — the next re-import
+  // of the same (handle, week) overwrites the history point and re-runs this
+  // upsert (both idempotent by handle).
+  async #upsertLocked(entry: ImportedEntry): Promise<ImportedEntry[]> {
+    const prev = (await readArray<ImportedEntry>(STORE_PATH)).map(hydrateEntry);
+    // Card/denominator fields take the incoming import; only the VES numerator
+    // is precedence-merged so a later browser-fsa or numerator-absent upload
+    // cannot clobber/lower a CLI count (see mergeNumerator).
+    const existing = prev.find((e) => e.handle === entry.handle);
+    const merged = { ...entry, ...mergeNumerator(existing, entry) };
+    const next = [merged, ...prev.filter((e) => e.handle !== entry.handle)];
+    next.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
+    await this.#recordHistory(merged);
+    await atomicWriteJson(STORE_PATH, next);
+    return next;
   }
 
   // Record one weekly import. NO own lock — upsertEntry already holds
@@ -106,6 +177,11 @@ export class FileBurnStore implements BurnStore {
       weekKey,
       totalTokens: entry.totalTokens,
       importedAt: entry.importedAt,
+      // Carry display casing onto the trend point only when it differs from the
+      // canonical key — render parity without bloating canonical rows.
+      ...(entry.displayHandle != null
+        ? { displayHandle: entry.displayHandle }
+        : {}),
     };
     const prev = await readArray<ImportHistoryPoint>(HIST_PATH);
     const others = prev.filter(

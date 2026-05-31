@@ -25,15 +25,37 @@
 import type { Redis } from "@upstash/redis";
 import type { ImportedEntry } from "@/lib/data";
 import { mergeNumerator } from "@/lib/server/burnStore/mergeNumerator";
+import {
+  isValidTokenFormat,
+  hashToken,
+  CLAIM_SCHEME,
+  LEGACY_LOCKED_STRING,
+} from "@/lib/server/claim";
 import type {
   BurnStore,
+  ClaimUpsertResult,
   ImportHistoryPoint,
 } from "@/lib/server/burnStore/types";
 
 const LEADERBOARD_KEY = "burn:leaderboard";
 const histKey = (handle: string) => `burn:hist:${handle}`;
+// Claim hash: field = CANONICAL handleKey, value = the metadata-thin string
+// `sha256-v1:<hex>` | `legacy-locked` (spec A2 — no cjson so the atomic Lua gate
+// needs no parsing). v1 in the key lets a future scheme migrate without a clash.
+const CLAIMS_KEY = "burn:claims:v1";
 
 const KEEP_PER_HANDLE = 12; // > trend WINDOW(7), caps history hash growth
+
+// Claim-gate return codes — the small int the Lua returns and the TS maps to a
+// ClaimUpsertResult (spec §2.9). NEVER a thrown error: an identity conflict is
+// an expected 409/400, and throwing would collapse it into route.ts's 500 catch.
+const CODE = {
+  OK: 0, // active claim matched → upsert ran → 201
+  CLAIMED: 1, // unclaimed + valid token → minted + upsert ran → 201
+  MISMATCH: 2, // active claim, token missing/wrong → no write → 409
+  LEGACY: 3, // legacy-locked → no write → 409
+  INVALID: 4, // unclaimed + missing token → no write → 400
+} as const;
 
 // Atomic upsert: leaderboard HSET + (week-only) history HSET + history trim,
 // all in one indivisible server-side script. This is what makes redisStore
@@ -54,6 +76,65 @@ if ARGV[3] == '1' then
   for i = 1, excess do redis.call('HDEL', KEYS[2], keys[i]) end
 end
 return 1
+`;
+
+// Claim-gated upsert (spec §2.3, Q2 Option A). One indivisible EVAL: read the
+// claim FIRST, decide, then write leaderboard + history + (on a mint) the claim
+// — the card/history writes are CONDITIONAL on the claim passing, so an impostor
+// changes nothing. The TS side mirrors decideClaim's matrix by passing the
+// presented value as the already-domain-separated string `sha256-v1:<hex>`
+// (or "" for a missing token); Lua needs no hashing and no parsing.
+//
+//   KEYS[1]=burn:leaderboard  KEYS[2]=burn:hist:<handle>  KEYS[3]=burn:claims:v1
+//   ARGV = handle, entryJson, isWeek("0"|"1"), weekKey, pointJson, keep,
+//          presented("" | "sha256-v1:<hex>"), legacyStr("legacy-locked")
+//
+// ROLLBACK HAZARD (Q2c): Redis Lua is atomic against interleaving but NOT
+// transactional — a runtime error mid-script leaves prior writes committed. So
+// every fallible step is done up front: `keep` is tonumber'd and bounds-guarded
+// BEFORE any write, the presented string is pre-validated in TS (we never hash
+// junk), and the claim HSET is the LAST write with nothing parse-able after it.
+// The remaining ops are only HGET/HSET/HKEYS/HDEL on string args — they cannot
+// raise. The `keep` guard is the teeth: a malformed ARGV[6] (today impossible —
+// the wrapper passes the hardcoded KEEP_PER_HANDLE) would otherwise make
+// `#keys - keep` throw AFTER the card/history write but BEFORE the claim write,
+// leaving a card-without-claim that an impostor could then mint. With the guard,
+// an unparseable/negative keep simply SKIPS the trim (never over-deletes, never
+// raises); the card/history/claim writes still complete atomically.
+//
+// Returns a small int (NEVER throws — an identity conflict is an expected
+// 409/400, and a thrown error would collapse into route.ts's 500 catch):
+//   0=ok(matched) 1=claimed(minted) 2=mismatch 3=legacy 4=invalid.
+const CLAIM_UPSERT_LUA = `
+local keep = tonumber(ARGV[6])
+local presented = ARGV[7]
+local legacyStr = ARGV[8]
+local claim = redis.call('HGET', KEYS[3], ARGV[1])
+local minted = false
+if not claim then
+  if presented == '' then return 4 end
+  minted = true
+elseif claim == legacyStr then
+  return 3
+else
+  if presented == '' then return 2 end
+  if claim ~= presented then return 2 end
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+if ARGV[3] == '1' then
+  redis.call('HSET', KEYS[2], ARGV[4], ARGV[5])
+  if keep and keep >= 1 then
+    local keys = redis.call('HKEYS', KEYS[2])
+    table.sort(keys)
+    local excess = #keys - keep
+    for i = 1, excess do redis.call('HDEL', KEYS[2], keys[i]) end
+  end
+end
+if minted then
+  redis.call('HSET', KEYS[3], ARGV[1], presented)
+  return 1
+end
+return 0
 `;
 
 // Sort newest import first — the order route.ts echoes to the client.
@@ -84,6 +165,7 @@ function projectEntry(e: ImportedEntry): ImportedEntry {
     toolsUsed: e.toolsUsed ?? [],
     breakdown: e.breakdown ?? [],
   };
+  if (e.displayHandle !== undefined) stored.displayHandle = e.displayHandle;
   if (e.fixes !== undefined) stored.fixes = e.fixes;
   if (e.fixesSource !== undefined) stored.fixesSource = e.fixesSource;
   if (e.ves !== undefined) stored.ves = e.ves;
@@ -131,12 +213,88 @@ export class RedisBurnStore implements BurnStore {
   // point — one atomic Lua EVAL (see UPSERT_LUA). Returns the full leaderboard
   // (newest first) read back after the write.
   async upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
-    // Precedence-merge the VES numerator against the stored card BEFORE the
-    // atomic write. This read-merge happens in TS (HGET → mergeNumerator), not
-    // inside Lua — see the CONCURRENCY note at the top of this file. Only the
-    // numerator (fixes/fixesSource) is merged; the merged blob then flows into
-    // the SAME unchanged Lua EVAL, which still pairs leaderboard + history
-    // writes indivisibly.
+    const { handle, entryJson, isWeek, weekKey, pointJson } =
+      await this.#mergeAndProject(entry);
+    await this.#redis.eval(
+      UPSERT_LUA,
+      [LEADERBOARD_KEY, histKey(handle)],
+      [handle, entryJson, isWeek ? "1" : "0", weekKey, pointJson, String(KEEP_PER_HANDLE)],
+    );
+    return this.readEntries();
+  }
+
+  // Claim-gated upsert (spec §2.3). One atomic EVAL (CLAIM_UPSERT_LUA): the
+  // claim gate runs FIRST and the card/history writes are conditional on it
+  // passing, so a mismatched/legacy/invalid claim changes nothing and the board
+  // is not echoed back (caller can't read post-write state on a refusal).
+  //
+  // The token is format-validated and hashed HERE — never inside Lua (Q2c: we
+  // pass an already-domain-separated `sha256-v1:<hex>` string, or "" for a
+  // missing token, so the script needs no crypto and cannot hash junk). A
+  // present-but-malformed token short-circuits to `invalid` before any Redis
+  // call. The numerator precedence merge stays the pre-EVAL HGET→mergeNumerator
+  // (non-atomic, accepted — see the CONCURRENCY note at top).
+  async claimAndUpsert(
+    entry: ImportedEntry,
+    presentedToken: string | undefined,
+  ): Promise<ClaimUpsertResult> {
+    const provided =
+      typeof presentedToken === "string" && presentedToken.length > 0;
+    // A present-but-malformed token never reaches Redis and is never hashed.
+    if (provided && !isValidTokenFormat(presentedToken)) {
+      return { status: "invalid" };
+    }
+    const presented = provided
+      ? `${CLAIM_SCHEME}:${hashToken(presentedToken)}`
+      : "";
+
+    const { handle, entryJson, isWeek, weekKey, pointJson } =
+      await this.#mergeAndProject(entry);
+    const raw = await this.#redis.eval(
+      CLAIM_UPSERT_LUA,
+      [LEADERBOARD_KEY, histKey(handle), CLAIMS_KEY],
+      [
+        handle,
+        entryJson,
+        isWeek ? "1" : "0",
+        weekKey,
+        pointJson,
+        String(KEEP_PER_HANDLE),
+        presented,
+        LEGACY_LOCKED_STRING,
+      ],
+    );
+
+    switch (Number(raw)) {
+      case CODE.OK:
+        return { status: "ok", entries: await this.readEntries() };
+      case CODE.CLAIMED:
+        return { status: "claimed", entries: await this.readEntries() };
+      case CODE.MISMATCH:
+        return { status: "mismatch" };
+      case CODE.LEGACY:
+        return { status: "legacyLocked" };
+      case CODE.INVALID:
+        return { status: "invalid" };
+      // Unreachable: the script returns only 0–4. Fail closed (treat as a
+      // refusal that wrote nothing) rather than reporting a false success.
+      default:
+        return { status: "mismatch" };
+    }
+  }
+
+  // Shared pre-EVAL prep for upsertEntry + claimAndUpsert: precedence-merge the
+  // VES numerator against the stored card (HGET → mergeNumerator, in TS not Lua
+  // — see CONCURRENCY note), then project to the exact persisted shapes. Returns
+  // the JSON strings the EVAL writes verbatim, so the two paths share one source
+  // of truth for the card/history layout (incl. displayHandle).
+  async #mergeAndProject(entry: ImportedEntry): Promise<{
+    handle: string;
+    entryJson: string;
+    isWeek: boolean;
+    weekKey: string;
+    pointJson: string;
+  }> {
     const stored = await this.#redis.hget<ImportedEntry>(
       LEADERBOARD_KEY,
       entry.handle,
@@ -146,30 +304,27 @@ export class RedisBurnStore implements BurnStore {
 
     const isWeek = merged.period === "week" && merged.since != null;
     const weekKey = isWeek ? (merged.since as string) : "";
-    // Build the history point as a typed object — never spread `entry`.
+    // Build the history point as a typed object — never spread `entry`. Carry
+    // displayHandle onto the trend point only when it differs from the key.
     const point: ImportHistoryPoint | null = isWeek
       ? {
           handle: merged.handle,
           weekKey,
           totalTokens: merged.totalTokens,
           importedAt: merged.importedAt,
+          ...(merged.displayHandle != null
+            ? { displayHandle: merged.displayHandle }
+            : {}),
         }
       : null;
 
-    await this.#redis.eval(
-      UPSERT_LUA,
-      [LEADERBOARD_KEY, histKey(merged.handle)],
-      [
-        merged.handle,
-        JSON.stringify(projectEntry(merged)),
-        isWeek ? "1" : "0",
-        weekKey,
-        point == null ? "" : JSON.stringify(point),
-        String(KEEP_PER_HANDLE),
-      ],
-    );
-
-    return this.readEntries();
+    return {
+      handle: merged.handle,
+      entryJson: JSON.stringify(projectEntry(merged)),
+      isWeek,
+      weekKey,
+      pointJson: point == null ? "" : JSON.stringify(point),
+    };
   }
 
   // Every weekly history point across all handles. The handle universe comes

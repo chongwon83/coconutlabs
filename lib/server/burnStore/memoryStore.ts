@@ -15,8 +15,11 @@
 
 import type { ImportedEntry } from "@/lib/data";
 import { mergeNumerator } from "@/lib/server/burnStore/mergeNumerator";
+import { decideClaim } from "@/lib/server/claim";
+import type { ClaimRecord } from "@/lib/server/claim";
 import type {
   BurnStore,
+  ClaimUpsertResult,
   ImportHistoryPoint,
 } from "@/lib/server/burnStore/types";
 
@@ -42,6 +45,10 @@ function hydrateEntry(e: ImportedEntry): ImportedEntry {
 export class MemoryBurnStore implements BurnStore {
   #entries: ImportedEntry[] = [];
   #history: ImportHistoryPoint[] = [];
+  // Per-handle claim records, keyed by the CANONICAL handle (entry.handle).
+  // Process-local, lost on shutdown — the e2e-only mirror of fileStore's
+  // .data/claims.json and redisStore's burn:claims:v1 hash.
+  #claims = new Map<string, ClaimRecord>();
 
   async readEntries(): Promise<ImportedEntry[]> {
     return this.#entries.map(hydrateEntry);
@@ -52,10 +59,38 @@ export class MemoryBurnStore implements BurnStore {
   }
 
   async upsertEntry(entry: ImportedEntry): Promise<ImportedEntry[]> {
+    return this.#applyUpsert(entry);
+  }
+
+  // Claim-gated upsert (spec §2.3). Decides mint/match/reject against the
+  // per-handle claim record; performs the SAME upsert as upsertEntry ONLY on
+  // ok/claimed. A rejected claim writes nothing — neither a card nor a claim —
+  // so an impostor leaves no trace and the board is not echoed back.
+  async claimAndUpsert(
+    entry: ImportedEntry,
+    presentedToken: string | undefined,
+  ): Promise<ClaimUpsertResult> {
+    const handleKey = entry.handle; // already canonical (see interface contract)
+    const existing = this.#claims.get(handleKey) ?? null;
+    const now = new Date().toISOString();
+    const decision = decideClaim(existing, presentedToken, { handleKey, now });
+
+    if (decision.status === "claimed") {
+      this.#claims.set(handleKey, decision.record); // mint BEFORE the card write
+      return { status: "claimed", entries: this.#applyUpsert(entry) };
+    }
+    if (decision.status === "ok") {
+      return { status: "ok", entries: this.#applyUpsert(entry) };
+    }
+    return { status: decision.status }; // mismatch | legacyLocked | invalid — no write
+  }
+
+  // Shared upsert core for upsertEntry + claimAndUpsert. Only the VES numerator
+  // is precedence-merged; card/denominator fields take the incoming import (see
+  // mergeNumerator + fileStore for the rationale).
+  #applyUpsert(entry: ImportedEntry): ImportedEntry[] {
     const hydrated = hydrateEntry(entry);
     const prev = this.#entries.map(hydrateEntry);
-    // Only the VES numerator is precedence-merged; card/denominator fields take
-    // the incoming import (see mergeNumerator + fileStore for the rationale).
     const existing = prev.find((e) => e.handle === hydrated.handle);
     const merged = { ...hydrated, ...mergeNumerator(existing, hydrated) };
     const next = [merged, ...prev.filter((e) => e.handle !== merged.handle)];
@@ -74,6 +109,11 @@ export class MemoryBurnStore implements BurnStore {
       weekKey,
       totalTokens: entry.totalTokens,
       importedAt: entry.importedAt,
+      // Carry the display casing onto the trend point only when it differs from
+      // the canonical key — keeps render parity without bloating canonical rows.
+      ...(entry.displayHandle != null
+        ? { displayHandle: entry.displayHandle }
+        : {}),
     };
     const others = this.#history.filter(
       (p) => !(p.handle === entry.handle && p.weekKey === weekKey),

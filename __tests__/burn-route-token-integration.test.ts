@@ -69,9 +69,14 @@ vi.mock("@upstash/redis", () => ({
 // them are exercised only where it matters (case 1 / case 8 / case 9).
 // NOTE: @/lib/server/burn/token is DELIBERATELY ABSENT from this list.
 
+// PR2: the route's write path is now claimAndUpsert (claim-gated), not the
+// ungated upsertEntry. The claim DECISION is unit-tested at the store layer;
+// here it is mocked to a successful write so the TOKEN path stays the subject.
 vi.mock("@/lib/server/store", () => ({
   readEntries: vi.fn().mockResolvedValue([] as ImportedEntry[]),
-  upsertEntry: vi.fn().mockResolvedValue([] as ImportedEntry[]),
+  claimAndUpsert: vi
+    .fn()
+    .mockResolvedValue({ status: "claimed", entries: [] as ImportedEntry[] }),
 }));
 vi.mock("@/lib/server/trend", () => ({
   trendByHandle: vi.fn().mockResolvedValue(new Map()),
@@ -105,6 +110,10 @@ beforeEach(() => {
   process.env.COLLECTOR_HMAC_SECRET =
     "test-secret-value-that-is-long-enough-32chars";
   process.env.COLLECTOR_TOKEN_TTL_SECONDS = "300";
+  // This file exercises the ENFORCING nonce path end-to-end. Without this the
+  // route defaults to readonly and every POST short-circuits to 503 before the
+  // collector token is ever verified (defeating the whole drift-guard).
+  process.env.CLAIM_MODE = "claims_enforcing";
 });
 
 // ── Envelope fixtures (period-gate.test.ts:37-62 shape) ──────────────────────
@@ -176,34 +185,34 @@ function telemetryRequest(token: string | null, body: object): NextRequest {
 describe("POST /api/burnindex — real token verification", () => {
   it("1) valid issued token + valid week envelope → 201, store called", async () => {
     const { POST } = await import("@/app/api/burnindex/route");
-    const { upsertEntry } = await import("@/lib/server/store");
+    const { claimAndUpsert } = await import("@/lib/server/store");
     const token = await issueToken("burnindex");
     const res = await POST(burnindexRequest(token, makeWeekEnvelope()));
     expect(res.status).toBe(201);
-    // upsertEntry only fires if the real verifier returned ok — proof the
+    // claimAndUpsert only fires if the real verifier returned ok — proof the
     // token traversed the real verifyAndConsumeToken path.
-    expect(upsertEntry).toHaveBeenCalledTimes(1);
+    expect(claimAndUpsert).toHaveBeenCalledTimes(1);
   });
 
   it("2) missing Authorization → 401, store not called", async () => {
     const { POST } = await import("@/app/api/burnindex/route");
-    const { upsertEntry } = await import("@/lib/server/store");
+    const { claimAndUpsert } = await import("@/lib/server/store");
     const res = await POST(burnindexRequest(null, makeWeekEnvelope()));
     expect(res.status).toBe(401);
-    expect(upsertEntry).not.toHaveBeenCalled();
+    expect(claimAndUpsert).not.toHaveBeenCalled();
   });
 
   it("3) malformed token → 401", async () => {
     const { POST } = await import("@/app/api/burnindex/route");
-    const { upsertEntry } = await import("@/lib/server/store");
+    const { claimAndUpsert } = await import("@/lib/server/store");
     const res = await POST(burnindexRequest("not.a.valid", makeWeekEnvelope()));
     expect(res.status).toBe(401);
-    expect(upsertEntry).not.toHaveBeenCalled();
+    expect(claimAndUpsert).not.toHaveBeenCalled();
   });
 
   it("4) expired token → 401", async () => {
     const { POST } = await import("@/app/api/burnindex/route");
-    const { upsertEntry } = await import("@/lib/server/store");
+    const { claimAndUpsert } = await import("@/lib/server/store");
     const token = await issueToken("burnindex");
     const parsed = parseToken(token);
     expect(parsed).not.toBeNull();
@@ -216,16 +225,16 @@ describe("POST /api/burnindex — real token verification", () => {
     });
     const res = await POST(burnindexRequest(expired, makeWeekEnvelope()));
     expect(res.status).toBe(401);
-    expect(upsertEntry).not.toHaveBeenCalled();
+    expect(claimAndUpsert).not.toHaveBeenCalled();
   });
 
   it("5) wrong-kind token (telemetry → burnindex) → 401", async () => {
     const { POST } = await import("@/app/api/burnindex/route");
-    const { upsertEntry } = await import("@/lib/server/store");
+    const { claimAndUpsert } = await import("@/lib/server/store");
     const telemetryToken = await issueToken("telemetry");
     const res = await POST(burnindexRequest(telemetryToken, makeWeekEnvelope()));
     expect(res.status).toBe(401);
-    expect(upsertEntry).not.toHaveBeenCalled();
+    expect(claimAndUpsert).not.toHaveBeenCalled();
   });
 
   it("6) nonce reuse (same token submitted twice) → 1st 201, 2nd 401", async () => {
@@ -241,19 +250,19 @@ describe("POST /api/burnindex — real token verification", () => {
 
   it("7) tampered signature (last 4 chars replaced) → 401", async () => {
     const { POST } = await import("@/app/api/burnindex/route");
-    const { upsertEntry } = await import("@/lib/server/store");
+    const { claimAndUpsert } = await import("@/lib/server/store");
     const token = await issueToken("burnindex");
     const tampered = token.slice(0, -4) + "xxxx";
     const res = await POST(burnindexRequest(tampered, makeWeekEnvelope()));
     expect(res.status).toBe(401);
-    expect(upsertEntry).not.toHaveBeenCalled();
+    expect(claimAndUpsert).not.toHaveBeenCalled();
   });
 
   it("8) valid token consumed but store throws → 500 (token still consumed)", async () => {
     const { POST } = await import("@/app/api/burnindex/route");
     const store = await import("@/lib/server/store");
     // Simulate a transient store failure AFTER successful token verification.
-    vi.mocked(store.upsertEntry).mockRejectedValueOnce(new Error("disk full"));
+    vi.mocked(store.claimAndUpsert).mockRejectedValueOnce(new Error("disk full"));
 
     const token = await issueToken("burnindex");
     const res = await POST(burnindexRequest(token, makeWeekEnvelope()));
