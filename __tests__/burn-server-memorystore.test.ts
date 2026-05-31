@@ -158,6 +158,116 @@ describe("MemoryBurnStore.upsertEntry — history side-effect", () => {
   });
 });
 
+// claimAndUpsert — the §2.3 enforcing matrix AT THE STORE LEVEL. claim.ts
+// unit-tests decideClaim in isolation; these prove the store WIRES it correctly:
+//   - a minted/matched claim performs the SAME upsert (board + history written)
+//   - a rejected claim writes NOTHING (no card, no claim, board untouched)
+//   - the mergeNumerator precedence merge survives the claim gate (§3.5 P1)
+//   - claims are per-canonical-handle (one token never unlocks another handle)
+// legacyLocked at the store level is exercised in the file/redis stores (claims
+// are seedable there) + claim.ts; memory is e2e-only and starts unclaimed.
+describe("MemoryBurnStore.claimAndUpsert — §2.3 matrix + write side-effects", () => {
+  const TOKEN = "A".repeat(43); // valid 43-char base64url
+  const OTHER = "B".repeat(43);
+  // Canonical handle (post-canonicalHandle): no @, lowercase.
+  const ALICE: ImportedEntry = { ...VALID_ENTRY, handle: "alice" };
+
+  it("unclaimed + valid token → claimed, writes the card + history", async () => {
+    const res = await store.claimAndUpsert(ALICE, TOKEN);
+    expect(res.status).toBe("claimed");
+    if (res.status === "claimed") {
+      expect(res.entries).toHaveLength(1);
+      expect(res.entries[0].handle).toBe("alice");
+    }
+    expect(await store.readEntries()).toHaveLength(1);
+    expect(await store.readHistory()).toHaveLength(1);
+  });
+
+  it("re-upload with the SAME token → ok, updates the same card (no split)", async () => {
+    await store.claimAndUpsert(ALICE, TOKEN);
+    const updated: ImportedEntry = {
+      ...ALICE,
+      totalTokens: 99999,
+      importedAt: "2026-05-21T12:00:00Z",
+    };
+    const res = await store.claimAndUpsert(updated, TOKEN);
+    expect(res.status).toBe("ok");
+    if (res.status === "ok") expect(res.entries).toHaveLength(1);
+    const board = await store.readEntries();
+    expect(board).toHaveLength(1);
+    expect(board[0].totalTokens).toBe(99999);
+  });
+
+  it("re-upload with a WRONG token → mismatch, writes nothing", async () => {
+    await store.claimAndUpsert(ALICE, TOKEN);
+    const impostor: ImportedEntry = { ...ALICE, totalTokens: 1 };
+    const res = await store.claimAndUpsert(impostor, OTHER);
+    expect(res.status).toBe("mismatch");
+    expect("entries" in res).toBe(false);
+    const board = await store.readEntries();
+    expect(board).toHaveLength(1);
+    expect(board[0].totalTokens).toBe(VALID_ENTRY.totalTokens); // untouched
+  });
+
+  it("re-upload with a MISSING token on a claimed handle → mismatch, no write", async () => {
+    await store.claimAndUpsert(ALICE, TOKEN);
+    const res = await store.claimAndUpsert({ ...ALICE, totalTokens: 7 }, undefined);
+    expect(res.status).toBe("mismatch");
+    expect((await store.readEntries())[0].totalTokens).toBe(VALID_ENTRY.totalTokens);
+  });
+
+  it("unclaimed + missing token → invalid, writes nothing", async () => {
+    const res = await store.claimAndUpsert(ALICE, undefined);
+    expect(res.status).toBe("invalid");
+    expect(await store.readEntries()).toEqual([]);
+  });
+
+  it("unclaimed + malformed token → invalid, never mints, writes nothing", async () => {
+    const res = await store.claimAndUpsert(ALICE, "tooshort");
+    expect(res.status).toBe("invalid");
+    expect(await store.readEntries()).toEqual([]);
+    // and the handle is still unclaimed: a valid token now mints fresh
+    expect((await store.claimAndUpsert(ALICE, TOKEN)).status).toBe("claimed");
+  });
+
+  it("preserves mergeNumerator precedence through the claim gate (§3.5 P1)", async () => {
+    // First: CLI numerator 153 claims @alice.
+    await store.claimAndUpsert({ ...ALICE, fixes: 153, fixesSource: "cli" }, TOKEN);
+    // Then the SAME claimant re-uploads the SAME week with a LOWER browser count.
+    const res = await store.claimAndUpsert(
+      { ...ALICE, fixes: 5, fixesSource: "browser-fsa" },
+      TOKEN,
+    );
+    expect(res.status).toBe("ok");
+    const board = await store.readEntries();
+    expect(board[0].fixes).toBe(153); // cli(2) > browser-fsa(1) — not clobbered
+    expect(board[0].fixesSource).toBe("cli");
+  });
+
+  it("claims are per-canonical-handle — @alice's token does NOT unlock @bob", async () => {
+    await store.claimAndUpsert(ALICE, TOKEN);
+    const bob: ImportedEntry = { ...VALID_ENTRY, handle: "bob" };
+    // bob is unclaimed; alice's token is a VALID format → mints bob fresh.
+    expect((await store.claimAndUpsert(bob, TOKEN)).status).toBe("claimed");
+    // and bob now rejects a different token.
+    expect((await store.claimAndUpsert(bob, OTHER)).status).toBe("mismatch");
+  });
+
+  it("persists displayHandle onto the card AND the history point when present", async () => {
+    const withDisplay: ImportedEntry = {
+      ...ALICE,
+      displayHandle: "Alice",
+    };
+    await store.claimAndUpsert(withDisplay, TOKEN);
+    const board = await store.readEntries();
+    expect(board[0].handle).toBe("alice");
+    expect(board[0].displayHandle).toBe("Alice");
+    const hist = await store.readHistory();
+    expect(hist[0].handle).toBe("alice");
+    expect(hist[0].displayHandle).toBe("Alice");
+  });
+});
+
 describe("MemoryBurnStore — defensive copies on read", () => {
   it("mutating readEntries() result does NOT corrupt the store", async () => {
     await store.upsertEntry(VALID_ENTRY);
