@@ -167,6 +167,92 @@ export async function runRedisOps(redis: RedisLike, ops: RedisOp[]): Promise<voi
   }
 }
 
+// ── Gate B: owner self-reclaim (single-claim clear) ───────────────────────────
+
+/**
+ * TRUE when the plan would collapse/rename ZERO raw aliases — i.e. the migration
+ * is already complete and re-applying would do nothing but (re)write legacy-locks.
+ *
+ * This is the H1 re-apply guard predicate. Once Gate B clears the owner's claim,
+ * that handle re-appears as a `migrate` group (claim=none ⇒ writeClaim=true) BUT
+ * with empty removeCardFields/removeHistKeys (the field is already canonical), so
+ * it still has zero raw-alias removals — this returns true and the runner refuses
+ * `--apply`, which would otherwise re-`HSET legacy-locked` and clobber Gate B.
+ * The genuine first migration has non-empty removals → returns false → proceeds.
+ */
+export function isMigrationComplete(plan: MigrationPlan): boolean {
+  return plan.groups.every(
+    (g) => g.removeCardFields.length === 0 && g.removeHistKeys.length === 0,
+  );
+}
+
+export interface ClearClaimResult {
+  canonical: string;
+  /** The full claims hash before the HDEL (canonical field → scheme string). */
+  before: Record<string, string>;
+  /** The full claims hash after the HDEL (canonical field absent). */
+  after: Record<string, string>;
+}
+
+/**
+ * Clear ONE legacy-locked claim so the owner can self-reclaim that row via a
+ * fresh browser-minted token after the enforcing flip (Gate B).
+ *
+ * HDEL (not an HSET tombstone) is mandatory: the redisStore Lua mint branch needs
+ * HGET to be falsey, so any non-empty value would route to mismatch/legacy and
+ * BLOCK the reclaim. PRE-CHECK refuses unless the target field is EXACTLY
+ * `legacy-locked` — never touch an ABSENT (already clearable) or ACTIVE (owned,
+ * value would be a `sha256-v1:<hex>` scheme string) claim; clearing an active
+ * claim would let anyone steal the row. POST-CHECK asserts the target is gone and
+ * every OTHER field is byte-identical (no collateral mutation).
+ *
+ * Touches only CLAIMS_KEY (a separate Redis key from LEADERBOARD_KEY/histKey), so
+ * the card + history are untouched and the owner's row survives intact.
+ */
+export async function clearClaim(redis: RedisLike, handle: string): Promise<ClearClaimResult> {
+  const canonical = canonicalHandle(handle);
+  if (canonical == null) {
+    throw new Error(`[clear-claim] "${handle}" does not canonicalize to a valid handle`);
+  }
+
+  const before = (await redis.hgetall<string>(CLAIMS_KEY)) ?? {};
+  const current = before[canonical];
+
+  if (current == null) {
+    throw new Error(
+      `[clear-claim] refusing: claim "${canonical}" is ABSENT (already clearable) — nothing to do`,
+    );
+  }
+  if (current !== LEGACY_LOCKED_STRING) {
+    throw new Error(
+      `[clear-claim] refusing: claim "${canonical}" is "${current}", not "${LEGACY_LOCKED_STRING}". ` +
+        "Clearing an active/owned claim would let anyone steal the row.",
+    );
+  }
+
+  await redis.hdel(CLAIMS_KEY, canonical);
+
+  const after = (await redis.hgetall<string>(CLAIMS_KEY)) ?? {};
+  if (after[canonical] != null) {
+    throw new Error(`[clear-claim] POST-CHECK FAILED: "${canonical}" still present after HDEL`);
+  }
+  for (const [field, value] of Object.entries(before)) {
+    if (field === canonical) continue;
+    if (after[field] !== value) {
+      throw new Error(
+        `[clear-claim] POST-CHECK FAILED: collateral change on "${field}" ("${value}" → "${after[field]}")`,
+      );
+    }
+  }
+  for (const field of Object.keys(after)) {
+    if (!(field in before)) {
+      throw new Error(`[clear-claim] POST-CHECK FAILED: unexpected new field "${field}"`);
+    }
+  }
+
+  return { canonical, before, after };
+}
+
 // ── File path ───────────────────────────────────────────────────────────────
 
 const DATA_DIR = (cwd: string): string => path.join(cwd, ".data");
